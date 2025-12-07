@@ -49,20 +49,20 @@ export default function CompanyDetailPage() {
   }, [user, authLoading, router]);
 
   useEffect(() => {
-    if (id && user) {
-      fetchCompanyData();
+    if (id && typeof id === 'string' && user) {
+      fetchCompanyData(id);
     }
   }, [id, user]);
 
-  const fetchCompanyData = async () => {
+  const fetchCompanyData = async (companyId: string) => {
     setLoading(true);
     const { data: companyData, error: companyError } = await supabase
       .from("companies")
       .select("*")
-      .eq("id", id)
+      .eq("id", companyId)
       .single();
 
-    if (companyError) {
+    if (companyError || !companyData) {
       setError("Company not found");
       setLoading(false);
       return;
@@ -80,7 +80,7 @@ export default function CompanyDetailPage() {
     const { data: contactsData } = await supabase
       .from("contacts")
       .select("*")
-      .eq("company_id", id)
+      .eq("company_id", companyId)
       .order("name");
 
     if (contactsData) {
@@ -93,6 +93,8 @@ export default function CompanyDetailPage() {
   const handleUpdateCompany = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    if (typeof id !== 'string') return;
 
     const { error: updateError } = await supabase
       .from("companies")
@@ -110,12 +112,13 @@ export default function CompanyDetailPage() {
       return;
     }
 
-    await fetchCompanyData();
+    await fetchCompanyData(id);
     setIsEditing(false);
   };
 
   const handleSaveContact = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (typeof id !== 'string') return;
 
     if (editingContact) {
       const { error } = await supabase
@@ -135,7 +138,7 @@ export default function CompanyDetailPage() {
       }
     } else {
       const { error } = await supabase.from("contacts").insert({
-        company_id: id as string,
+        company_id: id,
         name: contactFormData.name,
         email: contactFormData.email || null,
         phone: contactFormData.phone || null,
@@ -149,7 +152,7 @@ export default function CompanyDetailPage() {
       }
     }
 
-    await fetchCompanyData();
+    await fetchCompanyData(id);
     setContactFormOpen(false);
     setEditingContact(null);
     resetContactForm();
@@ -157,6 +160,7 @@ export default function CompanyDetailPage() {
 
   const handleDeleteContact = async (contactId: string) => {
     if (!confirm("Are you sure you want to delete this contact?")) return;
+    if (typeof id !== 'string') return;
 
     const { error } = await supabase
       .from("contacts")
@@ -168,7 +172,7 @@ export default function CompanyDetailPage() {
       return;
     }
 
-    await fetchCompanyData();
+    await fetchCompanyData(id);
   };
 
   const resetContactForm = () => {
