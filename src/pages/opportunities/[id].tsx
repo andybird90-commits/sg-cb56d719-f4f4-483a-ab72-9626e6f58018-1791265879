@@ -71,10 +71,7 @@ export default function OpportunityDetailPage() {
       .select(`
         *,
         companies!opportunities_company_id_fkey (
-          id,
-          name,
-          short_name,
-          status
+          *
         ),
         contacts!opportunities_contact_id_fkey (
           id,

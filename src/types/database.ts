@@ -189,6 +189,12 @@ export interface Database {
             columns: ["contact_id"]
             referencedRelation: "contacts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_linked_project_id_fkey"
+            columns: ["linked_project_id"]
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
           }
         ]
       }
