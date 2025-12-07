@@ -74,16 +74,10 @@ export default function OpportunityDetailPage() {
           *
         ),
         contacts!opportunities_contact_id_fkey (
-          id,
-          name,
-          email,
-          phone
+          *
         ),
         projects!opportunities_linked_project_id_fkey (
-          id,
-          code,
-          name,
-          status
+          *
         )
       `)
       .eq("id", oppId)
