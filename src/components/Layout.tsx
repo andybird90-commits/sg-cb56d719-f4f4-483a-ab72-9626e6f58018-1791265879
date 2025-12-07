@@ -2,7 +2,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
-import { Building2, Users, LogOut, LayoutDashboard } from "lucide-react";
+import { Building2, Users, LogOut, LayoutDashboard, Target, Briefcase, Calendar, Clock } from "lucide-react";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { user, profile, signOut } = useAuth();
@@ -52,6 +52,46 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   >
                     <Users className="w-4 h-4" />
                     Contacts
+                  </Button>
+                </Link>
+                <Link href="/opportunities">
+                  <Button
+                    variant={router.pathname.startsWith("/opportunities") ? "default" : "ghost"}
+                    size="sm"
+                    className="gap-2"
+                  >
+                    <Target className="w-4 h-4" />
+                    Opportunities
+                  </Button>
+                </Link>
+                <Link href="/projects">
+                  <Button
+                    variant={router.pathname.startsWith("/projects") ? "default" : "ghost"}
+                    size="sm"
+                    className="gap-2"
+                  >
+                    <Briefcase className="w-4 h-4" />
+                    Projects
+                  </Button>
+                </Link>
+                <Link href="/pipeline">
+                  <Button
+                    variant={router.pathname === "/pipeline" ? "default" : "ghost"}
+                    size="sm"
+                    className="gap-2"
+                  >
+                    <Calendar className="w-4 h-4" />
+                    Pipeline
+                  </Button>
+                </Link>
+                <Link href="/timesheets">
+                  <Button
+                    variant={router.pathname.startsWith("/timesheets") ? "default" : "ghost"}
+                    size="sm"
+                    className="gap-2"
+                  >
+                    <Clock className="w-4 h-4" />
+                    Timesheets
                   </Button>
                 </Link>
               </div>
