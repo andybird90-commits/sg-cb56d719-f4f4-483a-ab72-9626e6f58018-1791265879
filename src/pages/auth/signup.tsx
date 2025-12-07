@@ -40,20 +40,11 @@ export default function SignUpPage() {
     }
 
     if (data.user) {
-      const { error: profileError } = await supabase.from("profiles").insert({
-        id: data.user.id,
-        full_name: formData.fullName,
-        email: formData.email,
-        role: "user" as const,
-      });
-
-      if (profileError) {
-        setError("Account created but profile setup failed. Please contact admin.");
-        setLoading(false);
-        return;
-      }
-
-      router.push("/dashboard");
+      // Profile is automatically created by database trigger
+      // Wait a moment for trigger to complete, then redirect
+      setTimeout(() => {
+        router.push("/dashboard");
+      }, 500);
     }
 
     setLoading(false);
