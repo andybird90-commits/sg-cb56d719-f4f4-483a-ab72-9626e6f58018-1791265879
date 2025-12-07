@@ -95,9 +95,7 @@ export default function ProjectDetailPage() {
       .select(`
         *,
         companies!projects_client_company_id_fkey (
-          id,
-          name,
-          short_name
+          *
         )
       `)
       .eq("id", projectId)
