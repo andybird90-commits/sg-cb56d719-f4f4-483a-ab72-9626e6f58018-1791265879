@@ -48,6 +48,21 @@ export default function NewProjectPage() {
     }
   }, [user]);
 
+  // Handle query params for converting opportunity to project
+  useEffect(() => {
+    if (router.isReady && router.query) {
+      const { opportunity_id, client_company_id, name, fee } = router.query;
+      
+      setFormData(prev => ({
+        ...prev,
+        opportunity_id: (opportunity_id as string) || prev.opportunity_id,
+        client_company_id: (client_company_id as string) || prev.client_company_id,
+        name: (name as string) || prev.name,
+        agreed_fee_value: (fee as string) || prev.agreed_fee_value,
+      }));
+    }
+  }, [router.isReady, router.query]);
+
   const fetchCompanies = async () => {
     const { data } = await supabase
       .from("companies")
