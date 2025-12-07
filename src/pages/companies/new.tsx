@@ -44,7 +44,7 @@ export default function NewCompanyPage() {
       name: formData.name,
       short_name: formData.short_name || null,
       sector: formData.sector || null,
-      status: formData.status,
+      status: formData.status as "active" | "prospect" | "inactive",
       notes: formData.notes || null,
     });
 

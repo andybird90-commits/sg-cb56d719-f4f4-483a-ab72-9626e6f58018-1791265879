@@ -44,7 +44,7 @@ export default function SignUpPage() {
         id: data.user.id,
         full_name: formData.fullName,
         email: formData.email,
-        role: "user",
+        role: "user" as const,
       });
 
       if (profileError) {
