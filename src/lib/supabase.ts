@@ -15,3 +15,5 @@ export type ProjectActivity = Database["public"]["Tables"]["project_activities"]
 export type Variation = Database["public"]["Tables"]["variations"]["Row"];
 export type Timesheet = Database["public"]["Tables"]["timesheets"]["Row"];
 export type SubcontractorCost = Database["public"]["Tables"]["subcontractor_costs"]["Row"];
+export type MonthlyBudget = Database["public"]["Tables"]["monthly_budgets"]["Row"];
+export type Absence = Database["public"]["Tables"]["absences"]["Row"];

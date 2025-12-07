@@ -441,13 +441,96 @@ export interface Database {
           {
             foreignKeyName: "subcontractor_costs_project_id_fkey"
             columns: ["project_id"]
+            isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "subcontractor_costs_variation_id_fkey"
             columns: ["variation_id"]
+            isOneToOne: false
             referencedRelation: "variations"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      monthly_budgets: {
+        Row: {
+          id: string
+          year: number
+          month: number
+          budget_revenue: number
+          budget_cost: number | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          year: number
+          month: number
+          budget_revenue: number
+          budget_cost?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          year?: number
+          month?: number
+          budget_revenue?: number
+          budget_cost?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      absences: {
+        Row: {
+          id: string
+          user_id: string
+          type: "holiday" | "sick" | "other"
+          start_date: string
+          end_date: string
+          notes: string | null
+          approved_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          type: "holiday" | "sick" | "other"
+          start_date: string
+          end_date: string
+          notes?: string | null
+          approved_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          type?: "holiday" | "sick" | "other"
+          start_date?: string
+          end_date?: string
+          notes?: string | null
+          approved_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "absences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "absences_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           }
         ]
