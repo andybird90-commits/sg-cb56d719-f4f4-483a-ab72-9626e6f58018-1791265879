@@ -16,6 +16,8 @@ export interface Database {
           email: string
           role: "admin" | "director" | "user"
           default_hourly_cost_rate: number | null
+          annual_holiday_days: number
+          holiday_cost_rate: number | null
           is_active: boolean
           created_at: string
           updated_at: string
@@ -26,6 +28,8 @@ export interface Database {
           email: string
           role?: "admin" | "director" | "user"
           default_hourly_cost_rate?: number | null
+          annual_holiday_days?: number
+          holiday_cost_rate?: number | null
           is_active?: boolean
           created_at?: string
           updated_at?: string
@@ -36,6 +40,8 @@ export interface Database {
           email?: string
           role?: "admin" | "director" | "user"
           default_hourly_cost_rate?: number | null
+          annual_holiday_days?: number
+          holiday_cost_rate?: number | null
           is_active?: boolean
           created_at?: string
           updated_at?: string

@@ -4,8 +4,9 @@ import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Users, Target, ArrowRight } from "lucide-react";
+import { Building2, Users, Target, ArrowRight, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 interface MonthPipeline {
   month: string;
@@ -15,13 +16,25 @@ interface MonthPipeline {
   budget: number;
 }
 
+interface CurrentAbsence {
+  id: string;
+  type: string;
+  start_date: string;
+  end_date: string;
+  profiles?: {
+    full_name: string;
+  };
+}
+
 function DashboardContent() {
   const router = useRouter();
   const [pipelineData, setPipelineData] = useState<MonthPipeline[]>([]);
+  const [currentAbsences, setCurrentAbsences] = useState<CurrentAbsence[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchPipelineData();
+    fetchCurrentAbsences();
   }, []);
 
   const fetchPipelineData = async () => {
@@ -76,11 +89,63 @@ function DashboardContent() {
     setLoading(false);
   };
 
+  const fetchCurrentAbsences = async () => {
+    // Get current week (Monday to Sunday)
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + mondayOffset);
+    monday.setHours(0, 0, 0, 0);
+    
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+
+    const mondayStr = monday.toISOString().split("T")[0];
+    const sundayStr = sunday.toISOString().split("T")[0];
+
+    // Fetch absences that overlap with current week
+    const { data } = await supabase
+      .from("absences")
+      .select(`
+        *,
+        profiles!absences_user_id_fkey (
+          full_name
+        )
+      `)
+      .not("approved_by", "is", null)
+      .or(`and(start_date.lte.${sundayStr},end_date.gte.${mondayStr})`);
+
+    setCurrentAbsences(data || []);
+  };
+
   const formatCurrency = (value: number) => {
     if (value === 0) return "£0";
     if (value >= 1000000) return `£${(value / 1000000).toFixed(1)}M`;
     if (value >= 1000) return `£${(value / 1000).toFixed(0)}k`;
     return `£${value.toFixed(0)}`;
+  };
+
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+    });
+  };
+
+  const getTypeColor = (type: string) => {
+    switch (type) {
+      case "holiday":
+        return "bg-blue-100 text-blue-800";
+      case "sick":
+        return "bg-red-100 text-red-800";
+      case "other":
+        return "bg-slate-100 text-slate-800";
+      default:
+        return "bg-slate-100 text-slate-800";
+    }
   };
 
   const maxValue = Math.max(
@@ -150,6 +215,41 @@ function DashboardContent() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Who's Off This Week Widget */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <Calendar className="w-5 h-5 text-slate-600" />
+              <CardTitle>Who's Off This Week</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {currentAbsences.length === 0 ? (
+              <div className="text-center py-4 text-slate-600">
+                No current absences this week.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {currentAbsences.map((absence) => (
+                  <div key={absence.id} className="flex items-center justify-between p-3 bg-slate-50 rounded">
+                    <div className="flex items-center gap-3">
+                      <div className="font-medium text-slate-900">
+                        {absence.profiles?.full_name}
+                      </div>
+                      <Badge className={getTypeColor(absence.type)}>
+                        {absence.type}
+                      </Badge>
+                    </div>
+                    <div className="text-sm text-slate-600">
+                      {formatDate(absence.start_date)} → {formatDate(absence.end_date)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Pipeline Chart */}
         <Card>

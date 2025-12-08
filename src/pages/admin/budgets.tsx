@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, Edit, Trash2 } from "lucide-react";
+import Link from "next/link";
 
 interface MonthlyBudget {
   id: string;
@@ -159,90 +160,95 @@ function AdminBudgetsContent() {
             <h1 className="text-3xl font-bold text-slate-900">Monthly Budgets</h1>
             <p className="text-slate-600 mt-1">Set revenue and cost targets</p>
           </div>
-          <Dialog open={formOpen} onOpenChange={setFormOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2" onClick={() => {
-                setEditingBudget(null);
-                setFormData({
-                  year: new Date().getFullYear().toString(),
-                  month: (new Date().getMonth() + 1).toString(),
-                  budget_revenue: "",
-                  budget_cost: "",
-                });
-              }}>
-                <Plus className="w-4 h-4" />
-                New Budget
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{editingBudget ? "Edit Budget" : "New Monthly Budget"}</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+          <div className="flex gap-3">
+            <Link href="/admin">
+              <Button variant="outline">User Management</Button>
+            </Link>
+            <Dialog open={formOpen} onOpenChange={setFormOpen}>
+              <DialogTrigger asChild>
+                <Button className="gap-2" onClick={() => {
+                  setEditingBudget(null);
+                  setFormData({
+                    year: new Date().getFullYear().toString(),
+                    month: (new Date().getMonth() + 1).toString(),
+                    budget_revenue: "",
+                    budget_cost: "",
+                  });
+                }}>
+                  <Plus className="w-4 h-4" />
+                  New Budget
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>{editingBudget ? "Edit Budget" : "New Monthly Budget"}</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="year">Year *</Label>
+                      <Input
+                        id="year"
+                        type="number"
+                        min="2020"
+                        max="2100"
+                        value={formData.year}
+                        onChange={(e) => setFormData({ ...formData, year: e.target.value })}
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="month">Month *</Label>
+                      <Input
+                        id="month"
+                        type="number"
+                        min="1"
+                        max="12"
+                        value={formData.month}
+                        onChange={(e) => setFormData({ ...formData, month: e.target.value })}
+                        required
+                      />
+                    </div>
+                  </div>
+
                   <div className="space-y-2">
-                    <Label htmlFor="year">Year *</Label>
+                    <Label htmlFor="budget_revenue">Budget Revenue (£) *</Label>
                     <Input
-                      id="year"
+                      id="budget_revenue"
                       type="number"
-                      min="2020"
-                      max="2100"
-                      value={formData.year}
-                      onChange={(e) => setFormData({ ...formData, year: e.target.value })}
+                      step="0.01"
+                      min="0"
+                      value={formData.budget_revenue}
+                      onChange={(e) => setFormData({ ...formData, budget_revenue: e.target.value })}
                       required
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="month">Month *</Label>
+                    <Label htmlFor="budget_cost">Budget Cost (£)</Label>
                     <Input
-                      id="month"
+                      id="budget_cost"
                       type="number"
-                      min="1"
-                      max="12"
-                      value={formData.month}
-                      onChange={(e) => setFormData({ ...formData, month: e.target.value })}
-                      required
+                      step="0.01"
+                      min="0"
+                      value={formData.budget_cost}
+                      onChange={(e) => setFormData({ ...formData, budget_cost: e.target.value })}
                     />
                   </div>
-                </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="budget_revenue">Budget Revenue (£) *</Label>
-                  <Input
-                    id="budget_revenue"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.budget_revenue}
-                    onChange={(e) => setFormData({ ...formData, budget_revenue: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="budget_cost">Budget Cost (£)</Label>
-                  <Input
-                    id="budget_cost"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.budget_cost}
-                    onChange={(e) => setFormData({ ...formData, budget_cost: e.target.value })}
-                  />
-                </div>
-
-                <div className="flex gap-3">
-                  <Button type="submit">
-                    {editingBudget ? "Update" : "Create"}
-                  </Button>
-                  <Button type="button" variant="outline" onClick={() => setFormOpen(false)}>
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+                  <div className="flex gap-3">
+                    <Button type="submit">
+                      {editingBudget ? "Update" : "Create"}
+                    </Button>
+                    <Button type="button" variant="outline" onClick={() => setFormOpen(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
         <Card>

@@ -11,7 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit, Trash2 } from "lucide-react";
+import { Plus, Edit, Trash2, Calendar } from "lucide-react";
+import Link from "next/link";
 
 interface Absence {
   id: string;
@@ -26,9 +27,14 @@ interface Absence {
 }
 
 function MyAbsencesContent() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [absences, setAbsences] = useState<Absence[]>([]);
   const [loading, setLoading] = useState(true);
+  const [holidayStats, setHolidayStats] = useState({
+    annual: 0,
+    taken: 0,
+    remaining: 0,
+  });
   
   const [formOpen, setFormOpen] = useState(false);
   const [editingAbsence, setEditingAbsence] = useState<Absence | null>(null);
@@ -39,11 +45,14 @@ function MyAbsencesContent() {
     notes: "",
   });
 
+  const isAdmin = profile?.role === "admin" || profile?.role === "director";
+
   useEffect(() => {
-    if (user) {
+    if (user && profile) {
       fetchAbsences();
+      calculateHolidayBalance();
     }
-  }, [user]);
+  }, [user, profile]);
 
   const fetchAbsences = async () => {
     if (!user) return;
@@ -62,6 +71,39 @@ function MyAbsencesContent() {
 
     setAbsences(data || []);
     setLoading(false);
+  };
+
+  const calculateHolidayBalance = async () => {
+    if (!user || !profile) return;
+
+    const currentYear = new Date().getFullYear();
+    const annual = (profile as any).annual_holiday_days || 0;
+
+    // Get approved holidays for current year
+    const { data: holidays } = await supabase
+      .from("absences")
+      .select("start_date, end_date")
+      .eq("user_id", user.id)
+      .eq("type", "holiday")
+      .not("approved_by", "is", null)
+      .gte("start_date", `${currentYear}-01-01`)
+      .lte("start_date", `${currentYear}-12-31`);
+
+    let taken = 0;
+    if (holidays) {
+      holidays.forEach((holiday) => {
+        const start = new Date(holiday.start_date);
+        const end = new Date(holiday.end_date);
+        const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        taken += days;
+      });
+    }
+
+    setHolidayStats({
+      annual,
+      taken,
+      remaining: annual - taken,
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -101,6 +143,7 @@ function MyAbsencesContent() {
     }
 
     await fetchAbsences();
+    await calculateHolidayBalance();
     setFormOpen(false);
     setEditingAbsence(null);
     setFormData({
@@ -146,6 +189,7 @@ function MyAbsencesContent() {
     }
 
     await fetchAbsences();
+    await calculateHolidayBalance();
   };
 
   const formatDate = (date: string) => {
@@ -187,89 +231,124 @@ function MyAbsencesContent() {
             <h1 className="text-3xl font-bold text-slate-900">My Absences</h1>
             <p className="text-slate-600 mt-1">Request and manage time off</p>
           </div>
-          <Dialog open={formOpen} onOpenChange={setFormOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2" onClick={() => {
-                setEditingAbsence(null);
-                setFormData({
-                  type: "holiday",
-                  start_date: "",
-                  end_date: "",
-                  notes: "",
-                });
-              }}>
-                <Plus className="w-4 h-4" />
-                Request Absence
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{editingAbsence ? "Edit Absence" : "Request Absence"}</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="type">Type *</Label>
-                  <Select
-                    value={formData.type}
-                    onValueChange={(value) => setFormData({ ...formData, type: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="holiday">Holiday</SelectItem>
-                      <SelectItem value="sick">Sick</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
+          <div className="flex gap-3">
+            {isAdmin && (
+              <Link href="/absences/heatmap">
+                <Button variant="outline" className="gap-2">
+                  <Calendar className="w-4 h-4" />
+                  Team Heatmap
+                </Button>
+              </Link>
+            )}
+            <Dialog open={formOpen} onOpenChange={setFormOpen}>
+              <DialogTrigger asChild>
+                <Button className="gap-2" onClick={() => {
+                  setEditingAbsence(null);
+                  setFormData({
+                    type: "holiday",
+                    start_date: "",
+                    end_date: "",
+                    notes: "",
+                  });
+                }}>
+                  <Plus className="w-4 h-4" />
+                  Request Absence
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>{editingAbsence ? "Edit Absence" : "Request Absence"}</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="start_date">Start Date *</Label>
-                    <Input
-                      id="start_date"
-                      type="date"
-                      value={formData.start_date}
-                      onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                      required
-                    />
+                    <Label htmlFor="type">Type *</Label>
+                    <Select
+                      value={formData.type}
+                      onValueChange={(value) => setFormData({ ...formData, type: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="holiday">Holiday</SelectItem>
+                        <SelectItem value="sick">Sick</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="start_date">Start Date *</Label>
+                      <Input
+                        id="start_date"
+                        type="date"
+                        value={formData.start_date}
+                        onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="end_date">End Date *</Label>
+                      <Input
+                        id="end_date"
+                        type="date"
+                        value={formData.end_date}
+                        onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                        required
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="end_date">End Date *</Label>
-                    <Input
-                      id="end_date"
-                      type="date"
-                      value={formData.end_date}
-                      onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                      required
+                    <Label htmlFor="notes">Notes</Label>
+                    <Textarea
+                      id="notes"
+                      value={formData.notes}
+                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                      rows={3}
                     />
                   </div>
-                </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="notes">Notes</Label>
-                  <Textarea
-                    id="notes"
-                    value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    rows={3}
-                  />
-                </div>
-
-                <div className="flex gap-3">
-                  <Button type="submit">
-                    {editingAbsence ? "Update" : "Submit Request"}
-                  </Button>
-                  <Button type="button" variant="outline" onClick={() => setFormOpen(false)}>
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+                  <div className="flex gap-3">
+                    <Button type="submit">
+                      {editingAbsence ? "Update" : "Submit Request"}
+                    </Button>
+                    <Button type="button" variant="outline" onClick={() => setFormOpen(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
+
+        {/* Holiday Balance Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Holiday Balance ({new Date().getFullYear()})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <div className="text-sm text-slate-500 mb-1">Annual Holiday Entitlement</div>
+                <div className="text-2xl font-bold text-slate-900">{holidayStats.annual} days</div>
+              </div>
+              <div>
+                <div className="text-sm text-slate-500 mb-1">Holiday Taken This Year</div>
+                <div className="text-2xl font-bold text-blue-600">{holidayStats.taken} days</div>
+              </div>
+              <div>
+                <div className="text-sm text-slate-500 mb-1">Holiday Remaining</div>
+                <div className={`text-2xl font-bold ${holidayStats.remaining < 5 ? "text-red-600" : "text-green-600"}`}>
+                  {holidayStats.remaining} days
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
