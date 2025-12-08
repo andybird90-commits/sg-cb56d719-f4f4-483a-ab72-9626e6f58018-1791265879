@@ -77,33 +77,107 @@ function DashboardContent() {
   const fetchPipelineData = async () => {
     const months: MonthPipeline[] = [];
     const currentDate = new Date();
+    
+    // Build 12-month window
+    const windowMonths: { start: Date; end: Date; label: string }[] = [];
+    for (let i = 0; i < 12; i++) {
+      const monthDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + i, 1);
+      const year = monthDate.getFullYear();
+      const month = monthDate.getMonth();
+      const monthStart = new Date(year, month, 1);
+      const monthEnd = new Date(year, month + 1, 0); // Last day of month
+      
+      windowMonths.push({
+        start: monthStart,
+        end: monthEnd,
+        label: monthDate.toLocaleDateString("en-GB", { month: "short", year: "2-digit" }),
+      });
+    }
 
+    const windowStart = windowMonths[0].start;
+    const windowEnd = windowMonths[windowMonths.length - 1].end;
+
+    // Fetch all opportunities with date ranges
+    const { data: oppsData } = await supabase
+      .from("opportunities")
+      .select("stage, expected_fee_value, expected_start_date, expected_end_date, tender_due_date");
+
+    // Process each opportunity with pro-rated allocation
+    const monthlyAllocations: Record<number, { secured: number; highPotential: number; bid: number }> = {};
+    
+    // Initialize all months
+    for (let i = 0; i < 12; i++) {
+      monthlyAllocations[i] = { secured: 0, highPotential: 0, bid: 0 };
+    }
+
+    if (oppsData) {
+      oppsData.forEach((opp) => {
+        // Determine start date
+        let startDate: Date | null = null;
+        if (opp.expected_start_date) {
+          startDate = new Date(opp.expected_start_date);
+        } else if (opp.tender_due_date) {
+          startDate = new Date(opp.tender_due_date);
+        }
+
+        if (!startDate || isNaN(startDate.getTime())) return; // Skip if no valid start
+
+        // Determine end date
+        let endDate: Date | null = null;
+        if (opp.expected_end_date) {
+          endDate = new Date(opp.expected_end_date);
+        } else {
+          // Treat as single-month item
+          endDate = new Date(startDate);
+        }
+
+        if (!endDate || isNaN(endDate.getTime())) return; // Skip if no valid end
+
+        // Check if opportunity overlaps with 12-month window
+        if (endDate < windowStart || startDate > windowEnd) {
+          return; // Entirely outside window
+        }
+
+        // Clamp to window
+        const effectiveStart = startDate < windowStart ? windowStart : startDate;
+        const effectiveEnd = endDate > windowEnd ? windowEnd : endDate;
+
+        // Calculate total duration in days (inclusive)
+        const totalDays = Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+        const feeValue = opp.expected_fee_value || 0;
+
+        // Allocate to each month based on overlap
+        windowMonths.forEach((monthWindow, monthIndex) => {
+          // Calculate overlap between opportunity and this month
+          const overlapStart = effectiveStart > monthWindow.start ? effectiveStart : monthWindow.start;
+          const overlapEnd = effectiveEnd < monthWindow.end ? effectiveEnd : monthWindow.end;
+
+          if (overlapEnd >= overlapStart) {
+            // Calculate days in this month
+            const overlapDays = Math.ceil((overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+            
+            // Pro-rate the fee value
+            const monthAllocation = feeValue * (overlapDays / totalDays);
+
+            // Add to correct bucket based on stage
+            if (opp.stage === "secured") {
+              monthlyAllocations[monthIndex].secured += monthAllocation;
+            } else if (opp.stage === "high_potential") {
+              monthlyAllocations[monthIndex].highPotential += monthAllocation;
+            } else if (opp.stage === "bid") {
+              monthlyAllocations[monthIndex].bid += monthAllocation;
+            }
+          }
+        });
+      });
+    }
+
+    // Build final month data with budgets
     for (let i = 0; i < 12; i++) {
       const monthDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + i, 1);
       const year = monthDate.getFullYear();
       const month = monthDate.getMonth() + 1;
-      const monthStart = new Date(year, month - 1, 1).toISOString().split("T")[0];
-      const monthEnd = new Date(year, month, 0).toISOString().split("T")[0];
-
-      // Get opportunities for this month
-      const { data: oppsData } = await supabase
-        .from("opportunities")
-        .select("stage, expected_fee_value, expected_start_date")
-        .gte("expected_start_date", monthStart)
-        .lte("expected_start_date", monthEnd);
-
-      let secured = 0;
-      let highPotential = 0;
-      let bid = 0;
-
-      if (oppsData) {
-        oppsData.forEach((opp) => {
-          const value = opp.expected_fee_value || 0;
-          if (opp.stage === "secured") secured += value;
-          else if (opp.stage === "high_potential") highPotential += value;
-          else if (opp.stage === "bid") bid += value;
-        });
-      }
 
       // Get budget for this month
       const { data: budgetData } = await supabase
@@ -114,10 +188,10 @@ function DashboardContent() {
         .maybeSingle();
 
       months.push({
-        month: monthDate.toLocaleDateString("en-GB", { month: "short", year: "2-digit" }),
-        secured,
-        highPotential,
-        bid,
+        month: windowMonths[i].label,
+        secured: monthlyAllocations[i].secured,
+        highPotential: monthlyAllocations[i].highPotential,
+        bid: monthlyAllocations[i].bid,
         budget: budgetData?.budget_revenue || 0,
       });
     }
