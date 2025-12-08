@@ -65,6 +65,8 @@ function MyTimesheetsContent() {
     notes: "",
   });
 
+  const canEdit = profile?.role === "admin" || profile?.role === "director";
+
   function getWeekStart(date: Date) {
     const d = new Date(date);
     const day = d.getDay();
@@ -316,7 +318,7 @@ function MyTimesheetsContent() {
                 <div className="space-y-2">
                   <Label htmlFor="project_id">Project *</Label>
                   <Select
-                    value={formData.project_id}
+                    value={formData.project_id ?? undefined}
                     onValueChange={(value) => setFormData({ ...formData, project_id: value, activity_id: "", variation_id: "" })}
                   >
                     <SelectTrigger>
@@ -336,7 +338,7 @@ function MyTimesheetsContent() {
                   <div className="space-y-2">
                     <Label htmlFor="activity_id">Activity (Optional)</Label>
                     <Select
-                      value={formData.activity_id}
+                      value={formData.activity_id ?? undefined}
                       onValueChange={(value) => setFormData({ ...formData, activity_id: value })}
                     >
                       <SelectTrigger>
@@ -358,7 +360,7 @@ function MyTimesheetsContent() {
                   <div className="space-y-2">
                     <Label htmlFor="variation_id">Variation (Optional)</Label>
                     <Select
-                      value={formData.variation_id}
+                      value={formData.variation_id ?? undefined}
                       onValueChange={(value) => setFormData({ ...formData, variation_id: value })}
                     >
                       <SelectTrigger>
