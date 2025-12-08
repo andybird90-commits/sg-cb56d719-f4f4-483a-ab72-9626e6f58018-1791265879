@@ -2,9 +2,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Layout } from "@/components/Layout";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { AlertCircle } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Calendar, BarChart3 } from "lucide-react";
 
 export default function PipelinePage() {
   const { user, loading: authLoading } = useAuth();
@@ -31,51 +31,79 @@ export default function PipelinePage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Pipeline</h1>
-          <p className="text-slate-600 mt-1">Project and opportunity timeline</p>
+          <p className="text-slate-600 mt-1">Project and opportunity timeline visualization</p>
         </div>
 
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Database Setup Required</AlertTitle>
-          <AlertDescription>
-            <p className="mb-2">
-              The Pipeline module requires additional database tables that haven't been set up yet.
-            </p>
-            <p className="mb-2">
-              To enable this feature, please run the SQL migrations from:
-            </p>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li><strong>DATABASE_SETUP_PART_B.md</strong> - Creates opportunities and projects tables</li>
-            </ul>
-            <p className="mt-3 text-sm">
-              After running the migrations, refresh this page to see your pipeline timeline.
-            </p>
-          </AlertDescription>
-        </Alert>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <Calendar className="h-6 w-6 text-blue-600" />
+                </div>
+                <CardTitle>Gantt Chart View</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-slate-600 text-sm mb-4">
+                Visualize your opportunities and projects on a timeline. See start dates, end dates, and status at a glance.
+              </p>
+              <Button 
+                onClick={() => router.push("/pipeline/gantt")}
+                className="w-full"
+              >
+                View Gantt Chart
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-lg transition-shadow opacity-60">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-slate-100 rounded-lg">
+                  <BarChart3 className="h-6 w-6 text-slate-600" />
+                </div>
+                <CardTitle>Pipeline Analytics</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-slate-600 text-sm mb-4">
+                Analyze your pipeline performance with detailed metrics and insights.
+              </p>
+              <Button 
+                disabled
+                variant="outline"
+                className="w-full"
+              >
+                Coming Soon
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
 
         <Card>
-          <CardContent className="p-12 text-center">
-            <div className="text-slate-400 mb-4">
-              <svg
-                className="w-16 h-16 mx-auto"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                />
-              </svg>
+          <CardHeader>
+            <CardTitle>Quick Stats</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center p-4 bg-slate-50 rounded-lg">
+                <div className="text-2xl font-bold text-slate-900">-</div>
+                <div className="text-xs text-slate-600 mt-1">Active Projects</div>
+              </div>
+              <div className="text-center p-4 bg-slate-50 rounded-lg">
+                <div className="text-2xl font-bold text-slate-900">-</div>
+                <div className="text-xs text-slate-600 mt-1">Opportunities</div>
+              </div>
+              <div className="text-center p-4 bg-slate-50 rounded-lg">
+                <div className="text-2xl font-bold text-slate-900">-</div>
+                <div className="text-xs text-slate-600 mt-1">This Quarter</div>
+              </div>
+              <div className="text-center p-4 bg-slate-50 rounded-lg">
+                <div className="text-2xl font-bold text-slate-900">-</div>
+                <div className="text-xs text-slate-600 mt-1">Win Rate</div>
+              </div>
             </div>
-            <h3 className="text-lg font-medium text-slate-900 mb-1">
-              Pipeline View Coming Soon
-            </h3>
-            <p className="text-slate-600 text-sm">
-              Complete the database setup to visualize your opportunities and projects on a timeline
-            </p>
           </CardContent>
         </Card>
       </div>
