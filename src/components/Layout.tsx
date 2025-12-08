@@ -2,7 +2,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
-import { Building2, Users, Target, Briefcase, LogOut, LayoutDashboard } from "lucide-react";
+import { Building2, Users, Target, Briefcase, LogOut, LayoutDashboard, Clock, Calendar } from "lucide-react";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { user, profile, signOut } = useAuth();
@@ -70,6 +70,26 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   >
                     <Briefcase className="w-4 h-4" />
                     Projects
+                  </Button>
+                </Link>
+                <Link href="/timesheets/my">
+                  <Button
+                    variant={router.pathname.startsWith("/timesheets") ? "default" : "ghost"}
+                    size="sm"
+                    className="gap-2"
+                  >
+                    <Clock className="w-4 h-4" />
+                    Timesheets
+                  </Button>
+                </Link>
+                <Link href="/absences/my">
+                  <Button
+                    variant={router.pathname.startsWith("/absences") ? "default" : "ghost"}
+                    size="sm"
+                    className="gap-2"
+                  >
+                    <Calendar className="w-4 h-4" />
+                    Absences
                   </Button>
                 </Link>
               </div>

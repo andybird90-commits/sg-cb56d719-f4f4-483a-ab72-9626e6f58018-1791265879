@@ -1,0 +1,224 @@
+import { RequireAuth } from "@/components/RequireAuth";
+import { Layout } from "@/components/Layout";
+import { useAuth } from "@/contexts/AuthContext";
+import { useRouter } from "next/router";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Check } from "lucide-react";
+
+interface Absence {
+  id: string;
+  type: string;
+  start_date: string;
+  end_date: string;
+  notes: string | null;
+  approved_by: string | null;
+  profiles?: {
+    full_name: string;
+  };
+  approver?: {
+    full_name: string;
+  };
+}
+
+function TeamAbsencesContent() {
+  const { user, profile } = useAuth();
+  const router = useRouter();
+  const [absences, setAbsences] = useState<Absence[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const canView = profile?.role === "admin" || profile?.role === "director";
+
+  useEffect(() => {
+    if (profile && !canView) {
+      router.push("/absences/my");
+    } else if (canView) {
+      fetchAbsences();
+    }
+  }, [profile, canView, router]);
+
+  const fetchAbsences = async () => {
+    setLoading(true);
+
+    const { data } = await supabase
+      .from("absences")
+      .select(`
+        *,
+        profiles!absences_user_id_fkey (
+          full_name
+        ),
+        approver:profiles!absences_approved_by_fkey (
+          full_name
+        )
+      `)
+      .order("start_date", { ascending: false });
+
+    setAbsences(data || []);
+    setLoading(false);
+  };
+
+  const handleApprove = async (absenceId: string) => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from("absences")
+      .update({ approved_by: user.id })
+      .eq("id", absenceId);
+
+    if (error) {
+      alert("Error approving absence");
+      return;
+    }
+
+    await fetchAbsences();
+  };
+
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const getTypeColor = (type: string) => {
+    switch (type) {
+      case "holiday":
+        return "bg-blue-100 text-blue-800";
+      case "sick":
+        return "bg-red-100 text-red-800";
+      case "other":
+        return "bg-slate-100 text-slate-800";
+      default:
+        return "bg-slate-100 text-slate-800";
+    }
+  };
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center py-12">
+          <div className="text-slate-600">Loading...</div>
+        </div>
+      </Layout>
+    );
+  }
+
+  const pendingAbsences = absences.filter((a) => !a.approved_by);
+  const approvedAbsences = absences.filter((a) => a.approved_by);
+
+  return (
+    <Layout>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900">Team Absences</h1>
+          <p className="text-slate-600 mt-1">Review and approve absence requests</p>
+        </div>
+
+        {pendingAbsences.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Pending Approvals ({pendingAbsences.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {pendingAbsences.map((absence) => (
+                  <div key={absence.id} className="p-4 border rounded-lg">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="font-medium text-slate-900">
+                            {absence.profiles?.full_name}
+                          </div>
+                          <Badge className={getTypeColor(absence.type)}>
+                            {absence.type}
+                          </Badge>
+                          <Badge variant="outline">Pending</Badge>
+                        </div>
+                        <div className="text-sm text-slate-700 mb-1">
+                          {formatDate(absence.start_date)} → {formatDate(absence.end_date)}
+                        </div>
+                        {absence.notes && (
+                          <div className="text-sm text-slate-600 whitespace-pre-wrap">
+                            {absence.notes}
+                          </div>
+                        )}
+                      </div>
+                      <Button size="sm" onClick={() => handleApprove(absence.id)} className="gap-2">
+                        <Check className="w-4 h-4" />
+                        Approve
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        <Card>
+          <CardHeader>
+            <CardTitle>All Absences</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {absences.length === 0 ? (
+              <div className="text-center py-8 text-slate-600">
+                No absence requests yet.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {absences.map((absence) => (
+                  <div key={absence.id} className="p-4 border rounded-lg">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="font-medium text-slate-900">
+                            {absence.profiles?.full_name}
+                          </div>
+                          <Badge className={getTypeColor(absence.type)}>
+                            {absence.type}
+                          </Badge>
+                          {absence.approved_by ? (
+                            <Badge className="bg-green-100 text-green-800">
+                              Approved
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline">Pending</Badge>
+                          )}
+                        </div>
+                        <div className="text-sm text-slate-700 mb-1">
+                          {formatDate(absence.start_date)} → {formatDate(absence.end_date)}
+                        </div>
+                        {absence.notes && (
+                          <div className="text-sm text-slate-600 whitespace-pre-wrap">
+                            {absence.notes}
+                          </div>
+                        )}
+                        {absence.approved_by && absence.approver && (
+                          <div className="text-xs text-slate-500 mt-2">
+                            Approved by {absence.approver.full_name}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </Layout>
+  );
+}
+
+export default function TeamAbsencesPage() {
+  return (
+    <RequireAuth>
+      <TeamAbsencesContent />
+    </RequireAuth>
+  );
+}

@@ -1,5 +1,6 @@
 import { RequireAuth } from "@/components/RequireAuth";
 import { Layout } from "@/components/Layout";
+import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -7,7 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ArrowLeft, Plus, Edit, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 interface Project {
@@ -27,22 +35,90 @@ interface Project {
   };
 }
 
+interface Activity {
+  id: string;
+  name: string;
+  activity_type: string | null;
+  billable: boolean;
+  status: string;
+  notes: string | null;
+}
+
+interface Variation {
+  id: string;
+  code: string;
+  description: string | null;
+  value: number;
+  status: string;
+}
+
+interface SubcontractorCost {
+  id: string;
+  supplier_name: string;
+  description: string | null;
+  cost_amount: number;
+  cost_date: string;
+  variation_id: string | null;
+  variations?: {
+    code: string;
+  };
+}
+
 function ProjectDetailContent() {
+  const { profile } = useAuth();
   const router = useRouter();
   const { id } = router.query;
   const [project, setProject] = useState<Project | null>(null);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [variations, setVariations] = useState<Variation[]>([]);
+  const [costs, setCosts] = useState<SubcontractorCost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Activity form state
+  const [activityFormOpen, setActivityFormOpen] = useState(false);
+  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
+  const [activityForm, setActivityForm] = useState({
+    name: "",
+    activity_type: "",
+    billable: true,
+    status: "not_started",
+    notes: "",
+  });
+
+  // Variation form state
+  const [variationFormOpen, setVariationFormOpen] = useState(false);
+  const [editingVariation, setEditingVariation] = useState<Variation | null>(null);
+  const [variationForm, setVariationForm] = useState({
+    code: "",
+    description: "",
+    value: "",
+    status: "proposed",
+  });
+
+  // Subcontractor cost form state
+  const [costFormOpen, setCostFormOpen] = useState(false);
+  const [editingCost, setEditingCost] = useState<SubcontractorCost | null>(null);
+  const [costForm, setCostForm] = useState({
+    supplier_name: "",
+    description: "",
+    cost_amount: "",
+    cost_date: "",
+    variation_id: "",
+  });
+
+  const canEdit = profile?.role === "admin" || profile?.role === "director";
+
   useEffect(() => {
     if (id && typeof id === "string") {
-      fetchProject(id);
+      fetchProjectData(id);
     }
   }, [id]);
 
-  const fetchProject = async (projectId: string) => {
+  const fetchProjectData = async (projectId: string) => {
     setLoading(true);
-    const { data, error: fetchError } = await supabase
+    
+    const { data: projectData, error: projectError } = await supabase
       .from("projects")
       .select(`
         *,
@@ -56,14 +132,279 @@ function ProjectDetailContent() {
       .eq("id", projectId)
       .single();
 
-    if (fetchError || !data) {
+    if (projectError || !projectData) {
       setError("Project not found");
       setLoading(false);
       return;
     }
 
-    setProject(data);
+    const { data: activitiesData } = await supabase
+      .from("project_activities")
+      .select("*")
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false });
+
+    const { data: variationsData } = await supabase
+      .from("variations")
+      .select("*")
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false });
+
+    const { data: costsData } = await supabase
+      .from("subcontractor_costs")
+      .select(`
+        *,
+        variations (
+          code
+        )
+      `)
+      .eq("project_id", projectId)
+      .order("cost_date", { ascending: false });
+
+    setProject(projectData);
+    setActivities(activitiesData || []);
+    setVariations(variationsData || []);
+    setCosts(costsData || []);
     setLoading(false);
+  };
+
+  // Activity handlers
+  const handleActivitySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id || typeof id !== "string") return;
+
+    if (editingActivity) {
+      const { error } = await supabase
+        .from("project_activities")
+        .update({
+          name: activityForm.name,
+          activity_type: activityForm.activity_type || null,
+          billable: activityForm.billable,
+          status: activityForm.status as "not_started" | "in_progress" | "complete",
+          notes: activityForm.notes || null,
+        })
+        .eq("id", editingActivity.id);
+
+      if (error) {
+        alert("Error updating activity");
+        return;
+      }
+    } else {
+      const { error } = await supabase
+        .from("project_activities")
+        .insert({
+          project_id: id,
+          name: activityForm.name,
+          activity_type: activityForm.activity_type || null,
+          billable: activityForm.billable,
+          status: activityForm.status as "not_started" | "in_progress" | "complete",
+          notes: activityForm.notes || null,
+        });
+
+      if (error) {
+        alert("Error creating activity");
+        return;
+      }
+    }
+
+    await fetchProjectData(id);
+    setActivityFormOpen(false);
+    setEditingActivity(null);
+    setActivityForm({
+      name: "",
+      activity_type: "",
+      billable: true,
+      status: "not_started",
+      notes: "",
+    });
+  };
+
+  const handleEditActivity = (activity: Activity) => {
+    setEditingActivity(activity);
+    setActivityForm({
+      name: activity.name,
+      activity_type: activity.activity_type || "",
+      billable: activity.billable,
+      status: activity.status,
+      notes: activity.notes || "",
+    });
+    setActivityFormOpen(true);
+  };
+
+  const handleDeleteActivity = async (activityId: string) => {
+    if (!confirm("Delete this activity?")) return;
+
+    const { error } = await supabase
+      .from("project_activities")
+      .delete()
+      .eq("id", activityId);
+
+    if (error) {
+      alert("Error deleting activity");
+      return;
+    }
+
+    if (id && typeof id === "string") {
+      await fetchProjectData(id);
+    }
+  };
+
+  // Variation handlers
+  const handleVariationSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id || typeof id !== "string") return;
+
+    if (editingVariation) {
+      const { error } = await supabase
+        .from("variations")
+        .update({
+          code: variationForm.code,
+          description: variationForm.description || null,
+          value: parseFloat(variationForm.value),
+          status: variationForm.status as "proposed" | "accepted" | "rejected",
+        })
+        .eq("id", editingVariation.id);
+
+      if (error) {
+        alert("Error updating variation");
+        return;
+      }
+    } else {
+      const { error } = await supabase
+        .from("variations")
+        .insert({
+          project_id: id,
+          code: variationForm.code,
+          description: variationForm.description || null,
+          value: parseFloat(variationForm.value),
+          status: variationForm.status as "proposed" | "accepted" | "rejected",
+        });
+
+      if (error) {
+        alert("Error creating variation");
+        return;
+      }
+    }
+
+    await fetchProjectData(id);
+    setVariationFormOpen(false);
+    setEditingVariation(null);
+    setVariationForm({
+      code: "",
+      description: "",
+      value: "",
+      status: "proposed",
+    });
+  };
+
+  const handleEditVariation = (variation: Variation) => {
+    setEditingVariation(variation);
+    setVariationForm({
+      code: variation.code,
+      description: variation.description || "",
+      value: variation.value.toString(),
+      status: variation.status,
+    });
+    setVariationFormOpen(true);
+  };
+
+  const handleDeleteVariation = async (variationId: string) => {
+    if (!confirm("Delete this variation?")) return;
+
+    const { error } = await supabase
+      .from("variations")
+      .delete()
+      .eq("id", variationId);
+
+    if (error) {
+      alert("Error deleting variation");
+      return;
+    }
+
+    if (id && typeof id === "string") {
+      await fetchProjectData(id);
+    }
+  };
+
+  // Subcontractor cost handlers
+  const handleCostSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id || typeof id !== "string") return;
+
+    if (editingCost) {
+      const { error } = await supabase
+        .from("subcontractor_costs")
+        .update({
+          supplier_name: costForm.supplier_name,
+          description: costForm.description || null,
+          cost_amount: parseFloat(costForm.cost_amount),
+          cost_date: costForm.cost_date,
+          variation_id: costForm.variation_id || null,
+        })
+        .eq("id", editingCost.id);
+
+      if (error) {
+        alert("Error updating cost");
+        return;
+      }
+    } else {
+      const { error } = await supabase
+        .from("subcontractor_costs")
+        .insert({
+          project_id: id,
+          supplier_name: costForm.supplier_name,
+          description: costForm.description || null,
+          cost_amount: parseFloat(costForm.cost_amount),
+          cost_date: costForm.cost_date,
+          variation_id: costForm.variation_id || null,
+        });
+
+      if (error) {
+        alert("Error creating cost");
+        return;
+      }
+    }
+
+    await fetchProjectData(id);
+    setCostFormOpen(false);
+    setEditingCost(null);
+    setCostForm({
+      supplier_name: "",
+      description: "",
+      cost_amount: "",
+      cost_date: "",
+      variation_id: "",
+    });
+  };
+
+  const handleEditCost = (cost: SubcontractorCost) => {
+    setEditingCost(cost);
+    setCostForm({
+      supplier_name: cost.supplier_name,
+      description: cost.description || "",
+      cost_amount: cost.cost_amount.toString(),
+      cost_date: cost.cost_date,
+      variation_id: cost.variation_id || "",
+    });
+    setCostFormOpen(true);
+  };
+
+  const handleDeleteCost = async (costId: string) => {
+    if (!confirm("Delete this cost?")) return;
+
+    const { error } = await supabase
+      .from("subcontractor_costs")
+      .delete()
+      .eq("id", costId);
+
+    if (error) {
+      alert("Error deleting cost");
+      return;
+    }
+
+    if (id && typeof id === "string") {
+      await fetchProjectData(id);
+    }
   };
 
   const formatCurrency = (value: number | null) => {
@@ -87,14 +428,20 @@ function ProjectDetailContent() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "live":
+      case "complete":
+      case "accepted":
         return "bg-green-100 text-green-800";
       case "pipeline":
+      case "in_progress":
+      case "proposed":
         return "bg-blue-100 text-blue-800";
       case "on_hold":
+      case "not_started":
         return "bg-yellow-100 text-yellow-800";
       case "completed":
         return "bg-slate-100 text-slate-800";
       case "cancelled":
+      case "rejected":
         return "bg-red-100 text-red-800";
       default:
         return "bg-slate-100 text-slate-800";
@@ -200,16 +547,469 @@ function ProjectDetailContent() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Project Details</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-slate-600 text-center py-8">
-              Activities, variations, and costs will be added in the next phase.
-            </p>
-          </CardContent>
-        </Card>
+        <Tabs defaultValue="activities" className="w-full">
+          <TabsList>
+            <TabsTrigger value="activities">Activities</TabsTrigger>
+            <TabsTrigger value="variations">Variations</TabsTrigger>
+            <TabsTrigger value="costs">Subcontractor Costs</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="activities">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Project Activities</CardTitle>
+                {canEdit && (
+                  <Dialog open={activityFormOpen} onOpenChange={setActivityFormOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" className="gap-2" onClick={() => {
+                        setEditingActivity(null);
+                        setActivityForm({
+                          name: "",
+                          activity_type: "",
+                          billable: true,
+                          status: "not_started",
+                          notes: "",
+                        });
+                      }}>
+                        <Plus className="w-4 h-4" />
+                        New Activity
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>{editingActivity ? "Edit Activity" : "New Activity"}</DialogTitle>
+                      </DialogHeader>
+                      <form onSubmit={handleActivitySubmit} className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="activity_name">Name *</Label>
+                          <Input
+                            id="activity_name"
+                            value={activityForm.name}
+                            onChange={(e) => setActivityForm({ ...activityForm, name: e.target.value })}
+                            required
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="activity_type">Type</Label>
+                          <Input
+                            id="activity_type"
+                            value={activityForm.activity_type}
+                            onChange={(e) => setActivityForm({ ...activityForm, activity_type: e.target.value })}
+                            placeholder="e.g., Design, Review, Coordination"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="status">Status</Label>
+                          <Select
+                            value={activityForm.status}
+                            onValueChange={(value) => setActivityForm({ ...activityForm, status: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="not_started">Not Started</SelectItem>
+                              <SelectItem value="in_progress">In Progress</SelectItem>
+                              <SelectItem value="complete">Complete</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="billable"
+                            checked={activityForm.billable}
+                            onCheckedChange={(checked) => setActivityForm({ ...activityForm, billable: checked === true })}
+                          />
+                          <Label htmlFor="billable">Billable</Label>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="activity_notes">Notes</Label>
+                          <Textarea
+                            id="activity_notes"
+                            value={activityForm.notes}
+                            onChange={(e) => setActivityForm({ ...activityForm, notes: e.target.value })}
+                            rows={3}
+                          />
+                        </div>
+
+                        <div className="flex gap-3">
+                          <Button type="submit">
+                            {editingActivity ? "Update" : "Create"}
+                          </Button>
+                          <Button type="button" variant="outline" onClick={() => setActivityFormOpen(false)}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </CardHeader>
+              <CardContent>
+                {activities.length === 0 ? (
+                  <div className="text-center py-8 text-slate-600">
+                    No activities yet.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {activities.map((activity) => (
+                      <div key={activity.id} className="p-4 border rounded-lg">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <h4 className="font-medium text-slate-900">{activity.name}</h4>
+                              <Badge className={getStatusColor(activity.status)}>
+                                {activity.status.replace("_", " ")}
+                              </Badge>
+                              {activity.billable && (
+                                <Badge variant="outline">Billable</Badge>
+                              )}
+                            </div>
+                            {activity.activity_type && (
+                              <div className="text-sm text-slate-600 mb-1">
+                                Type: {activity.activity_type}
+                              </div>
+                            )}
+                            {activity.notes && (
+                              <div className="text-sm text-slate-600 whitespace-pre-wrap">
+                                {activity.notes}
+                              </div>
+                            )}
+                          </div>
+                          {canEdit && (
+                            <div className="flex gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditActivity(activity)}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteActivity(activity.id)}
+                              >
+                                <Trash2 className="w-4 h-4 text-red-600" />
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="variations">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Variations</CardTitle>
+                {canEdit && (
+                  <Dialog open={variationFormOpen} onOpenChange={setVariationFormOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" className="gap-2" onClick={() => {
+                        setEditingVariation(null);
+                        setVariationForm({
+                          code: "",
+                          description: "",
+                          value: "",
+                          status: "proposed",
+                        });
+                      }}>
+                        <Plus className="w-4 h-4" />
+                        New Variation
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>{editingVariation ? "Edit Variation" : "New Variation"}</DialogTitle>
+                      </DialogHeader>
+                      <form onSubmit={handleVariationSubmit} className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="variation_code">Code *</Label>
+                          <Input
+                            id="variation_code"
+                            value={variationForm.code}
+                            onChange={(e) => setVariationForm({ ...variationForm, code: e.target.value })}
+                            placeholder="e.g., VAR-001"
+                            required
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="variation_description">Description</Label>
+                          <Textarea
+                            id="variation_description"
+                            value={variationForm.description}
+                            onChange={(e) => setVariationForm({ ...variationForm, description: e.target.value })}
+                            rows={3}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="variation_value">Value (£) *</Label>
+                          <Input
+                            id="variation_value"
+                            type="number"
+                            step="0.01"
+                            value={variationForm.value}
+                            onChange={(e) => setVariationForm({ ...variationForm, value: e.target.value })}
+                            required
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="variation_status">Status</Label>
+                          <Select
+                            value={variationForm.status}
+                            onValueChange={(value) => setVariationForm({ ...variationForm, status: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="proposed">Proposed</SelectItem>
+                              <SelectItem value="accepted">Accepted</SelectItem>
+                              <SelectItem value="rejected">Rejected</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="flex gap-3">
+                          <Button type="submit">
+                            {editingVariation ? "Update" : "Create"}
+                          </Button>
+                          <Button type="button" variant="outline" onClick={() => setVariationFormOpen(false)}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </CardHeader>
+              <CardContent>
+                {variations.length === 0 ? (
+                  <div className="text-center py-8 text-slate-600">
+                    No variations yet.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {variations.map((variation) => (
+                      <div key={variation.id} className="p-4 border rounded-lg">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <span className="font-mono text-sm text-slate-500">{variation.code}</span>
+                              <Badge className={getStatusColor(variation.status)}>
+                                {variation.status}
+                              </Badge>
+                            </div>
+                            {variation.description && (
+                              <div className="text-sm text-slate-600 mb-2 whitespace-pre-wrap">
+                                {variation.description}
+                              </div>
+                            )}
+                            <div className="text-lg font-semibold text-slate-900">
+                              {formatCurrency(variation.value)}
+                            </div>
+                          </div>
+                          {canEdit && (
+                            <div className="flex gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditVariation(variation)}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteVariation(variation.id)}
+                              >
+                                <Trash2 className="w-4 h-4 text-red-600" />
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="costs">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Subcontractor Costs</CardTitle>
+                {canEdit && (
+                  <Dialog open={costFormOpen} onOpenChange={setCostFormOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" className="gap-2" onClick={() => {
+                        setEditingCost(null);
+                        setCostForm({
+                          supplier_name: "",
+                          description: "",
+                          cost_amount: "",
+                          cost_date: "",
+                          variation_id: "",
+                        });
+                      }}>
+                        <Plus className="w-4 h-4" />
+                        New Cost
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>{editingCost ? "Edit Cost" : "New Subcontractor Cost"}</DialogTitle>
+                      </DialogHeader>
+                      <form onSubmit={handleCostSubmit} className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="supplier_name">Supplier Name *</Label>
+                          <Input
+                            id="supplier_name"
+                            value={costForm.supplier_name}
+                            onChange={(e) => setCostForm({ ...costForm, supplier_name: e.target.value })}
+                            required
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="cost_description">Description</Label>
+                          <Textarea
+                            id="cost_description"
+                            value={costForm.description}
+                            onChange={(e) => setCostForm({ ...costForm, description: e.target.value })}
+                            rows={3}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="cost_amount">Cost Amount (£) *</Label>
+                            <Input
+                              id="cost_amount"
+                              type="number"
+                              step="0.01"
+                              value={costForm.cost_amount}
+                              onChange={(e) => setCostForm({ ...costForm, cost_amount: e.target.value })}
+                              required
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="cost_date">Date *</Label>
+                            <Input
+                              id="cost_date"
+                              type="date"
+                              value={costForm.cost_date}
+                              onChange={(e) => setCostForm({ ...costForm, cost_date: e.target.value })}
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="cost_variation">Variation (Optional)</Label>
+                          <Select
+                            value={costForm.variation_id}
+                            onValueChange={(value) => setCostForm({ ...costForm, variation_id: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="None" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="">None</SelectItem>
+                              {variations.map((v) => (
+                                <SelectItem key={v.id} value={v.id}>
+                                  {v.code}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="flex gap-3">
+                          <Button type="submit">
+                            {editingCost ? "Update" : "Create"}
+                          </Button>
+                          <Button type="button" variant="outline" onClick={() => setCostFormOpen(false)}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </CardHeader>
+              <CardContent>
+                {costs.length === 0 ? (
+                  <div className="text-center py-8 text-slate-600">
+                    No subcontractor costs yet.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {costs.map((cost) => (
+                      <div key={cost.id} className="p-4 border rounded-lg">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <h4 className="font-medium text-slate-900">{cost.supplier_name}</h4>
+                              {cost.variations && (
+                                <Badge variant="outline">{cost.variations.code}</Badge>
+                              )}
+                            </div>
+                            {cost.description && (
+                              <div className="text-sm text-slate-600 mb-2 whitespace-pre-wrap">
+                                {cost.description}
+                              </div>
+                            )}
+                            <div className="flex items-center gap-4">
+                              <div className="text-lg font-semibold text-slate-900">
+                                {formatCurrency(cost.cost_amount)}
+                              </div>
+                              <div className="text-sm text-slate-500">
+                                {formatDate(cost.cost_date)}
+                              </div>
+                            </div>
+                          </div>
+                          {canEdit && (
+                            <div className="flex gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditCost(cost)}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteCost(cost.id)}
+                              >
+                                <Trash2 className="w-4 h-4 text-red-600" />
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </Layout>
   );
