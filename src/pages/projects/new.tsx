@@ -71,25 +71,41 @@ function NewProjectContent() {
     setLoading(true);
     setError("");
 
-    const { error: insertError } = await supabase.from("projects").insert({
-      code: formData.code,
-      name: formData.name,
-      opportunity_id: formData.opportunity_id || null,
-      client_company_id: formData.client_company_id,
-      start_date: formData.start_date || null,
-      end_date: formData.end_date || null,
-      status: formData.status as "pipeline" | "live" | "on_hold" | "completed" | "cancelled",
-      agreed_fee_value: formData.agreed_fee_value ? parseFloat(formData.agreed_fee_value) : null,
-      notes: formData.notes || null,
-    });
+    try {
+      const payload = {
+        code: formData.code,
+        name: formData.name,
+        client_company_id: formData.client_company_id,
+        status: formData.status.toLowerCase() as "pipeline" | "live" | "on_hold" | "completed" | "cancelled",
+        opportunity_id: formData.opportunity_id || null,
+        start_date: formData.start_date || null,
+        end_date: formData.end_date || null,
+        agreed_fee_value: formData.agreed_fee_value ? parseFloat(formData.agreed_fee_value) : null,
+        notes: formData.notes || null,
+      };
 
-    if (insertError) {
-      setError(insertError.message);
+      const { data, error: insertError } = await supabase
+        .from("projects")
+        .insert(payload)
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error("Insert error:", insertError);
+        setError("Failed to create project: " + insertError.message);
+        setLoading(false);
+        return;
+      }
+
+      // Success
       setLoading(false);
-      return;
+      router.push("/projects");
+      
+    } catch (err) {
+      console.error("Unexpected error:", err);
+      setError("Unexpected error creating project.");
+      setLoading(false);
     }
-
-    router.push("/projects");
   };
 
   return (
