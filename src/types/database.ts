@@ -490,6 +490,43 @@ export interface Database {
         }
         Relationships: []
       }
+      project_monthly_phasing: {
+        Row: {
+          id: string
+          project_id: string
+          year: number
+          month: number
+          revenue_amount: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          year: number
+          month: number
+          revenue_amount: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          year?: number
+          month?: number
+          revenue_amount?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_monthly_phasing_project_id_fkey"
+            columns: ["project_id"]
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       absences: {
         Row: {
           id: string
