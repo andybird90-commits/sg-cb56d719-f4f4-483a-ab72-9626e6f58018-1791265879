@@ -171,7 +171,6 @@ function NewOpportunityContent() {
                       <SelectValue placeholder="Select a contact (optional)" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
                       {contacts.map((contact) => (
                         <SelectItem key={contact.id} value={contact.id}>
                           {contact.name}
