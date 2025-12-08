@@ -1,46 +1,20 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { Layout } from "@/components/Layout";
+import { RequireAuth } from "@/components/RequireAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useRouter } from "next/router";
-import { useEffect } from "react";
 
-export default function DashboardPage() {
-  const { user, profile, loading } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    // Wait for loading to complete
-    if (loading) return;
-
-    // Redirect to signin if not authenticated
-    if (!user) {
-      router.replace("/auth/signin");
-    }
-  }, [user, loading, router]);
-
-  // Show loading state
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-slate-600">Loading...</div>
-      </div>
-    );
-  }
-
-  // Don't render anything if not authenticated (redirect is in progress)
-  if (!user || !profile) {
-    return null;
-  }
+function DashboardContent() {
+  const { profile } = useAuth();
 
   return (
     <Layout>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">
-            Welcome, {profile.full_name}
+            Welcome, {profile?.full_name}
           </h1>
           <p className="text-slate-600 mt-1">
-            Your role: <span className="capitalize font-medium">{profile.role}</span>
+            Your role: <span className="capitalize font-medium">{profile?.role}</span>
           </p>
         </div>
 
@@ -83,5 +57,13 @@ export default function DashboardPage() {
         </div>
       </div>
     </Layout>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <RequireAuth>
+      <DashboardContent />
+    </RequireAuth>
   );
 }

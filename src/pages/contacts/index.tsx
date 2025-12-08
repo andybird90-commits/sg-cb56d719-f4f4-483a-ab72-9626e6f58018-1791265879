@@ -1,6 +1,6 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { Layout } from "@/components/Layout";
-import { useRouter } from "next/router";
+import { RequireAuth } from "@/components/RequireAuth";
 import { useEffect, useState } from "react";
 import { supabase, Contact, Company } from "@/lib/supabase";
 import { Input } from "@/components/ui/input";
@@ -12,25 +12,15 @@ interface ContactWithCompany extends Contact {
   company?: Company;
 }
 
-export default function ContactsPage() {
-  const { user, profile, loading: authLoading } = useAuth();
-  const router = useRouter();
+function ContactsContent() {
   const [contacts, setContacts] = useState<ContactWithCompany[]>([]);
   const [filteredContacts, setFilteredContacts] = useState<ContactWithCompany[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push("/auth/signin");
-    }
-  }, [user, authLoading, router]);
-
-  useEffect(() => {
-    if (user) {
-      fetchContacts();
-    }
-  }, [user]);
+    fetchContacts();
+  }, []);
 
   useEffect(() => {
     filterContacts();
@@ -74,7 +64,7 @@ export default function ContactsPage() {
     setFilteredContacts(filtered);
   };
 
-  if (authLoading || loading) {
+  if (loading) {
     return (
       <Layout>
         <div className="flex items-center justify-center py-12">
@@ -171,5 +161,13 @@ export default function ContactsPage() {
         )}
       </div>
     </Layout>
+  );
+}
+
+export default function ContactsPage() {
+  return (
+    <RequireAuth>
+      <ContactsContent />
+    </RequireAuth>
   );
 }

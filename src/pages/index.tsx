@@ -2,23 +2,21 @@ import { useEffect } from "react";
 import { useRouter } from "next/router";
 import { useAuth } from "@/contexts/AuthContext";
 
-export default function HomePage() {
-  const router = useRouter();
+export default function RootRedirect() {
   const { user, loading } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
-    // Wait for auth to finish loading
-    if (loading) return;
-
-    // Once loaded, redirect based on auth status
-    if (user) {
-      router.replace("/dashboard");
-    } else {
-      router.replace("/auth/signin");
+    if (!loading) {
+      if (user) {
+        router.replace("/dashboard");
+      } else {
+        router.replace("/auth/signin");
+      }
     }
-  }, [user, loading, router]);
+  }, [loading, user, router]);
 
-  // Show loading state while checking auth
+  // Show loading while determining auth state
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
       <div className="text-slate-600">Loading...</div>

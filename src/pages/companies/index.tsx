@@ -1,6 +1,6 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { Layout } from "@/components/Layout";
-import { useRouter } from "next/router";
+import { RequireAuth } from "@/components/RequireAuth";
 import { useEffect, useState } from "react";
 import { supabase, Company } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
@@ -10,9 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Building2 } from "lucide-react";
 import Link from "next/link";
 
-export default function CompaniesPage() {
-  const { user, profile, loading: authLoading } = useAuth();
-  const router = useRouter();
+function CompaniesContent() {
+  const { profile } = useAuth();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [filteredCompanies, setFilteredCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,16 +19,8 @@ export default function CompaniesPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push("/auth/signin");
-    }
-  }, [user, authLoading, router]);
-
-  useEffect(() => {
-    if (user) {
-      fetchCompanies();
-    }
-  }, [user]);
+    fetchCompanies();
+  }, []);
 
   useEffect(() => {
     filterCompanies();
@@ -78,7 +69,7 @@ export default function CompaniesPage() {
     }
   };
 
-  if (authLoading || loading) {
+  if (loading) {
     return (
       <Layout>
         <div className="flex items-center justify-center py-12">
@@ -196,5 +187,13 @@ export default function CompaniesPage() {
         )}
       </div>
     </Layout>
+  );
+}
+
+export default function CompaniesPage() {
+  return (
+    <RequireAuth>
+      <CompaniesContent />
+    </RequireAuth>
   );
 }
