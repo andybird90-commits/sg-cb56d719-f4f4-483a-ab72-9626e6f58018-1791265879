@@ -70,12 +70,20 @@ interface PhasingRow {
   year: number;
   month: number;
   revenue_amount: number;
+  actual_revenue: number | null;
+  invoice_status: string | null;
+  invoice_ref: string | null;
+  invoice_date: string | null;
 }
 
 interface MonthPhasing {
   year: number;
   month: number;
   revenue: number;
+  actualRevenue: number;
+  invoiceStatus: string;
+  invoiceRef: string;
+  invoiceDate: string;
   hasData: boolean;
 }
 
@@ -207,10 +215,10 @@ function ProjectDetailContent() {
     setActivities(activitiesData || []);
     setVariations(variationsData || []);
     setCosts(costsData || []);
-    setPhasingData(phasingDataResult || []);
+    setPhasingData((phasingDataResult as unknown as PhasingRow[]) || []);
     
     // Generate months grid
-    generateMonthsGrid(projectData, phasingDataResult || []);
+    generateMonthsGrid(projectData, (phasingDataResult as unknown as PhasingRow[]) || []);
     
     setLoading(false);
   };
@@ -219,12 +227,10 @@ function ProjectDetailContent() {
     const now = new Date();
     const startDate = proj.start_date ? new Date(proj.start_date) : now;
     
-    // Start from the earlier of project start or current month
     const gridStart = startDate < now ? startDate : now;
     
     const months: MonthPhasing[] = [];
     
-    // Generate 24 months from grid start
     for (let i = 0; i < 24; i++) {
       const date = new Date(gridStart.getFullYear(), gridStart.getMonth() + i, 1);
       const year = date.getFullYear();
@@ -236,6 +242,10 @@ function ProjectDetailContent() {
         year,
         month,
         revenue: existingPhasing?.revenue_amount || 0,
+        actualRevenue: existingPhasing?.actual_revenue || 0,
+        invoiceStatus: existingPhasing?.invoice_status || "none",
+        invoiceRef: existingPhasing?.invoice_ref || "",
+        invoiceDate: existingPhasing?.invoice_date || "",
         hasData: !!existingPhasing,
       });
     }
@@ -243,28 +253,68 @@ function ProjectDetailContent() {
     setMonthsGrid(months);
   };
 
-  const handlePhasingUpdate = async (year: number, month: number, value: number) => {
+  const handlePhasingUpdate = async (
+    year: number, 
+    month: number, 
+    field: "revenue" | "actual" | "invoiceStatus" | "invoiceRef" | "invoiceDate",
+    value: number | string
+  ) => {
     if (!id || typeof id !== "string") return;
     
-    if (value > 0) {
-      // Upsert phasing row
-      const { error } = await supabase
-        .from("project_monthly_phasing")
-        .upsert({
-          project_id: id,
-          year,
-          month,
-          revenue_amount: value,
-        }, {
-          onConflict: "project_id,year,month",
-        });
-      
-      if (error) {
-        alert("Error updating phasing: " + error.message);
-        return;
-      }
-    } else {
-      // Delete phasing row if value is 0
+    // Get current row data
+    const currentRow = monthsGrid.find(m => m.year === year && m.month === month);
+    if (!currentRow) return;
+    
+    // Build update object
+    const updateData: any = {
+      project_id: id,
+      year,
+      month,
+    };
+    
+    // Update the specific field
+    if (field === "revenue") {
+      updateData.revenue_amount = value;
+      updateData.actual_revenue = currentRow.actualRevenue || null;
+      updateData.invoice_status = currentRow.invoiceStatus || "none";
+      updateData.invoice_ref = currentRow.invoiceRef || null;
+      updateData.invoice_date = currentRow.invoiceDate || null;
+    } else if (field === "actual") {
+      updateData.revenue_amount = currentRow.revenue || 0;
+      updateData.actual_revenue = value;
+      updateData.invoice_status = currentRow.invoiceStatus || "none";
+      updateData.invoice_ref = currentRow.invoiceRef || null;
+      updateData.invoice_date = currentRow.invoiceDate || null;
+    } else if (field === "invoiceStatus") {
+      updateData.revenue_amount = currentRow.revenue || 0;
+      updateData.actual_revenue = currentRow.actualRevenue || null;
+      updateData.invoice_status = value;
+      updateData.invoice_ref = currentRow.invoiceRef || null;
+      updateData.invoice_date = currentRow.invoiceDate || null;
+    } else if (field === "invoiceRef") {
+      updateData.revenue_amount = currentRow.revenue || 0;
+      updateData.actual_revenue = currentRow.actualRevenue || null;
+      updateData.invoice_status = currentRow.invoiceStatus || "none";
+      updateData.invoice_ref = value || null;
+      updateData.invoice_date = currentRow.invoiceDate || null;
+    } else if (field === "invoiceDate") {
+      updateData.revenue_amount = currentRow.revenue || 0;
+      updateData.actual_revenue = currentRow.actualRevenue || null;
+      updateData.invoice_status = currentRow.invoiceStatus || "none";
+      updateData.invoice_ref = currentRow.invoiceRef || null;
+      updateData.invoice_date = value || null;
+    }
+    
+    // Check if we should delete the row (all values empty/default)
+    const shouldDelete = 
+      (!updateData.revenue_amount || updateData.revenue_amount === 0) &&
+      (!updateData.actual_revenue || updateData.actual_revenue === 0) &&
+      updateData.invoice_status === "none" &&
+      !updateData.invoice_ref &&
+      !updateData.invoice_date;
+    
+    if (shouldDelete) {
+      // Delete the row
       const { error } = await supabase
         .from("project_monthly_phasing")
         .delete()
@@ -274,6 +324,18 @@ function ProjectDetailContent() {
       
       if (error) {
         alert("Error deleting phasing: " + error.message);
+        return;
+      }
+    } else {
+      // Upsert the row
+      const { error } = await supabase
+        .from("project_monthly_phasing")
+        .upsert(updateData, {
+          onConflict: "project_id,year,month",
+        });
+      
+      if (error) {
+        alert("Error updating phasing: " + error.message);
         return;
       }
     }
@@ -660,6 +722,10 @@ function ProjectDetailContent() {
 
   const getTotalPhasedRevenue = () => {
     return phasingData.reduce((sum, p) => sum + p.revenue_amount, 0);
+  };
+
+  const getTotalActualRevenue = () => {
+    return phasingData.reduce((sum, p) => sum + (p.actual_revenue || 0), 0);
   };
 
   const getTotalProjectFee = () => {
@@ -1274,17 +1340,21 @@ function ProjectDetailContent() {
                   </div>
 
                   <div className="overflow-x-auto">
-                    <table className="w-full border-collapse">
+                    <table className="w-full border-collapse text-sm">
                       <thead>
                         <tr className="border-b">
-                          <th className="text-left p-2 text-sm font-medium text-slate-600">Month</th>
-                          <th className="text-right p-2 text-sm font-medium text-slate-600">Revenue (£)</th>
+                          <th className="text-left p-2 font-medium text-slate-600">Month</th>
+                          <th className="text-right p-2 font-medium text-slate-600">Forecast (£)</th>
+                          <th className="text-right p-2 font-medium text-slate-600">Actual (£)</th>
+                          <th className="text-left p-2 font-medium text-slate-600">Invoice Status</th>
+                          <th className="text-left p-2 font-medium text-slate-600">Invoice Ref</th>
+                          <th className="text-left p-2 font-medium text-slate-600">Invoice Date</th>
                         </tr>
                       </thead>
                       <tbody>
                         {monthsGrid.map((m, idx) => (
-                          <tr key={idx} className="border-b">
-                            <td className="p-2 text-sm text-slate-900">
+                          <tr key={idx} className="border-b hover:bg-slate-50">
+                            <td className="p-2 text-slate-900">
                               {getMonthName(m.month)} {m.year}
                             </td>
                             <td className="p-2">
@@ -1296,15 +1366,84 @@ function ProjectDetailContent() {
                                   value={m.revenue || ""}
                                   onChange={(e) => {
                                     const value = e.target.value === "" ? 0 : parseFloat(e.target.value);
-                                    handlePhasingUpdate(m.year, m.month, value);
+                                    handlePhasingUpdate(m.year, m.month, "revenue", value);
                                   }}
-                                  className="text-right"
+                                  className="text-right h-8"
                                   placeholder="0"
                                 />
                               ) : (
-                                <div className="text-right text-sm">
+                                <div className="text-right">
                                   {formatCurrency(m.revenue)}
                                 </div>
+                              )}
+                            </td>
+                            <td className="p-2">
+                              {canEdit ? (
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={m.actualRevenue || ""}
+                                  onChange={(e) => {
+                                    const value = e.target.value === "" ? 0 : parseFloat(e.target.value);
+                                    handlePhasingUpdate(m.year, m.month, "actual", value);
+                                  }}
+                                  className="text-right h-8"
+                                  placeholder="0"
+                                />
+                              ) : (
+                                <div className="text-right">
+                                  {formatCurrency(m.actualRevenue)}
+                                </div>
+                              )}
+                            </td>
+                            <td className="p-2">
+                              {canEdit ? (
+                                <Select
+                                  value={m.invoiceStatus}
+                                  onValueChange={(value) => handlePhasingUpdate(m.year, m.month, "invoiceStatus", value)}
+                                >
+                                  <SelectTrigger className="h-8 w-32">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">None</SelectItem>
+                                    <SelectItem value="to_invoice">To Invoice</SelectItem>
+                                    <SelectItem value="invoiced">Invoiced</SelectItem>
+                                    <SelectItem value="paid">Paid</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              ) : (
+                                <Badge variant="outline" className="capitalize">
+                                  {m.invoiceStatus.replace("_", " ")}
+                                </Badge>
+                              )}
+                            </td>
+                            <td className="p-2">
+                              {canEdit ? (
+                                <Input
+                                  type="text"
+                                  value={m.invoiceRef || ""}
+                                  onChange={(e) => handlePhasingUpdate(m.year, m.month, "invoiceRef", e.target.value)}
+                                  className="h-8"
+                                  placeholder="INV-001"
+                                  disabled={m.invoiceStatus === "none" || m.invoiceStatus === "to_invoice"}
+                                />
+                              ) : (
+                                <div className="text-slate-900">{m.invoiceRef || "—"}</div>
+                              )}
+                            </td>
+                            <td className="p-2">
+                              {canEdit ? (
+                                <Input
+                                  type="date"
+                                  value={m.invoiceDate || ""}
+                                  onChange={(e) => handlePhasingUpdate(m.year, m.month, "invoiceDate", e.target.value)}
+                                  className="h-8 w-36"
+                                  disabled={m.invoiceStatus === "none" || m.invoiceStatus === "to_invoice"}
+                                />
+                              ) : (
+                                <div className="text-slate-900">{m.invoiceDate ? formatDate(m.invoiceDate) : "—"}</div>
                               )}
                             </td>
                           </tr>
@@ -1315,11 +1454,17 @@ function ProjectDetailContent() {
 
                   {/* Summary */}
                   <div className="border-t pt-4 mt-4">
-                    <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div className="grid grid-cols-4 gap-4 text-sm">
                       <div>
-                        <div className="text-slate-500 mb-1">Total phased revenue</div>
+                        <div className="text-slate-500 mb-1">Total forecast revenue</div>
                         <div className="text-lg font-semibold text-slate-900">
                           {formatCurrency(getTotalPhasedRevenue())}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-slate-500 mb-1">Total actual revenue</div>
+                        <div className="text-lg font-semibold text-green-600">
+                          {formatCurrency(getTotalActualRevenue())}
                         </div>
                       </div>
                       <div>
@@ -1329,7 +1474,7 @@ function ProjectDetailContent() {
                         </div>
                       </div>
                       <div>
-                        <div className="text-slate-500 mb-1">Difference</div>
+                        <div className="text-slate-500 mb-1">Forecast difference</div>
                         <div className={`text-lg font-semibold ${
                           Math.abs(getTotalPhasedRevenue() - getTotalProjectFee()) > 0.01
                             ? "text-orange-600"
@@ -1341,7 +1486,7 @@ function ProjectDetailContent() {
                     </div>
                     {Math.abs(getTotalPhasedRevenue() - getTotalProjectFee()) > 0.01 && (
                       <div className="mt-3 text-xs text-orange-600">
-                        ⚠️ Phased revenue does not match project fee. Adjust phasing or use "Auto-fill evenly".
+                        ⚠️ Forecast phased revenue does not match project fee. Adjust phasing or use "Auto-fill evenly".
                       </div>
                     )}
                   </div>

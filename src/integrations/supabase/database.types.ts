@@ -145,31 +145,31 @@ export type Database = {
       }
       monthly_budgets: {
         Row: {
-          id: string
-          year: number
-          month: number
-          budget_revenue: number
           budget_cost: number | null
+          budget_revenue: number
           created_at: string
+          id: string
+          month: number
           updated_at: string
+          year: number
         }
         Insert: {
-          id?: string
-          year: number
-          month: number
-          budget_revenue: number
           budget_cost?: number | null
+          budget_revenue: number
           created_at?: string
+          id?: string
+          month: number
           updated_at?: string
+          year: number
         }
         Update: {
-          id?: string
-          year?: number
-          month?: number
-          budget_revenue?: number
           budget_cost?: number | null
+          budget_revenue?: number
           created_at?: string
+          id?: string
+          month?: number
           updated_at?: string
+          year?: number
         }
         Relationships: []
       }
@@ -337,36 +337,49 @@ export type Database = {
       }
       project_monthly_phasing: {
         Row: {
+          actual_revenue: number | null
+          created_at: string | null
           id: string
-          project_id: string
-          year: number
+          invoice_date: string | null
+          invoice_ref: string | null
+          invoice_status: string | null
           month: number
+          project_id: string
           revenue_amount: number
-          created_at: string
-          updated_at: string
+          updated_at: string | null
+          year: number
         }
         Insert: {
+          actual_revenue?: number | null
+          created_at?: string | null
           id?: string
-          project_id: string
-          year: number
+          invoice_date?: string | null
+          invoice_ref?: string | null
+          invoice_status?: string | null
           month: number
-          revenue_amount: number
-          created_at?: string
-          updated_at?: string
+          project_id: string
+          revenue_amount?: number
+          updated_at?: string | null
+          year: number
         }
         Update: {
+          actual_revenue?: number | null
+          created_at?: string | null
           id?: string
-          project_id?: string
-          year?: number
+          invoice_date?: string | null
+          invoice_ref?: string | null
+          invoice_status?: string | null
           month?: number
+          project_id?: string
           revenue_amount?: number
-          created_at?: string
-          updated_at?: string
+          updated_at?: string | null
+          year?: number
         }
         Relationships: [
           {
             foreignKeyName: "project_monthly_phasing_project_id_fkey"
             columns: ["project_id"]
+            isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
