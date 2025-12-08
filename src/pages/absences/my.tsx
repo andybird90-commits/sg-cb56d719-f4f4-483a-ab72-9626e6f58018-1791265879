@@ -72,7 +72,7 @@ function MyAbsencesContent() {
       const { error } = await supabase
         .from("absences")
         .update({
-          type: formData.type,
+          type: formData.type as "holiday" | "sick" | "other",
           start_date: formData.start_date,
           end_date: formData.end_date,
           notes: formData.notes || null,
@@ -88,7 +88,7 @@ function MyAbsencesContent() {
         .from("absences")
         .insert({
           user_id: user.id,
-          type: formData.type,
+          type: formData.type as "holiday" | "sick" | "other",
           start_date: formData.start_date,
           end_date: formData.end_date,
           notes: formData.notes || null,
