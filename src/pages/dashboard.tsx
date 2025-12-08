@@ -9,11 +9,16 @@ export default function DashboardPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push("/auth/signin");
+    // Wait for loading to complete
+    if (loading) return;
+
+    // Redirect to signin if not authenticated
+    if (!user) {
+      router.replace("/auth/signin");
     }
   }, [user, loading, router]);
 
+  // Show loading state
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -22,6 +27,7 @@ export default function DashboardPage() {
     );
   }
 
+  // Don't render anything if not authenticated (redirect is in progress)
   if (!user || !profile) {
     return null;
   }

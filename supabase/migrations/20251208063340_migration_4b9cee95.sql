@@ -1,0 +1,3 @@
+-- Step 5: Enable RLS on new tables
+ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE contacts ENABLE ROW LEVEL SECURITY;
