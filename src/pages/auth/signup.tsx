@@ -71,10 +71,10 @@ export default function SignUpPage() {
             <Image 
               src="/RDME_Logo.png" 
               alt="RD GROUP M&E" 
-              width={200} 
-              height={50}
+              width={280} 
+              height={70}
               priority
-              className="h-12 w-auto"
+              className="h-14 w-auto"
             />
           </div>
           <CardTitle className="text-2xl font-bold text-center">Create Account</CardTitle>

@@ -36,10 +36,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <Image 
                   src="/RDME_Logo.png" 
                   alt="RD GROUP M&E" 
-                  width={180} 
-                  height={45}
+                  width={240} 
+                  height={60}
                   priority
-                  className="h-10 w-auto"
+                  className="h-12 w-auto"
                 />
               </Link>
               <div className="flex gap-1">
