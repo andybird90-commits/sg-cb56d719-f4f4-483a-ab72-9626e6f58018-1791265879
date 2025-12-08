@@ -140,7 +140,7 @@ function FinancialsContent() {
       if (!phasingMap.has(key)) {
         phasingMap.set(key, []);
       }
-      phasingMap.get(key)!.push(row as PhasingRow);
+      phasingMap.get(key)!.push(row as unknown as PhasingRow);
     });
 
     // Fetch timesheets for internal cost
@@ -302,7 +302,7 @@ function FinancialsContent() {
         invoice_status: "invoiced",
         invoice_ref: invoiceForm.invoice_ref,
         invoice_date: invoiceForm.invoice_date,
-      })
+      } as any)
       .eq("id", markingInvoice.phasing_id);
 
     if (error) {
