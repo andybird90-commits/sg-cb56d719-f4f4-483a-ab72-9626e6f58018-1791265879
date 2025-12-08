@@ -5,22 +5,32 @@ import { Button } from "@/components/ui/button";
 import { Building2, Users, Target, Briefcase, LogOut, LayoutDashboard, Clock, Calendar, DollarSign, Settings } from "lucide-react";
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, loading, signOut } = useAuth();
   const router = useRouter();
 
-  if (!user || !profile) {
+  // If still loading auth, show loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-slate-600">Loading...</div>
+      </div>
+    );
+  }
+
+  // If no user at all, render without navigation (auth pages)
+  if (!user) {
     return <div className="min-h-screen bg-slate-50">{children}</div>;
   }
 
-  const isAdmin = profile.role === "admin" || profile.role === "director";
+  const isAdmin = profile?.role === "admin" || profile?.role === "director";
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <nav className="border-b bg-white">
+      <nav className="border-b bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center gap-8">
-              <Link href="/dashboard" className="text-2xl font-bold text-slate-900">
+              <Link href="/dashboard" className="text-2xl font-bold text-slate-900 hover:text-slate-700">
                 Conexa DT
               </Link>
               <div className="flex gap-1">
@@ -119,10 +129,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <div className="text-sm">
-                <div className="font-medium text-slate-900">{profile.full_name}</div>
-                <div className="text-slate-500 capitalize">{profile.role}</div>
-              </div>
+              {profile ? (
+                <div className="text-sm">
+                  <div className="font-medium text-slate-900">{profile.full_name}</div>
+                  <div className="text-slate-500 capitalize">{profile.role}</div>
+                </div>
+              ) : (
+                <div className="text-sm">
+                  <div className="font-medium text-slate-900">{user.email}</div>
+                  <div className="text-slate-500 text-xs">Profile loading...</div>
+                </div>
+              )}
               <Button variant="ghost" size="sm" onClick={signOut} className="gap-2">
                 <LogOut className="w-4 h-4" />
                 Sign Out
