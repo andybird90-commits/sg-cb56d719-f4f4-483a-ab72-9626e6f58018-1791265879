@@ -14,6 +14,10 @@ import { Plus, Edit, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface Timesheet {
   id: string;
+  user_id: string;
+  project_id: string;
+  activity_id: string | null;
+  variation_id: string | null;
   date: string;
   hours: number;
   notes: string | null;
@@ -46,7 +50,7 @@ interface Variation {
 }
 
 function MyTimesheetsContent() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [timesheets, setTimesheets] = useState<Timesheet[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -210,9 +214,9 @@ function MyTimesheetsContent() {
     setEditingTimesheet(timesheet);
     setFormData({
       date: timesheet.date,
-      project_id: timesheet.projects ? timesheet.projects.code : "",
-      activity_id: "",
-      variation_id: "",
+      project_id: timesheet.project_id,
+      activity_id: timesheet.activity_id || "",
+      variation_id: timesheet.variation_id || "",
       hours: timesheet.hours.toString(),
       notes: timesheet.notes || "",
     });
@@ -318,7 +322,7 @@ function MyTimesheetsContent() {
                 <div className="space-y-2">
                   <Label htmlFor="project_id">Project *</Label>
                   <Select
-                    value={formData.project_id ?? undefined}
+                    value={formData.project_id || undefined}
                     onValueChange={(value) => setFormData({ ...formData, project_id: value, activity_id: "", variation_id: "" })}
                   >
                     <SelectTrigger>
@@ -338,14 +342,13 @@ function MyTimesheetsContent() {
                   <div className="space-y-2">
                     <Label htmlFor="activity_id">Activity (Optional)</Label>
                     <Select
-                      value={formData.activity_id ?? undefined}
+                      value={formData.activity_id || undefined}
                       onValueChange={(value) => setFormData({ ...formData, activity_id: value })}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="None" />
+                        <SelectValue placeholder="Select an activity" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">None</SelectItem>
                         {activities.map((a) => (
                           <SelectItem key={a.id} value={a.id}>
                             {a.name}
@@ -360,14 +363,13 @@ function MyTimesheetsContent() {
                   <div className="space-y-2">
                     <Label htmlFor="variation_id">Variation (Optional)</Label>
                     <Select
-                      value={formData.variation_id ?? undefined}
+                      value={formData.variation_id || undefined}
                       onValueChange={(value) => setFormData({ ...formData, variation_id: value })}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="None" />
+                        <SelectValue placeholder="Select a variation" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">None</SelectItem>
                         {variations.map((v) => (
                           <SelectItem key={v.id} value={v.id}>
                             {v.code}
