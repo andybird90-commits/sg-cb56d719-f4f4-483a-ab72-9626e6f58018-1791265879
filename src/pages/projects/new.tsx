@@ -191,7 +191,6 @@ function NewProjectContent() {
                     <SelectValue placeholder="Select an opportunity (optional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
                     {opportunities.map((opp) => (
                       <SelectItem key={opp.id} value={opp.id}>
                         {opp.name}
