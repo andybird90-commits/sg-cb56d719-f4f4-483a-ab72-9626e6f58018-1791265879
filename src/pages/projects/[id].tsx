@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Plus, Edit, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Edit, Trash2, Calendar as CalendarIcon } from "lucide-react";
 import Link from "next/link";
 
 interface Project {
@@ -64,6 +64,21 @@ interface SubcontractorCost {
   };
 }
 
+interface PhasingRow {
+  id: string;
+  project_id: string;
+  year: number;
+  month: number;
+  revenue_amount: number;
+}
+
+interface MonthPhasing {
+  year: number;
+  month: number;
+  revenue: number;
+  hasData: boolean;
+}
+
 function ProjectDetailContent() {
   const { profile } = useAuth();
   const router = useRouter();
@@ -72,6 +87,8 @@ function ProjectDetailContent() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [variations, setVariations] = useState<Variation[]>([]);
   const [costs, setCosts] = useState<SubcontractorCost[]>([]);
+  const [phasingData, setPhasingData] = useState<PhasingRow[]>([]);
+  const [monthsGrid, setMonthsGrid] = useState<MonthPhasing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -179,11 +196,182 @@ function ProjectDetailContent() {
       .eq("project_id", projectId)
       .order("cost_date", { ascending: false });
 
+    const { data: phasingDataResult } = await supabase
+      .from("project_monthly_phasing")
+      .select("*")
+      .eq("project_id", projectId)
+      .order("year", { ascending: true })
+      .order("month", { ascending: true });
+
     setProject(projectData);
     setActivities(activitiesData || []);
     setVariations(variationsData || []);
     setCosts(costsData || []);
+    setPhasingData(phasingDataResult || []);
+    
+    // Generate months grid
+    generateMonthsGrid(projectData, phasingDataResult || []);
+    
     setLoading(false);
+  };
+
+  const generateMonthsGrid = (proj: Project, phasing: PhasingRow[]) => {
+    const now = new Date();
+    const startDate = proj.start_date ? new Date(proj.start_date) : now;
+    
+    // Start from the earlier of project start or current month
+    const gridStart = startDate < now ? startDate : now;
+    
+    const months: MonthPhasing[] = [];
+    
+    // Generate 24 months from grid start
+    for (let i = 0; i < 24; i++) {
+      const date = new Date(gridStart.getFullYear(), gridStart.getMonth() + i, 1);
+      const year = date.getFullYear();
+      const month = date.getMonth() + 1;
+      
+      const existingPhasing = phasing.find(p => p.year === year && p.month === month);
+      
+      months.push({
+        year,
+        month,
+        revenue: existingPhasing?.revenue_amount || 0,
+        hasData: !!existingPhasing,
+      });
+    }
+    
+    setMonthsGrid(months);
+  };
+
+  const handlePhasingUpdate = async (year: number, month: number, value: number) => {
+    if (!id || typeof id !== "string") return;
+    
+    if (value > 0) {
+      // Upsert phasing row
+      const { error } = await supabase
+        .from("project_monthly_phasing")
+        .upsert({
+          project_id: id,
+          year,
+          month,
+          revenue_amount: value,
+        }, {
+          onConflict: "project_id,year,month",
+        });
+      
+      if (error) {
+        alert("Error updating phasing: " + error.message);
+        return;
+      }
+    } else {
+      // Delete phasing row if value is 0
+      const { error } = await supabase
+        .from("project_monthly_phasing")
+        .delete()
+        .eq("project_id", id)
+        .eq("year", year)
+        .eq("month", month);
+      
+      if (error) {
+        alert("Error deleting phasing: " + error.message);
+        return;
+      }
+    }
+    
+    // Refresh data
+    await fetchProjectData(id);
+  };
+
+  const handleAutoFill = async () => {
+    if (!id || typeof id !== "string" || !project) return;
+    
+    if (!project.start_date || !project.end_date) {
+      alert("Project must have start and end dates to auto-fill phasing.");
+      return;
+    }
+    
+    if (!confirm("Auto-fill will distribute revenue evenly across project duration. Continue?")) {
+      return;
+    }
+    
+    // Calculate total fee (agreed fee + accepted variations)
+    let totalFee = project.agreed_fee_value || 0;
+    
+    const acceptedVariations = variations.filter(v => v.status === "accepted");
+    acceptedVariations.forEach(v => {
+      totalFee += v.value;
+    });
+    
+    if (totalFee === 0) {
+      alert("No revenue to distribute (agreed fee + accepted variations = 0).");
+      return;
+    }
+    
+    // Calculate months between start and end
+    const startDate = new Date(project.start_date);
+    const endDate = new Date(project.end_date);
+    
+    const months: { year: number; month: number }[] = [];
+    const current = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    
+    while (current <= endDate) {
+      months.push({
+        year: current.getFullYear(),
+        month: current.getMonth() + 1,
+      });
+      current.setMonth(current.getMonth() + 1);
+    }
+    
+    if (months.length === 0) {
+      alert("No months in project date range.");
+      return;
+    }
+    
+    // Distribute evenly
+    const perMonth = totalFee / months.length;
+    
+    // Upsert all months
+    const upserts = months.map(m => ({
+      project_id: id,
+      year: m.year,
+      month: m.month,
+      revenue_amount: perMonth,
+    }));
+    
+    const { error } = await supabase
+      .from("project_monthly_phasing")
+      .upsert(upserts, {
+        onConflict: "project_id,year,month",
+      });
+    
+    if (error) {
+      alert("Error auto-filling phasing: " + error.message);
+      return;
+    }
+    
+    // Refresh data
+    await fetchProjectData(id);
+  };
+
+  const handleClearPhasing = async () => {
+    if (!id || typeof id !== "string") return;
+    
+    if (!confirm("Clear all phasing data? This will revert to automatic date-based allocation.")) {
+      return;
+    }
+    
+    const { error } = await supabase
+      .from("project_monthly_phasing")
+      .delete()
+      .eq("project_id", id);
+    
+    if (error) {
+      alert("Error clearing phasing: " + error.message);
+      return;
+    }
+    
+    // Refresh data
+    await fetchProjectData(id);
   };
 
   // Activity handlers
@@ -466,6 +654,22 @@ function ProjectDetailContent() {
     }
   };
 
+  const getMonthName = (month: number) => {
+    return new Date(2000, month - 1, 1).toLocaleDateString("en-GB", { month: "short" });
+  };
+
+  const getTotalPhasedRevenue = () => {
+    return phasingData.reduce((sum, p) => sum + p.revenue_amount, 0);
+  };
+
+  const getTotalProjectFee = () => {
+    let total = project?.agreed_fee_value || 0;
+    variations.filter(v => v.status === "accepted").forEach(v => {
+      total += v.value;
+    });
+    return total;
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -570,6 +774,7 @@ function ProjectDetailContent() {
             <TabsTrigger value="activities">Activities</TabsTrigger>
             <TabsTrigger value="variations">Variations</TabsTrigger>
             <TabsTrigger value="costs">Subcontractor Costs</TabsTrigger>
+            <TabsTrigger value="phasing">Phasing</TabsTrigger>
           </TabsList>
 
           <TabsContent value="activities">
@@ -1024,6 +1229,123 @@ function ProjectDetailContent() {
                     ))}
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="phasing">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <CalendarIcon className="w-5 h-5 text-slate-600" />
+                  <CardTitle>Revenue Phasing</CardTitle>
+                </div>
+                {canEdit && (
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={handleAutoFill}>
+                      Auto-fill evenly
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={handleClearPhasing}>
+                      Clear phasing
+                    </Button>
+                  </div>
+                )}
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="text-sm text-slate-600">
+                    {phasingData.length === 0 ? (
+                      <div className="bg-blue-50 border border-blue-200 rounded p-4 mb-4">
+                        <p className="font-medium text-blue-900 mb-1">Automatic allocation active</p>
+                        <p className="text-blue-700 text-sm">
+                          Revenue is automatically spread across project duration using day-based allocation.
+                          Set manual phasing below to override the automatic calculation.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="bg-orange-50 border border-orange-200 rounded p-4 mb-4">
+                        <p className="font-medium text-orange-900 mb-1">Manual phasing active</p>
+                        <p className="text-orange-700 text-sm">
+                          This project uses manual month-by-month revenue allocation.
+                          Clear phasing to revert to automatic day-based spread.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left p-2 text-sm font-medium text-slate-600">Month</th>
+                          <th className="text-right p-2 text-sm font-medium text-slate-600">Revenue (£)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {monthsGrid.map((m, idx) => (
+                          <tr key={idx} className="border-b">
+                            <td className="p-2 text-sm text-slate-900">
+                              {getMonthName(m.month)} {m.year}
+                            </td>
+                            <td className="p-2">
+                              {canEdit ? (
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={m.revenue || ""}
+                                  onChange={(e) => {
+                                    const value = e.target.value === "" ? 0 : parseFloat(e.target.value);
+                                    handlePhasingUpdate(m.year, m.month, value);
+                                  }}
+                                  className="text-right"
+                                  placeholder="0"
+                                />
+                              ) : (
+                                <div className="text-right text-sm">
+                                  {formatCurrency(m.revenue)}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Summary */}
+                  <div className="border-t pt-4 mt-4">
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <div className="text-slate-500 mb-1">Total phased revenue</div>
+                        <div className="text-lg font-semibold text-slate-900">
+                          {formatCurrency(getTotalPhasedRevenue())}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-slate-500 mb-1">Project agreed fee</div>
+                        <div className="text-lg font-semibold text-slate-900">
+                          {formatCurrency(getTotalProjectFee())}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-slate-500 mb-1">Difference</div>
+                        <div className={`text-lg font-semibold ${
+                          Math.abs(getTotalPhasedRevenue() - getTotalProjectFee()) > 0.01
+                            ? "text-orange-600"
+                            : "text-green-600"
+                        }`}>
+                          {formatCurrency(getTotalPhasedRevenue() - getTotalProjectFee())}
+                        </div>
+                      </div>
+                    </div>
+                    {Math.abs(getTotalPhasedRevenue() - getTotalProjectFee()) > 0.01 && (
+                      <div className="mt-3 text-xs text-orange-600">
+                        ⚠️ Phased revenue does not match project fee. Adjust phasing or use "Auto-fill evenly".
+                      </div>
+                    )}
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

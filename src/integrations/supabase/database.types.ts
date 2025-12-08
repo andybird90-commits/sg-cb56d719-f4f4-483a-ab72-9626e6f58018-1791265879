@@ -335,6 +335,44 @@ export type Database = {
           },
         ]
       }
+      project_monthly_phasing: {
+        Row: {
+          created_at: string | null
+          id: string
+          month: number
+          project_id: string
+          revenue_amount: number
+          updated_at: string | null
+          year: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          month: number
+          project_id: string
+          revenue_amount?: number
+          updated_at?: string | null
+          year: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          month?: number
+          project_id?: string
+          revenue_amount?: number
+          updated_at?: string | null
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_monthly_phasing_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           agreed_fee_value: number | null
