@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
 import { Building2, Users, Target, Briefcase, LogOut, LayoutDashboard, Clock, Calendar, PoundSterling, Settings } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import Image from "next/image";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading, signOut, profileError } = useAuth();
@@ -31,8 +32,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center gap-8">
-              <Link href="/dashboard" className="text-2xl font-bold text-slate-900 hover:text-slate-700">
-                Conexa DT
+              <Link href="/dashboard" className="flex items-center">
+                <Image 
+                  src="/rd-group-logo.png" 
+                  alt="RD GROUP M&E" 
+                  width={180} 
+                  height={45}
+                  priority
+                  className="h-10 w-auto"
+                />
               </Link>
               <div className="flex gap-1">
                 <Link href="/dashboard">

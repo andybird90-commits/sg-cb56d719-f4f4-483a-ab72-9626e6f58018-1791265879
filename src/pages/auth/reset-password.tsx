@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import Image from "next/image";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -41,7 +42,17 @@ export default function ResetPasswordPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
       <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
+        <CardHeader className="space-y-4">
+          <div className="flex justify-center">
+            <Image 
+              src="/rd-group-logo.png" 
+              alt="RD GROUP M&E" 
+              width={200} 
+              height={50}
+              priority
+              className="h-12 w-auto"
+            />
+          </div>
           <CardTitle className="text-2xl font-bold text-center">Set New Password</CardTitle>
           <CardDescription className="text-center">
             Enter your new password
