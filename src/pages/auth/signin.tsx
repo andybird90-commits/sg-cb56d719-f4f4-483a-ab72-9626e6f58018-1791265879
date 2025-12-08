@@ -45,10 +45,10 @@ export default function SignInPage() {
             <Image 
               src="/RDME_Logo.png" 
               alt="RD GROUP M&E" 
-              width={280} 
-              height={70}
+              width={400}
+              height={100}
               priority
-              className="h-14 w-auto"
+              className="h-16 w-auto object-contain"
             />
           </div>
           <CardTitle className="text-2xl font-bold text-center">Welcome Back</CardTitle>
