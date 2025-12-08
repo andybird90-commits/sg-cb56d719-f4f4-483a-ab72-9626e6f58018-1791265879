@@ -41,10 +41,8 @@ export default function SignUpPage() {
 
     if (data.user) {
       // Profile is automatically created by database trigger
-      // Wait a moment for trigger to complete, then redirect
-      setTimeout(() => {
-        router.push("/dashboard");
-      }, 500);
+      // Navigate to dashboard
+      router.push("/dashboard");
     }
 
     setLoading(false);

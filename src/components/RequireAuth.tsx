@@ -1,39 +1,48 @@
 import { useEffect } from "react";
 import { useRouter } from "next/router";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 
 interface RequireAuthProps {
   children: React.ReactNode;
 }
 
 export function RequireAuth({ children }: RequireAuthProps) {
-  const { user, loading } = useAuth();
+  const { session, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!loading && !session) {
       router.replace("/auth/signin");
     }
-  }, [loading, user, router]);
+  }, [loading, session, router]);
 
-  // Show loading state
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-slate-600">Loading...</div>
+      <div style={{ 
+        minHeight: "100vh", 
+        display: "flex", 
+        alignItems: "center", 
+        justifyContent: "center",
+        backgroundColor: "#f8fafc"
+      }}>
+        <div style={{ color: "#64748b" }}>Loading...</div>
       </div>
     );
   }
 
-  // If not authenticated, show loading while redirecting
-  if (!user) {
+  if (!session) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-slate-600">Loading...</div>
+      <div style={{ 
+        minHeight: "100vh", 
+        display: "flex", 
+        alignItems: "center", 
+        justifyContent: "center",
+        backgroundColor: "#f8fafc"
+      }}>
+        <div style={{ color: "#64748b" }}>Redirecting...</div>
       </div>
     );
   }
 
-  // User is authenticated, render the protected content
   return <>{children}</>;
 }

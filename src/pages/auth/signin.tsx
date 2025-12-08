@@ -33,6 +33,7 @@ export default function SignInPage() {
       return;
     }
 
+    // Navigate to dashboard on success
     router.push("/dashboard");
   };
 
