@@ -78,7 +78,7 @@ function NewProjectContent() {
       client_company_id: formData.client_company_id,
       start_date: formData.start_date || null,
       end_date: formData.end_date || null,
-      status: formData.status,
+      status: formData.status as "pipeline" | "live" | "on_hold" | "completed" | "cancelled",
       agreed_fee_value: formData.agreed_fee_value ? parseFloat(formData.agreed_fee_value) : null,
       notes: formData.notes || null,
     });

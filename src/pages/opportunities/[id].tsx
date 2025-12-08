@@ -110,8 +110,8 @@ function OpportunityDetailContent() {
       .update({
         name: editData.name,
         description: editData.description || null,
-        stage: editData.stage,
-        status: editData.status,
+        stage: editData.stage as "secured" | "high_potential" | "bid",
+        status: editData.status as "open" | "closed_won" | "closed_lost",
         tender_due_date: editData.tender_due_date || null,
         expected_start_date: editData.expected_start_date || null,
         expected_end_date: editData.expected_end_date || null,
