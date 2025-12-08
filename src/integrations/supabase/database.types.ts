@@ -251,33 +251,39 @@ export type Database = {
       }
       profiles: {
         Row: {
+          annual_holiday_days: number | null
           avatar_url: string | null
           created_at: string | null
           default_hourly_cost_rate: number | null
           email: string
           full_name: string
+          holiday_cost_rate: number | null
           id: string
           is_active: boolean
           role: Database["public"]["Enums"]["user_role"]
           updated_at: string | null
         }
         Insert: {
+          annual_holiday_days?: number | null
           avatar_url?: string | null
           created_at?: string | null
           default_hourly_cost_rate?: number | null
           email: string
           full_name: string
+          holiday_cost_rate?: number | null
           id: string
           is_active?: boolean
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string | null
         }
         Update: {
+          annual_holiday_days?: number | null
           avatar_url?: string | null
           created_at?: string | null
           default_hourly_cost_rate?: number | null
           email?: string
           full_name?: string
+          holiday_cost_rate?: number | null
           id?: string
           is_active?: boolean
           role?: Database["public"]["Enums"]["user_role"]
