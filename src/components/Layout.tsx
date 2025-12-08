@@ -4,7 +4,7 @@ import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Building2, Users, Target, Briefcase, LogOut, LayoutDashboard, Clock, Calendar, PoundSterling, Settings, Menu, X } from "lucide-react";
+import { Building2, Users, Target, Briefcase, LogOut, LayoutDashboard, Clock, Calendar, PoundSterling, Settings, Menu, X, User } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import Image from "next/image";
 import { useState } from "react";
@@ -75,49 +75,72 @@ export function Layout({ children }: { children: React.ReactNode }) {
             />
           </Link>
           
-          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="sm" className="p-2">
-                <Menu className="w-6 h-6" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-72 p-0">
-              <SheetHeader className="border-b p-4">
-                <SheetTitle className="text-left">Menu</SheetTitle>
-              </SheetHeader>
-              
-              <ScrollArea className="h-[calc(100vh-140px)]">
-                <div className="flex flex-col gap-1 p-4">
-                  {navItems.map((item) => (
-                    <NavLink
-                      key={item.href}
-                      href={item.href}
-                      icon={item.icon}
-                      label={item.label}
-                      onClick={() => setMobileMenuOpen(false)}
-                    />
-                  ))}
-                </div>
-              </ScrollArea>
-
-              <div className="border-t p-4">
-                {profile ? (
-                  <div className="mb-3">
-                    <div className="font-medium text-sm text-slate-900">{profile.full_name}</div>
-                    <div className="text-xs text-slate-500 capitalize">{profile.role}</div>
-                  </div>
-                ) : (
-                  <div className="mb-3">
-                    <div className="font-medium text-sm text-slate-900">{user.email}</div>
-                  </div>
-                )}
-                <Button variant="outline" size="sm" onClick={signOut} className="w-full gap-2">
-                  <LogOut className="w-4 h-4" />
-                  Sign Out
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={signOut} className="gap-2">
+              <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline">Sign Out</span>
+            </Button>
+            
+            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="sm" className="p-2">
+                  <Menu className="w-6 h-6" />
                 </Button>
-              </div>
-            </SheetContent>
-          </Sheet>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-72 p-0">
+                <SheetHeader className="border-b p-4">
+                  <SheetTitle className="text-left">Menu</SheetTitle>
+                </SheetHeader>
+                
+                <ScrollArea className="h-[calc(100vh-80px)]">
+                  <div className="p-4">
+                    {/* User Profile Section */}
+                    <div className="mb-4 pb-4 border-b">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center">
+                          <User className="w-5 h-5 text-slate-600" />
+                        </div>
+                        <div>
+                          {profile ? (
+                            <>
+                              <div className="font-medium text-sm text-slate-900">{profile.full_name}</div>
+                              <div className="text-xs text-slate-500 capitalize">{profile.role}</div>
+                            </>
+                          ) : (
+                            <div className="font-medium text-sm text-slate-900">{user.email}</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Navigation Links */}
+                    <div className="flex flex-col gap-1 mb-4">
+                      {navItems.map((item) => (
+                        <NavLink
+                          key={item.href}
+                          href={item.href}
+                          icon={item.icon}
+                          label={item.label}
+                          onClick={() => setMobileMenuOpen(false)}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Sign Out Button */}
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      onClick={signOut} 
+                      className="w-full gap-2"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Sign Out
+                    </Button>
+                  </div>
+                </ScrollArea>
+              </SheetContent>
+            </Sheet>
+          </div>
         </div>
       </nav>
 
@@ -153,9 +176,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </div>
             <div className="flex items-center gap-4">
               {profile ? (
-                <div className="text-sm">
-                  <div className="font-medium text-slate-900">{profile.full_name}</div>
-                  <div className="text-slate-500 capitalize">{profile.role}</div>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center">
+                    <User className="w-4 h-4 text-slate-600" />
+                  </div>
+                  <div className="text-sm">
+                    <div className="font-medium text-slate-900">{profile.full_name}</div>
+                    <div className="text-slate-500 capitalize text-xs">{profile.role}</div>
+                  </div>
                 </div>
               ) : profileError ? (
                 <div className="text-sm">
@@ -168,7 +196,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   <div className="text-slate-500 text-xs">Profile loading...</div>
                 </div>
               )}
-              <Button variant="ghost" size="sm" onClick={signOut} className="gap-2">
+              <Button variant="outline" size="sm" onClick={signOut} className="gap-2">
                 <LogOut className="w-4 h-4" />
                 Sign Out
               </Button>
