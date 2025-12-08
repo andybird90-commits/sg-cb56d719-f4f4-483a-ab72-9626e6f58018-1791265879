@@ -2,7 +2,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
-import { Building2, Users, Target, Briefcase, LogOut, LayoutDashboard, Clock, Calendar } from "lucide-react";
+import { Building2, Users, Target, Briefcase, LogOut, LayoutDashboard, Clock, Calendar, DollarSign, Settings } from "lucide-react";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { user, profile, signOut } = useAuth();
@@ -11,6 +11,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
   if (!user || !profile) {
     return <div className="min-h-screen bg-slate-50">{children}</div>;
   }
+
+  const isAdmin = profile.role === "admin" || profile.role === "director";
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -92,6 +94,28 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     Absences
                   </Button>
                 </Link>
+                <Link href="/financials">
+                  <Button
+                    variant={router.pathname.startsWith("/financials") ? "default" : "ghost"}
+                    size="sm"
+                    className="gap-2"
+                  >
+                    <DollarSign className="w-4 h-4" />
+                    Financials
+                  </Button>
+                </Link>
+                {isAdmin && (
+                  <Link href="/admin/budgets">
+                    <Button
+                      variant={router.pathname.startsWith("/admin") ? "default" : "ghost"}
+                      size="sm"
+                      className="gap-2"
+                    >
+                      <Settings className="w-4 h-4" />
+                      Admin
+                    </Button>
+                  </Link>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-4">

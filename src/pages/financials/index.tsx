@@ -1,22 +1,152 @@
-import { useAuth } from "@/contexts/AuthContext";
+import { RequireAuth } from "@/components/RequireAuth";
 import { Layout } from "@/components/Layout";
-import { useRouter } from "next/router";
-import { useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { AlertCircle } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useAuth } from "@/contexts/AuthContext";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TrendingUp, TrendingDown } from "lucide-react";
 
-export default function FinancialsPage() {
-  const { user, loading: authLoading } = useAuth();
-  const router = useRouter();
+interface FinancialData {
+  revenue: number;
+  internalCost: number;
+  subcontractorCost: number;
+  margin: number;
+  marginPercent: number;
+  budgetRevenue: number | null;
+  budgetCost: number | null;
+}
+
+function FinancialsContent() {
+  const { profile } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [financials, setFinancials] = useState<FinancialData>({
+    revenue: 0,
+    internalCost: 0,
+    subcontractorCost: 0,
+    margin: 0,
+    marginPercent: 0,
+    budgetRevenue: null,
+    budgetCost: null,
+  });
+
+  const isAdmin = profile?.role === "admin" || profile?.role === "director";
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push("/auth/signin");
-    }
-  }, [user, authLoading, router]);
+    fetchFinancials();
+  }, [selectedYear, selectedMonth]);
 
-  if (authLoading) {
+  const fetchFinancials = async () => {
+    setLoading(true);
+
+    const startDate = new Date(selectedYear, selectedMonth - 1, 1);
+    const endDate = new Date(selectedYear, selectedMonth, 0);
+    const startDateStr = startDate.toISOString().split("T")[0];
+    const endDateStr = endDate.toISOString().split("T")[0];
+
+    // Calculate Revenue
+    let revenue = 0;
+
+    const { data: projectsData } = await supabase
+      .from("projects")
+      .select("id, agreed_fee_value, start_date")
+      .gte("start_date", startDateStr)
+      .lte("start_date", endDateStr);
+
+    if (projectsData) {
+      revenue = projectsData.reduce((sum, p) => sum + (p.agreed_fee_value || 0), 0);
+
+      const projectIds = projectsData.map(p => p.id);
+      if (projectIds.length > 0) {
+        const { data: variationsData } = await supabase
+          .from("variations")
+          .select("value, status")
+          .in("project_id", projectIds)
+          .eq("status", "accepted");
+
+        if (variationsData) {
+          revenue += variationsData.reduce((sum, v) => sum + v.value, 0);
+        }
+      }
+    }
+
+    // Calculate Internal Cost
+    let internalCost = 0;
+
+    const { data: timesheetsData } = await supabase
+      .from("timesheets")
+      .select(`
+        hours,
+        profiles (
+          default_hourly_cost_rate
+        )
+      `)
+      .gte("date", startDateStr)
+      .lte("date", endDateStr);
+
+    if (timesheetsData) {
+      internalCost = timesheetsData.reduce((sum, t) => {
+        const rate = t.profiles?.default_hourly_cost_rate || 0;
+        return sum + (t.hours * rate);
+      }, 0);
+    }
+
+    // Calculate Subcontractor Cost
+    let subcontractorCost = 0;
+
+    const { data: costsData } = await supabase
+      .from("subcontractor_costs")
+      .select("cost_amount")
+      .gte("cost_date", startDateStr)
+      .lte("cost_date", endDateStr);
+
+    if (costsData) {
+      subcontractorCost = costsData.reduce((sum, c) => sum + c.cost_amount, 0);
+    }
+
+    // Get Budget
+    const { data: budgetData } = await supabase
+      .from("monthly_budgets")
+      .select("budget_revenue, budget_cost")
+      .eq("year", selectedYear)
+      .eq("month", selectedMonth)
+      .maybeSingle();
+
+    const totalCost = internalCost + subcontractorCost;
+    const margin = revenue - totalCost;
+    const marginPercent = revenue > 0 ? (margin / revenue) * 100 : 0;
+
+    setFinancials({
+      revenue,
+      internalCost,
+      subcontractorCost,
+      margin,
+      marginPercent,
+      budgetRevenue: budgetData?.budget_revenue || null,
+      budgetCost: budgetData?.budget_cost || null,
+    });
+
+    setLoading(false);
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat("en-GB", {
+      style: "currency",
+      currency: "GBP",
+      minimumFractionDigits: 0,
+    }).format(value);
+  };
+
+  const getMonthName = (month: number) => {
+    return new Date(2000, month - 1, 1).toLocaleDateString("en-GB", { month: "long" });
+  };
+
+  const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i);
+  const months = Array.from({ length: 12 }, (_, i) => i + 1);
+
+  if (loading) {
     return (
       <Layout>
         <div className="flex items-center justify-center py-12">
@@ -29,57 +159,145 @@ export default function FinancialsPage() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Financial Dashboard</h1>
-          <p className="text-slate-600 mt-1">Monthly revenue, costs, and margins</p>
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900">Financial Dashboard</h1>
+            <p className="text-slate-600 mt-1">Monthly revenue, costs, and margins</p>
+          </div>
+          <div className="flex gap-3">
+            <Select value={selectedMonth.toString()} onValueChange={(v) => setSelectedMonth(parseInt(v))}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {months.map((m) => (
+                  <SelectItem key={m} value={m.toString()}>
+                    {getMonthName(m)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(parseInt(v))}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {years.map((y) => (
+                  <SelectItem key={y} value={y.toString()}>
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Database Setup Required</AlertTitle>
-          <AlertDescription>
-            <p className="mb-2">
-              The Financial Dashboard requires additional database tables that haven't been set up yet.
-            </p>
-            <p className="mb-2">
-              To enable this feature, please run the SQL migrations from:
-            </p>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li><strong>DATABASE_SETUP_PART_B.md</strong> - Creates projects, timesheets, and costs tables</li>
-              <li><strong>DATABASE_SETUP_PART_C.md</strong> - Creates monthly budgets table</li>
-            </ul>
-            <p className="mt-3 text-sm">
-              After running the migrations, refresh this page to view financial reports.
-            </p>
-          </AlertDescription>
-        </Alert>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-slate-600">Total Revenue</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-slate-900">
+                {formatCurrency(financials.revenue)}
+              </div>
+              {financials.budgetRevenue && (
+                <div className="text-xs text-slate-500 mt-1">
+                  Budget: {formatCurrency(financials.budgetRevenue)}
+                  {financials.revenue >= financials.budgetRevenue ? (
+                    <TrendingUp className="inline w-3 h-3 ml-1 text-green-600" />
+                  ) : (
+                    <TrendingDown className="inline w-3 h-3 ml-1 text-red-600" />
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardContent className="p-12 text-center">
-            <div className="text-slate-400 mb-4">
-              <svg
-                className="w-16 h-16 mx-auto"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                />
-              </svg>
-            </div>
-            <h3 className="text-lg font-medium text-slate-900 mb-1">
-              Financial Dashboard Coming Soon
-            </h3>
-            <p className="text-slate-600 text-sm">
-              Complete the database setup to view your financial reports
-            </p>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-slate-600">Internal Cost</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-slate-900">
+                {formatCurrency(financials.internalCost)}
+              </div>
+              {isAdmin && (
+                <div className="text-xs text-slate-500 mt-1">
+                  From timesheet hours
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-slate-600">Subcontractor Cost</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-slate-900">
+                {formatCurrency(financials.subcontractorCost)}
+              </div>
+              <div className="text-xs text-slate-500 mt-1">
+                External suppliers
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-slate-600">Margin</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${financials.margin >= 0 ? "text-green-600" : "text-red-600"}`}>
+                {formatCurrency(financials.margin)}
+              </div>
+              <div className={`text-xs font-medium mt-1 ${financials.marginPercent >= 0 ? "text-green-600" : "text-red-600"}`}>
+                {financials.marginPercent.toFixed(1)}%
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {financials.budgetCost && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Budget Comparison</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="text-sm text-slate-500 mb-1">Total Cost vs Budget</div>
+                  <div className="text-lg font-semibold text-slate-900">
+                    {formatCurrency(financials.internalCost + financials.subcontractorCost)}
+                  </div>
+                  <div className="text-sm text-slate-500">
+                    Budget: {formatCurrency(financials.budgetCost)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm text-slate-500 mb-1">Variance</div>
+                  <div className={`text-lg font-semibold ${
+                    (financials.internalCost + financials.subcontractorCost) <= financials.budgetCost 
+                      ? "text-green-600" 
+                      : "text-red-600"
+                  }`}>
+                    {formatCurrency(financials.budgetCost - (financials.internalCost + financials.subcontractorCost))}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </Layout>
+  );
+}
+
+export default function FinancialsPage() {
+  return (
+    <RequireAuth>
+      <FinancialsContent />
+    </RequireAuth>
   );
 }
