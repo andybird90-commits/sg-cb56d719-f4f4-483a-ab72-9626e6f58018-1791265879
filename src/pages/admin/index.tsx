@@ -60,7 +60,8 @@ function AdminContent() {
       .select("*")
       .order("full_name");
 
-    setUsers(data || []);
+    // Cast to Profile[] as generated types might not have new columns yet
+    setUsers((data as unknown as Profile[]) || []);
     setLoading(false);
   };
 
