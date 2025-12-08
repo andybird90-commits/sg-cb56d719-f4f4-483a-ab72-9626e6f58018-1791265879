@@ -1,20 +1,20 @@
 import { useEffect } from "react";
 import { useRouter } from "next/router";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface RequireAuthProps {
   children: React.ReactNode;
 }
 
 export function RequireAuth({ children }: RequireAuthProps) {
-  const { session, loading } = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !session) {
+    if (!loading && !user) {
       router.replace("/auth/signin");
     }
-  }, [loading, session, router]);
+  }, [loading, user, router]);
 
   if (loading) {
     return (
@@ -30,7 +30,7 @@ export function RequireAuth({ children }: RequireAuthProps) {
     );
   }
 
-  if (!session) {
+  if (!user) {
     return (
       <div style={{ 
         minHeight: "100vh", 

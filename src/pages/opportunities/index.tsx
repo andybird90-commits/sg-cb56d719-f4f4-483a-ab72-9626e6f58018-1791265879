@@ -1,22 +1,77 @@
-import { useAuth } from "@/contexts/AuthContext";
+import { RequireAuth } from "@/components/RequireAuth";
 import { Layout } from "@/components/Layout";
+import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { AlertCircle } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Plus } from "lucide-react";
+import Link from "next/link";
 
-export default function OpportunitiesPage() {
-  const { user, loading: authLoading } = useAuth();
+interface Opportunity {
+  id: string;
+  name: string;
+  stage: string;
+  status: string;
+  expected_fee_value: number | null;
+  companies?: {
+    name: string;
+  };
+}
+
+function OpportunitiesContent() {
+  const { profile } = useAuth();
   const router = useRouter();
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const canEdit = profile?.role === "admin" || profile?.role === "director";
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push("/auth/signin");
-    }
-  }, [user, authLoading, router]);
+    fetchOpportunities();
+  }, []);
 
-  if (authLoading) {
+  const fetchOpportunities = async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from("opportunities")
+      .select(`
+        *,
+        companies (
+          name
+        )
+      `)
+      .order("created_at", { ascending: false });
+
+    if (data) setOpportunities(data);
+    setLoading(false);
+  };
+
+  const getStageColor = (stage: string) => {
+    switch (stage) {
+      case "secured":
+        return "bg-green-100 text-green-800";
+      case "high_potential":
+        return "bg-blue-100 text-blue-800";
+      case "bid":
+        return "bg-yellow-100 text-yellow-800";
+      default:
+        return "bg-slate-100 text-slate-800";
+    }
+  };
+
+  const formatCurrency = (value: number | null) => {
+    if (!value) return "—";
+    return new Intl.NumberFormat("en-GB", {
+      style: "currency",
+      currency: "GBP",
+      minimumFractionDigits: 0,
+    }).format(value);
+  };
+
+  if (loading) {
     return (
       <Layout>
         <div className="flex items-center justify-center py-12">
@@ -29,56 +84,60 @@ export default function OpportunitiesPage() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Opportunities</h1>
-          <p className="text-slate-600 mt-1">Track and manage business opportunities</p>
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900">Opportunities</h1>
+            <p className="text-slate-600 mt-1">Track and manage business opportunities</p>
+          </div>
+          {canEdit && (
+            <Link href="/opportunities/new">
+              <Button className="gap-2">
+                <Plus className="w-4 h-4" />
+                New Opportunity
+              </Button>
+            </Link>
+          )}
         </div>
 
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Database Setup Required</AlertTitle>
-          <AlertDescription>
-            <p className="mb-2">
-              The Opportunities module requires additional database tables that haven't been set up yet.
-            </p>
-            <p className="mb-2">
-              To enable this feature, please run the SQL migrations from:
-            </p>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li><strong>DATABASE_SETUP_PART_B.md</strong> - Creates opportunities, projects, and related tables</li>
-            </ul>
-            <p className="mt-3 text-sm">
-              After running the migrations, refresh this page to start managing opportunities.
-            </p>
-          </AlertDescription>
-        </Alert>
-
-        <Card>
-          <CardContent className="p-12 text-center">
-            <div className="text-slate-400 mb-4">
-              <svg
-                className="w-16 h-16 mx-auto"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
-                />
-              </svg>
-            </div>
-            <h3 className="text-lg font-medium text-slate-900 mb-1">
-              Opportunities Module Coming Soon
-            </h3>
-            <p className="text-slate-600 text-sm">
-              Complete the database setup to start tracking your sales pipeline
-            </p>
-          </CardContent>
-        </Card>
+        <div className="grid gap-4">
+          {opportunities.map((opp) => (
+            <Card 
+              key={opp.id} 
+              className="hover:shadow-md transition-shadow cursor-pointer"
+              onClick={() => router.push(`/opportunities/${opp.id}`)}
+            >
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="text-lg font-semibold text-slate-900">
+                        {opp.name}
+                      </h3>
+                      <Badge className={getStageColor(opp.stage)}>
+                        {opp.stage.replace("_", " ")}
+                      </Badge>
+                      <Badge variant="outline">{opp.status}</Badge>
+                    </div>
+                    <p className="text-sm text-slate-600">{opp.companies?.name}</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm text-slate-500">Expected Value</div>
+                    <div className="text-lg font-semibold">{formatCurrency(opp.expected_fee_value)}</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     </Layout>
+  );
+}
+
+export default function OpportunitiesPage() {
+  return (
+    <RequireAuth>
+      <OpportunitiesContent />
+    </RequireAuth>
   );
 }

@@ -33,7 +33,6 @@ export default function SignInPage() {
       return;
     }
 
-    // Navigate to dashboard on success
     router.push("/dashboard");
   };
 
@@ -74,11 +73,6 @@ export default function SignInPage() {
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 required
               />
-            </div>
-            <div className="text-right">
-              <Link href="/auth/forgot-password" className="text-sm text-blue-600 hover:underline">
-                Forgot password?
-              </Link>
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Signing in..." : "Sign In"}

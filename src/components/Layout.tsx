@@ -2,7 +2,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
-import { Building2, Users, LogOut, LayoutDashboard, Target, Briefcase, Calendar, Clock, TrendingUp, CalendarDays, Settings } from "lucide-react";
+import { Building2, Users, Target, Briefcase, LogOut, LayoutDashboard } from "lucide-react";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { user, profile, signOut } = useAuth();
@@ -11,8 +11,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
   if (!user || !profile) {
     return <div className="min-h-screen bg-slate-50">{children}</div>;
   }
-
-  const isAdmin = profile.role === "admin" || profile.role === "director";
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -74,58 +72,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     Projects
                   </Button>
                 </Link>
-                <Link href="/pipeline">
-                  <Button
-                    variant={router.pathname === "/pipeline" ? "default" : "ghost"}
-                    size="sm"
-                    className="gap-2"
-                  >
-                    <Calendar className="w-4 h-4" />
-                    Pipeline
-                  </Button>
-                </Link>
-                <Link href="/timesheets">
-                  <Button
-                    variant={router.pathname.startsWith("/timesheets") ? "default" : "ghost"}
-                    size="sm"
-                    className="gap-2"
-                  >
-                    <Clock className="w-4 h-4" />
-                    Timesheets
-                  </Button>
-                </Link>
-                <Link href="/financials">
-                  <Button
-                    variant={router.pathname === "/financials" ? "default" : "ghost"}
-                    size="sm"
-                    className="gap-2"
-                  >
-                    <TrendingUp className="w-4 h-4" />
-                    Financials
-                  </Button>
-                </Link>
-                <Link href="/absences">
-                  <Button
-                    variant={router.pathname.startsWith("/absences") ? "default" : "ghost"}
-                    size="sm"
-                    className="gap-2"
-                  >
-                    <CalendarDays className="w-4 h-4" />
-                    Absences
-                  </Button>
-                </Link>
-                {isAdmin && (
-                  <Link href="/admin">
-                    <Button
-                      variant={router.pathname.startsWith("/admin") ? "default" : "ghost"}
-                      size="sm"
-                      className="gap-2"
-                    >
-                      <Settings className="w-4 h-4" />
-                      Admin
-                    </Button>
-                  </Link>
-                )}
               </div>
             </div>
             <div className="flex items-center gap-4">

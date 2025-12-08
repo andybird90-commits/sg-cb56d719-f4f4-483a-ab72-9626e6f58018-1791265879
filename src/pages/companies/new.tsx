@@ -1,5 +1,6 @@
-import { useAuth } from "@/contexts/AuthContext";
+import { RequireAuth } from "@/components/RequireAuth";
 import { Layout } from "@/components/Layout";
+import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -13,8 +14,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
-export default function NewCompanyPage() {
-  const { user, profile, loading: authLoading } = useAuth();
+function NewCompanyContent() {
+  const { profile } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -22,18 +23,15 @@ export default function NewCompanyPage() {
     name: "",
     short_name: "",
     sector: "",
-    status: "prospect" as "active" | "prospect" | "inactive",
+    status: "active",
     notes: "",
   });
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push("/auth/signin");
-    }
-    if (!authLoading && profile && profile.role === "user") {
+    if (profile && profile.role !== "admin" && profile.role !== "director") {
       router.push("/companies");
     }
-  }, [user, profile, authLoading, router]);
+  }, [profile, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +42,7 @@ export default function NewCompanyPage() {
       name: formData.name,
       short_name: formData.short_name || null,
       sector: formData.sector || null,
-      status: formData.status as "active" | "prospect" | "inactive",
+      status: formData.status,
       notes: formData.notes || null,
     });
 
@@ -56,16 +54,6 @@ export default function NewCompanyPage() {
 
     router.push("/companies");
   };
-
-  if (authLoading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center py-12">
-          <div className="text-slate-600">Loading...</div>
-        </div>
-      </Layout>
-    );
-  }
 
   return (
     <Layout>
@@ -128,9 +116,7 @@ export default function NewCompanyPage() {
                 <Label htmlFor="status">Status</Label>
                 <Select
                   value={formData.status}
-                  onValueChange={(value: "active" | "prospect" | "inactive") =>
-                    setFormData({ ...formData, status: value })
-                  }
+                  onValueChange={(value) => setFormData({ ...formData, status: value })}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -168,5 +154,13 @@ export default function NewCompanyPage() {
         </Card>
       </div>
     </Layout>
+  );
+}
+
+export default function NewCompanyPage() {
+  return (
+    <RequireAuth>
+      <NewCompanyContent />
+    </RequireAuth>
   );
 }

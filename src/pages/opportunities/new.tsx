@@ -1,8 +1,9 @@
-import { useAuth } from "@/contexts/AuthContext";
+import { RequireAuth } from "@/components/RequireAuth";
 import { Layout } from "@/components/Layout";
+import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
-import { supabase, Company, Contact } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,8 +14,18 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
-export default function NewOpportunityPage() {
-  const { user, profile, loading: authLoading } = useAuth();
+interface Company {
+  id: string;
+  name: string;
+}
+
+interface Contact {
+  id: string;
+  name: string;
+}
+
+function NewOpportunityContent() {
+  const { profile } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -25,8 +36,8 @@ export default function NewOpportunityPage() {
     contact_id: "",
     name: "",
     description: "",
-    stage: "bid" as "secured" | "high_potential" | "bid",
-    status: "open" as "open" | "closed_won" | "closed_lost",
+    stage: "bid",
+    status: "open",
     tender_due_date: "",
     expected_start_date: "",
     expected_end_date: "",
@@ -35,32 +46,22 @@ export default function NewOpportunityPage() {
   });
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push("/auth/signin");
-    }
-    if (!authLoading && profile && profile.role === "user") {
+    if (profile && profile.role !== "admin" && profile.role !== "director") {
       router.push("/opportunities");
     }
-  }, [user, profile, authLoading, router]);
-
-  useEffect(() => {
-    if (user) {
-      fetchCompanies();
-    }
-  }, [user]);
+    fetchCompanies();
+  }, [profile, router]);
 
   useEffect(() => {
     if (formData.company_id) {
       fetchContacts(formData.company_id);
-    } else {
-      setContacts([]);
     }
   }, [formData.company_id]);
 
   const fetchCompanies = async () => {
     const { data } = await supabase
       .from("companies")
-      .select("*")
+      .select("id, name")
       .order("name");
     if (data) setCompanies(data);
   };
@@ -68,7 +69,7 @@ export default function NewOpportunityPage() {
   const fetchContacts = async (companyId: string) => {
     const { data } = await supabase
       .from("contacts")
-      .select("*")
+      .select("id, name")
       .eq("company_id", companyId)
       .order("name");
     if (data) setContacts(data);
@@ -101,16 +102,6 @@ export default function NewOpportunityPage() {
 
     router.push("/opportunities");
   };
-
-  if (authLoading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center py-12">
-          <div className="text-slate-600">Loading...</div>
-        </div>
-      </Layout>
-    );
-  }
 
   return (
     <Layout>
@@ -206,9 +197,7 @@ export default function NewOpportunityPage() {
                   <Label htmlFor="stage">Stage</Label>
                   <Select
                     value={formData.stage}
-                    onValueChange={(value: "secured" | "high_potential" | "bid") =>
-                      setFormData({ ...formData, stage: value })
-                    }
+                    onValueChange={(value) => setFormData({ ...formData, stage: value })}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -225,9 +214,7 @@ export default function NewOpportunityPage() {
                   <Label htmlFor="status">Status</Label>
                   <Select
                     value={formData.status}
-                    onValueChange={(value: "open" | "closed_won" | "closed_lost") =>
-                      setFormData({ ...formData, status: value })
-                    }
+                    onValueChange={(value) => setFormData({ ...formData, status: value })}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -313,5 +300,13 @@ export default function NewOpportunityPage() {
         </Card>
       </div>
     </Layout>
+  );
+}
+
+export default function NewOpportunityPage() {
+  return (
+    <RequireAuth>
+      <NewOpportunityContent />
+    </RequireAuth>
   );
 }

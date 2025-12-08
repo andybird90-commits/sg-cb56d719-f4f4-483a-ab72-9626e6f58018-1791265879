@@ -1,8 +1,9 @@
-import { useAuth } from "@/contexts/AuthContext";
+import { RequireAuth } from "@/components/RequireAuth";
 import { Layout } from "@/components/Layout";
+import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
-import { supabase, Company, Opportunity } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,8 +14,18 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
-export default function NewProjectPage() {
-  const { user, profile, loading: authLoading } = useAuth();
+interface Company {
+  id: string;
+  name: string;
+}
+
+interface Opportunity {
+  id: string;
+  name: string;
+}
+
+function NewProjectContent() {
+  const { profile } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -27,57 +38,32 @@ export default function NewProjectPage() {
     client_company_id: "",
     start_date: "",
     end_date: "",
-    status: "pipeline" as "pipeline" | "live" | "on_hold" | "completed",
+    status: "pipeline",
     agreed_fee_value: "",
     notes: "",
   });
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push("/auth/signin");
-    }
-    if (!authLoading && profile && profile.role === "user") {
+    if (profile && profile.role !== "admin" && profile.role !== "director") {
       router.push("/projects");
     }
-  }, [user, profile, authLoading, router]);
+    fetchData();
+  }, [profile, router]);
 
-  useEffect(() => {
-    if (user) {
-      fetchCompanies();
-      fetchOpportunities();
-    }
-  }, [user]);
-
-  // Handle query params for converting opportunity to project
-  useEffect(() => {
-    if (router.isReady && router.query) {
-      const { opportunity_id, client_company_id, name, fee } = router.query;
-      
-      setFormData(prev => ({
-        ...prev,
-        opportunity_id: (opportunity_id as string) || prev.opportunity_id,
-        client_company_id: (client_company_id as string) || prev.client_company_id,
-        name: (name as string) || prev.name,
-        agreed_fee_value: (fee as string) || prev.agreed_fee_value,
-      }));
-    }
-  }, [router.isReady, router.query]);
-
-  const fetchCompanies = async () => {
-    const { data } = await supabase
+  const fetchData = async () => {
+    const { data: companiesData } = await supabase
       .from("companies")
-      .select("*")
+      .select("id, name")
       .order("name");
-    if (data) setCompanies(data);
-  };
 
-  const fetchOpportunities = async () => {
-    const { data } = await supabase
+    const { data: opportunitiesData } = await supabase
       .from("opportunities")
-      .select("*")
+      .select("id, name")
       .eq("status", "open")
       .order("name");
-    if (data) setOpportunities(data);
+
+    if (companiesData) setCompanies(companiesData);
+    if (opportunitiesData) setOpportunities(opportunitiesData);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -105,16 +91,6 @@ export default function NewProjectPage() {
 
     router.push("/projects");
   };
-
-  if (authLoading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center py-12">
-          <div className="text-slate-600">Loading...</div>
-        </div>
-      </Layout>
-    );
-  }
 
   return (
     <Layout>
@@ -160,9 +136,7 @@ export default function NewProjectPage() {
                   <Label htmlFor="status">Status</Label>
                   <Select
                     value={formData.status}
-                    onValueChange={(value: "pipeline" | "live" | "on_hold" | "completed") =>
-                      setFormData({ ...formData, status: value })
-                    }
+                    onValueChange={(value) => setFormData({ ...formData, status: value })}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -172,6 +146,7 @@ export default function NewProjectPage() {
                       <SelectItem value="live">Live</SelectItem>
                       <SelectItem value="on_hold">On Hold</SelectItem>
                       <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -284,5 +259,13 @@ export default function NewProjectPage() {
         </Card>
       </div>
     </Layout>
+  );
+}
+
+export default function NewProjectPage() {
+  return (
+    <RequireAuth>
+      <NewProjectContent />
+    </RequireAuth>
   );
 }

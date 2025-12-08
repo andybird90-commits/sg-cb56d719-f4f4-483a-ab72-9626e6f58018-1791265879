@@ -1,20 +1,20 @@
 import { useEffect } from "react";
 import { useRouter } from "next/router";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function RootRedirect() {
-  const { session, loading } = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (!loading) {
-      if (session) {
+      if (user) {
         router.replace("/dashboard");
       } else {
         router.replace("/auth/signin");
       }
     }
-  }, [loading, session, router]);
+  }, [loading, user, router]);
 
   return (
     <div style={{ 

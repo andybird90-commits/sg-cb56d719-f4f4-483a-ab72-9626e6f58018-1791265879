@@ -1,8 +1,9 @@
-import { useAuth } from "@/contexts/AuthContext";
+import { RequireAuth } from "@/components/RequireAuth";
 import { Layout } from "@/components/Layout";
+import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
-import { supabase, Opportunity, Company, Contact, Project } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,33 +12,43 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowLeft, Edit, Calendar, DollarSign, Building2, User, Briefcase, ArrowRight } from "lucide-react";
+import { ArrowLeft, Edit } from "lucide-react";
 import Link from "next/link";
 
-interface OpportunityWithRelations extends Opportunity {
-  company?: Company;
-  contact?: Contact;
-  linked_project?: Project;
+interface Opportunity {
+  id: string;
+  name: string;
+  description: string | null;
+  stage: string;
+  status: string;
+  company_id: string;
+  contact_id: string | null;
+  tender_due_date: string | null;
+  expected_start_date: string | null;
+  expected_end_date: string | null;
+  expected_fee_value: number | null;
+  probability_percent: number | null;
+  companies?: {
+    name: string;
+  };
+  contacts?: {
+    name: string;
+  };
 }
 
-export default function OpportunityDetailPage() {
-  const { user, profile, loading: authLoading } = useAuth();
+function OpportunityDetailContent() {
+  const { profile } = useAuth();
   const router = useRouter();
   const { id } = router.query;
-  const [opportunity, setOpportunity] = useState<OpportunityWithRelations | null>(null);
+  const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState("");
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  
-  const [editFormData, setEditFormData] = useState({
-    company_id: "",
-    contact_id: "",
+  const [editData, setEditData] = useState({
     name: "",
     description: "",
-    stage: "bid" as "secured" | "high_potential" | "bid",
-    status: "open" as "open" | "closed_won" | "closed_lost",
+    stage: "",
+    status: "",
     tender_due_date: "",
     expected_start_date: "",
     expected_end_date: "",
@@ -45,64 +56,38 @@ export default function OpportunityDetailPage() {
     probability_percent: "",
   });
 
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.push("/auth/signin");
-    }
-  }, [user, authLoading, router]);
+  const canEdit = profile?.role === "admin" || profile?.role === "director";
 
   useEffect(() => {
-    if (id && typeof id === "string" && user) {
-      fetchOpportunityData(id);
-      fetchCompanies();
+    if (id && typeof id === "string") {
+      fetchOpportunity(id);
     }
-  }, [id, user]);
+  }, [id]);
 
-  useEffect(() => {
-    if (editFormData.company_id) {
-      fetchContacts(editFormData.company_id);
-    }
-  }, [editFormData.company_id]);
-
-  const fetchOpportunityData = async (oppId: string) => {
+  const fetchOpportunity = async (oppId: string) => {
     setLoading(true);
-    const { data, error } = await supabase
+    const { data, error: fetchError } = await supabase
       .from("opportunities")
       .select(`
         *,
-        companies!opportunities_company_id_fkey (
-          *
+        companies (
+          name
         ),
-        contacts!opportunities_contact_id_fkey (
-          *
-        ),
-        projects!opportunities_linked_project_id_fkey (
-          *
+        contacts (
+          name
         )
       `)
       .eq("id", oppId)
       .single();
 
-    if (error || !data) {
+    if (fetchError || !data) {
       setError("Opportunity not found");
       setLoading(false);
       return;
     }
 
-    const formatted = {
-      ...data,
-      company: data.companies,
-      contact: data.contacts,
-      linked_project: data.projects,
-      companies: undefined,
-      contacts: undefined,
-      projects: undefined,
-    };
-
-    setOpportunity(formatted);
-    setEditFormData({
-      company_id: data.company_id,
-      contact_id: data.contact_id || "",
+    setOpportunity(data);
+    setEditData({
       name: data.name,
       description: data.description || "",
       stage: data.stage,
@@ -113,44 +98,25 @@ export default function OpportunityDetailPage() {
       expected_fee_value: data.expected_fee_value?.toString() || "",
       probability_percent: data.probability_percent?.toString() || "",
     });
-
     setLoading(false);
-  };
-
-  const fetchCompanies = async () => {
-    const { data } = await supabase.from("companies").select("*").order("name");
-    if (data) setCompanies(data);
-  };
-
-  const fetchContacts = async (companyId: string) => {
-    const { data } = await supabase
-      .from("contacts")
-      .select("*")
-      .eq("company_id", companyId)
-      .order("name");
-    if (data) setContacts(data);
   };
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (typeof id !== "string") return;
-    
-    setError("");
+    if (!id || typeof id !== "string") return;
 
     const { error: updateError } = await supabase
       .from("opportunities")
       .update({
-        company_id: editFormData.company_id,
-        contact_id: editFormData.contact_id || null,
-        name: editFormData.name,
-        description: editFormData.description || null,
-        stage: editFormData.stage,
-        status: editFormData.status,
-        tender_due_date: editFormData.tender_due_date || null,
-        expected_start_date: editFormData.expected_start_date || null,
-        expected_end_date: editFormData.expected_end_date || null,
-        expected_fee_value: editFormData.expected_fee_value ? parseFloat(editFormData.expected_fee_value) : null,
-        probability_percent: editFormData.probability_percent ? parseInt(editFormData.probability_percent) : null,
+        name: editData.name,
+        description: editData.description || null,
+        stage: editData.stage,
+        status: editData.status,
+        tender_due_date: editData.tender_due_date || null,
+        expected_start_date: editData.expected_start_date || null,
+        expected_end_date: editData.expected_end_date || null,
+        expected_fee_value: editData.expected_fee_value ? parseFloat(editData.expected_fee_value) : null,
+        probability_percent: editData.probability_percent ? parseInt(editData.probability_percent) : null,
       })
       .eq("id", id);
 
@@ -159,41 +125,8 @@ export default function OpportunityDetailPage() {
       return;
     }
 
-    await fetchOpportunityData(id);
+    await fetchOpportunity(id);
     setIsEditing(false);
-  };
-
-  const handleCreateProject = () => {
-    if (!opportunity) return;
-    
-    // Redirect to project creation with pre-filled data
-    router.push({
-      pathname: "/projects/new",
-      query: {
-        opportunity_id: opportunity.id,
-        client_company_id: opportunity.company_id,
-        name: opportunity.name,
-        fee: opportunity.expected_fee_value?.toString(),
-      },
-    });
-  };
-
-  const getStageColor = (stage: string) => {
-    switch (stage) {
-      case "secured": return "bg-green-100 text-green-800";
-      case "high_potential": return "bg-blue-100 text-blue-800";
-      case "bid": return "bg-yellow-100 text-yellow-800";
-      default: return "bg-slate-100 text-slate-800";
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "open": return "bg-blue-100 text-blue-800";
-      case "closed_won": return "bg-green-100 text-green-800";
-      case "closed_lost": return "bg-red-100 text-red-800";
-      default: return "bg-slate-100 text-slate-800";
-    }
   };
 
   const formatCurrency = (value: number | null) => {
@@ -202,7 +135,6 @@ export default function OpportunityDetailPage() {
       style: "currency",
       currency: "GBP",
       minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
     }).format(value);
   };
 
@@ -215,22 +147,46 @@ export default function OpportunityDetailPage() {
     });
   };
 
-  if (authLoading || loading) {
-    return <Layout><div className="flex justify-center py-12">Loading...</div></Layout>;
-  }
+  const getStageColor = (stage: string) => {
+    switch (stage) {
+      case "secured":
+        return "bg-green-100 text-green-800";
+      case "high_potential":
+        return "bg-blue-100 text-blue-800";
+      case "bid":
+        return "bg-yellow-100 text-yellow-800";
+      default:
+        return "bg-slate-100 text-slate-800";
+    }
+  };
 
-  if (error && !opportunity) {
+  if (loading) {
     return (
       <Layout>
-        <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>
-        <Link href="/opportunities" className="mt-4 inline-block">
-          <Button variant="outline"><ArrowLeft className="mr-2 h-4 w-4"/> Back</Button>
-        </Link>
+        <div className="flex items-center justify-center py-12">
+          <div className="text-slate-600">Loading...</div>
+        </div>
       </Layout>
     );
   }
 
-  const isAdmin = profile?.role === "admin" || profile?.role === "director";
+  if (error || !opportunity) {
+    return (
+      <Layout>
+        <div className="space-y-6">
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+          <Link href="/opportunities">
+            <Button variant="outline" className="gap-2">
+              <ArrowLeft className="w-4 h-4" />
+              Back to Opportunities
+            </Button>
+          </Link>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -244,111 +200,72 @@ export default function OpportunityDetailPage() {
           </Link>
         </div>
 
-        {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
-
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div className="flex items-center gap-3">
-              <CardTitle className="text-2xl">{opportunity?.name}</CardTitle>
-              {opportunity && (
-                <>
-                  <Badge className={getStageColor(opportunity.stage)}>
-                    {opportunity.stage.replace("_", " ")}
-                  </Badge>
-                  <Badge className={getStatusColor(opportunity.status)}>
-                    {opportunity.status.replace("_", " ")}
-                  </Badge>
-                </>
-              )}
+              <CardTitle className="text-2xl">{opportunity.name}</CardTitle>
+              <Badge className={getStageColor(opportunity.stage)}>
+                {opportunity.stage.replace("_", " ")}
+              </Badge>
+              <Badge variant="outline">{opportunity.status}</Badge>
             </div>
-            <div className="flex gap-2">
-              {isAdmin && !isEditing && (
-                <>
-                  <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="gap-2">
-                    <Edit className="w-4 h-4" />
-                    Edit
-                  </Button>
-                  {!opportunity?.linked_project_id && opportunity?.status !== "closed_lost" && (
-                    <Button size="sm" onClick={handleCreateProject} className="gap-2">
-                      <Briefcase className="w-4 h-4" />
-                      Create Project
-                    </Button>
-                  )}
-                </>
-              )}
-            </div>
+            {canEdit && !isEditing && (
+              <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="gap-2">
+                <Edit className="w-4 h-4" />
+                Edit
+              </Button>
+            )}
           </CardHeader>
           <CardContent>
             {isEditing ? (
               <form onSubmit={handleUpdate} className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Name</Label>
-                  <Input 
-                    value={editFormData.name} 
-                    onChange={e => setEditFormData({...editFormData, name: e.target.value})}
+                  <Label htmlFor="name">Opportunity Name *</Label>
+                  <Input
+                    id="name"
+                    value={editData.name}
+                    onChange={(e) => setEditData({ ...editData, name: e.target.value })}
                     required
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Company</Label>
-                  <Select 
-                    value={editFormData.company_id} 
-                    onValueChange={v => setEditFormData({...editFormData, company_id: v, contact_id: ""})}
-                  >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {companies.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {editFormData.company_id && (
-                  <div className="space-y-2">
-                    <Label>Contact</Label>
-                    <Select 
-                      value={editFormData.contact_id} 
-                      onValueChange={v => setEditFormData({...editFormData, contact_id: v})}
-                    >
-                      <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="">None</SelectItem>
-                        {contacts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <Label>Description</Label>
-                  <Textarea 
-                    value={editFormData.description} 
-                    onChange={e => setEditFormData({...editFormData, description: e.target.value})}
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    value={editData.description}
+                    onChange={(e) => setEditData({ ...editData, description: e.target.value })}
+                    rows={4}
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Stage</Label>
-                    <Select 
-                      value={editFormData.stage} 
-                      onValueChange={(v: any) => setEditFormData({...editFormData, stage: v})}
+                    <Label htmlFor="stage">Stage</Label>
+                    <Select
+                      value={editData.stage}
+                      onValueChange={(value) => setEditData({ ...editData, stage: value })}
                     >
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="bid">Bid</SelectItem>
-                        <SelectItem value="high_potential">High Potential</SelectItem>
                         <SelectItem value="secured">Secured</SelectItem>
+                        <SelectItem value="high_potential">High Potential</SelectItem>
+                        <SelectItem value="bid">Bid</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
+
                   <div className="space-y-2">
-                    <Label>Status</Label>
-                    <Select 
-                      value={editFormData.status} 
-                      onValueChange={(v: any) => setEditFormData({...editFormData, status: v})}
+                    <Label htmlFor="status">Status</Label>
+                    <Select
+                      value={editData.status}
+                      onValueChange={(value) => setEditData({ ...editData, status: value })}
                     >
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="open">Open</SelectItem>
                         <SelectItem value="closed_won">Closed Won</SelectItem>
@@ -360,131 +277,130 @@ export default function OpportunityDetailPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Expected Fee (£)</Label>
-                    <Input 
-                      type="number" 
-                      value={editFormData.expected_fee_value} 
-                      onChange={e => setEditFormData({...editFormData, expected_fee_value: e.target.value})}
+                    <Label htmlFor="expected_fee_value">Expected Fee Value (£)</Label>
+                    <Input
+                      id="expected_fee_value"
+                      type="number"
+                      step="0.01"
+                      value={editData.expected_fee_value}
+                      onChange={(e) => setEditData({ ...editData, expected_fee_value: e.target.value })}
                     />
                   </div>
+
                   <div className="space-y-2">
-                    <Label>Probability (%)</Label>
-                    <Input 
-                      type="number" 
-                      min="0" max="100"
-                      value={editFormData.probability_percent} 
-                      onChange={e => setEditFormData({...editFormData, probability_percent: e.target.value})}
+                    <Label htmlFor="probability_percent">Probability (%)</Label>
+                    <Input
+                      id="probability_percent"
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={editData.probability_percent}
+                      onChange={(e) => setEditData({ ...editData, probability_percent: e.target.value })}
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label>Tender Due</Label>
-                    <Input 
-                      type="date" 
-                      value={editFormData.tender_due_date} 
-                      onChange={e => setEditFormData({...editFormData, tender_due_date: e.target.value})}
+                    <Label htmlFor="tender_due_date">Tender Due Date</Label>
+                    <Input
+                      id="tender_due_date"
+                      type="date"
+                      value={editData.tender_due_date}
+                      onChange={(e) => setEditData({ ...editData, tender_due_date: e.target.value })}
                     />
                   </div>
+
                   <div className="space-y-2">
-                    <Label>Exp. Start</Label>
-                    <Input 
-                      type="date" 
-                      value={editFormData.expected_start_date} 
-                      onChange={e => setEditFormData({...editFormData, expected_start_date: e.target.value})}
+                    <Label htmlFor="expected_start_date">Expected Start Date</Label>
+                    <Input
+                      id="expected_start_date"
+                      type="date"
+                      value={editData.expected_start_date}
+                      onChange={(e) => setEditData({ ...editData, expected_start_date: e.target.value })}
                     />
                   </div>
+
                   <div className="space-y-2">
-                    <Label>Exp. End</Label>
-                    <Input 
-                      type="date" 
-                      value={editFormData.expected_end_date} 
-                      onChange={e => setEditFormData({...editFormData, expected_end_date: e.target.value})}
+                    <Label htmlFor="expected_end_date">Expected End Date</Label>
+                    <Input
+                      id="expected_end_date"
+                      type="date"
+                      value={editData.expected_end_date}
+                      onChange={(e) => setEditData({ ...editData, expected_end_date: e.target.value })}
                     />
                   </div>
                 </div>
 
                 <div className="flex gap-3">
                   <Button type="submit">Save Changes</Button>
-                  <Button type="button" variant="outline" onClick={() => setIsEditing(false)}>Cancel</Button>
+                  <Button type="button" variant="outline" onClick={() => setIsEditing(false)}>
+                    Cancel
+                  </Button>
                 </div>
               </form>
             ) : (
-              <div className="space-y-6">
-                <div className="grid md:grid-cols-2 gap-8">
-                  <div className="space-y-4">
-                    {opportunity?.company && (
-                      <div className="flex items-center gap-2">
-                        <Building2 className="w-5 h-5 text-slate-400" />
-                        <div>
-                          <div className="text-sm font-medium text-slate-500">Client</div>
-                          <Link href={`/companies/${opportunity.company.id}`} className="text-blue-600 hover:underline font-medium">
-                            {opportunity.company.name}
-                          </Link>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {opportunity?.contact && (
-                      <div className="flex items-center gap-2">
-                        <User className="w-5 h-5 text-slate-400" />
-                        <div>
-                          <div className="text-sm font-medium text-slate-500">Contact</div>
-                          <div className="text-slate-900">{opportunity.contact.name}</div>
-                        </div>
-                      </div>
-                    )}
-
-                    {opportunity?.linked_project && (
-                      <div className="flex items-center gap-2">
-                        <Briefcase className="w-5 h-5 text-slate-400" />
-                        <div>
-                          <div className="text-sm font-medium text-slate-500">Converted to Project</div>
-                          <Link href={`/projects/${opportunity.linked_project.id}`} className="text-blue-600 hover:underline font-medium flex items-center gap-1">
-                            {opportunity.linked_project.code} - {opportunity.linked_project.name}
-                            <ArrowRight className="w-3 h-3" />
-                          </Link>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="w-5 h-5 text-slate-400" />
-                      <div>
-                        <div className="text-sm font-medium text-slate-500">Expected Fee</div>
-                        <div className="text-slate-900 font-medium">{formatCurrency(opportunity?.expected_fee_value || null)}</div>
-                        {opportunity?.probability_percent && (
-                          <div className="text-xs text-slate-500">{opportunity.probability_percent}% probability</div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-5 h-5 text-slate-400" />
-                      <div>
-                        <div className="text-sm font-medium text-slate-500">Dates</div>
-                        <div className="text-sm text-slate-900">
-                          Due: {formatDate(opportunity?.tender_due_date || null)}
-                        </div>
-                        {opportunity?.expected_start_date && (
-                          <div className="text-sm text-slate-900">
-                            Schedule: {formatDate(opportunity.expected_start_date)} - {formatDate(opportunity.expected_end_date)}
-                          </div>
-                        )}
-                      </div>
-                    </div>
+              <div className="space-y-4">
+                <div>
+                  <div className="text-sm font-medium text-slate-500 mb-1">Company</div>
+                  <div 
+                    className="text-blue-600 hover:underline cursor-pointer"
+                    onClick={() => router.push(`/companies/${opportunity.company_id}`)}
+                  >
+                    {opportunity.companies?.name}
                   </div>
                 </div>
 
-                {opportunity?.description && (
+                {opportunity.contacts && (
                   <div>
-                    <div className="text-sm font-medium text-slate-500 mb-2">Description</div>
-                    <div className="p-4 bg-slate-50 rounded-lg text-slate-700 whitespace-pre-wrap">
-                      {opportunity.description}
+                    <div className="text-sm font-medium text-slate-500 mb-1">Contact</div>
+                    <div className="text-slate-900">{opportunity.contacts.name}</div>
+                  </div>
+                )}
+
+                {opportunity.description && (
+                  <div>
+                    <div className="text-sm font-medium text-slate-500 mb-1">Description</div>
+                    <div className="text-slate-900 whitespace-pre-wrap">{opportunity.description}</div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <div className="text-sm font-medium text-slate-500">Expected Value</div>
+                    <div className="text-slate-900 font-semibold">{formatCurrency(opportunity.expected_fee_value)}</div>
+                  </div>
+                  
+                  {opportunity.probability_percent !== null && (
+                    <div>
+                      <div className="text-sm font-medium text-slate-500">Probability</div>
+                      <div className="text-slate-900">{opportunity.probability_percent}%</div>
                     </div>
+                  )}
+
+                  {opportunity.tender_due_date && (
+                    <div>
+                      <div className="text-sm font-medium text-slate-500">Tender Due</div>
+                      <div className="text-slate-900">{formatDate(opportunity.tender_due_date)}</div>
+                    </div>
+                  )}
+                </div>
+
+                {(opportunity.expected_start_date || opportunity.expected_end_date) && (
+                  <div className="grid grid-cols-2 gap-4">
+                    {opportunity.expected_start_date && (
+                      <div>
+                        <div className="text-sm font-medium text-slate-500">Expected Start</div>
+                        <div className="text-slate-900">{formatDate(opportunity.expected_start_date)}</div>
+                      </div>
+                    )}
+
+                    {opportunity.expected_end_date && (
+                      <div>
+                        <div className="text-sm font-medium text-slate-500">Expected End</div>
+                        <div className="text-slate-900">{formatDate(opportunity.expected_end_date)}</div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -493,5 +409,13 @@ export default function OpportunityDetailPage() {
         </Card>
       </div>
     </Layout>
+  );
+}
+
+export default function OpportunityDetailPage() {
+  return (
+    <RequireAuth>
+      <OpportunityDetailContent />
+    </RequireAuth>
   );
 }

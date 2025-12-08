@@ -1,22 +1,71 @@
-import { useAuth } from "@/contexts/AuthContext";
+import { RequireAuth } from "@/components/RequireAuth";
 import { Layout } from "@/components/Layout";
+import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { AlertCircle } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Plus } from "lucide-react";
+import Link from "next/link";
 
-export default function ProjectsPage() {
-  const { user, loading: authLoading } = useAuth();
+interface Project {
+  id: string;
+  code: string;
+  name: string;
+  status: string;
+  companies?: {
+    name: string;
+  };
+}
+
+function ProjectsContent() {
+  const { profile } = useAuth();
   const router = useRouter();
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const canEdit = profile?.role === "admin" || profile?.role === "director";
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push("/auth/signin");
-    }
-  }, [user, authLoading, router]);
+    fetchProjects();
+  }, []);
 
-  if (authLoading) {
+  const fetchProjects = async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from("projects")
+      .select(`
+        *,
+        companies!projects_client_company_id_fkey (
+          name
+        )
+      `)
+      .order("created_at", { ascending: false });
+
+    if (data) setProjects(data);
+    setLoading(false);
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "live":
+        return "bg-green-100 text-green-800";
+      case "pipeline":
+        return "bg-blue-100 text-blue-800";
+      case "on_hold":
+        return "bg-yellow-100 text-yellow-800";
+      case "completed":
+        return "bg-slate-100 text-slate-800";
+      case "cancelled":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-slate-100 text-slate-800";
+    }
+  };
+
+  if (loading) {
     return (
       <Layout>
         <div className="flex items-center justify-center py-12">
@@ -29,56 +78,56 @@ export default function ProjectsPage() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Projects</h1>
-          <p className="text-slate-600 mt-1">Manage active and pipeline projects</p>
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900">Projects</h1>
+            <p className="text-slate-600 mt-1">Manage active and pipeline projects</p>
+          </div>
+          {canEdit && (
+            <Link href="/projects/new">
+              <Button className="gap-2">
+                <Plus className="w-4 h-4" />
+                New Project
+              </Button>
+            </Link>
+          )}
         </div>
 
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Database Setup Required</AlertTitle>
-          <AlertDescription>
-            <p className="mb-2">
-              The Projects module requires additional database tables that haven't been set up yet.
-            </p>
-            <p className="mb-2">
-              To enable this feature, please run the SQL migrations from:
-            </p>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li><strong>DATABASE_SETUP_PART_B.md</strong> - Creates projects, activities, variations, and related tables</li>
-            </ul>
-            <p className="mt-3 text-sm">
-              After running the migrations, refresh this page to start managing projects.
-            </p>
-          </AlertDescription>
-        </Alert>
-
-        <Card>
-          <CardContent className="p-12 text-center">
-            <div className="text-slate-400 mb-4">
-              <svg
-                className="w-16 h-16 mx-auto"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                />
-              </svg>
-            </div>
-            <h3 className="text-lg font-medium text-slate-900 mb-1">
-              Projects Module Coming Soon
-            </h3>
-            <p className="text-slate-600 text-sm">
-              Complete the database setup to start managing your projects
-            </p>
-          </CardContent>
-        </Card>
+        <div className="grid gap-4">
+          {projects.map((project) => (
+            <Card 
+              key={project.id} 
+              className="hover:shadow-md transition-shadow cursor-pointer"
+              onClick={() => router.push(`/projects/${project.id}`)}
+            >
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="font-mono text-sm text-slate-500">{project.code}</span>
+                      <h3 className="text-lg font-semibold text-slate-900">
+                        {project.name}
+                      </h3>
+                      <Badge className={getStatusColor(project.status)}>
+                        {project.status.replace("_", " ")}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-slate-600">{project.companies?.name}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     </Layout>
+  );
+}
+
+export default function ProjectsPage() {
+  return (
+    <RequireAuth>
+      <ProjectsContent />
+    </RequireAuth>
   );
 }
