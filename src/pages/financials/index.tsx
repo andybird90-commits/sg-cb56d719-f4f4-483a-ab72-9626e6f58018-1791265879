@@ -7,6 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { useRouter } from "next/router";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface ProjectFinancials {
   project_id: string;
@@ -30,41 +37,72 @@ interface FinancialSummary {
   projects: ProjectFinancials[];
 }
 
+interface PhasingRow {
+  id: string;
+  project_id: string;
+  year: number;
+  month: number;
+  revenue_amount: number;
+  actual_revenue: number | null;
+  invoice_status: string | null;
+  invoice_ref: string | null;
+  invoice_date: string | null;
+}
+
+interface ToInvoiceItem {
+  project_id: string;
+  project_code: string;
+  project_name: string;
+  client_name: string;
+  year: number;
+  month: number;
+  actual_revenue: number;
+  phasing_id: string;
+}
+
 function FinancialsContent() {
   const { profile } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
-  const [financials, setFinancials] = useState<FinancialSummary>({
-    total_revenue: 0,
-    total_internal_cost: 0,
-    total_subcontractor_cost: 0,
-    total_margin_value: 0,
-    total_margin_percent: 0,
-    budget_revenue: null,
-    projects: [],
+  const [revenueMode, setRevenueMode] = useState<"forecast" | "actual">("forecast");
+  
+  const [totalRevenue, setTotalRevenue] = useState(0);
+  const [totalInternalCost, setTotalInternalCost] = useState(0);
+  const [totalSubcontractorCost, setTotalSubcontractorCost] = useState(0);
+  const [budgetRevenue, setBudgetRevenue] = useState<number | null>(null);
+  const [budgetCost, setBudgetCost] = useState<number | null>(null);
+  
+  const [projectBreakdown, setProjectBreakdown] = useState<any[]>([]);
+  const [toInvoiceItems, setToInvoiceItems] = useState<ToInvoiceItem[]>([]);
+  
+  // Invoice marking dialog state
+  const [markingInvoice, setMarkingInvoice] = useState<ToInvoiceItem | null>(null);
+  const [invoiceForm, setInvoiceForm] = useState({
+    invoice_ref: "",
+    invoice_date: new Date().toISOString().split("T")[0],
   });
 
-  const isAdmin = profile?.role === "admin" || profile?.role === "director";
+  const canEdit = profile?.role === "admin" || profile?.role === "director";
 
   useEffect(() => {
     fetchFinancials();
-  }, [selectedYear, selectedMonth]);
+  }, [selectedYear, selectedMonth, revenueMode]);
 
   const fetchFinancials = async () => {
     setLoading(true);
 
-    const monthStart = new Date(selectedYear, selectedMonth - 1, 1);
-    const monthEnd = new Date(selectedYear, selectedMonth, 0);
-    const monthStartStr = monthStart.toISOString().split("T")[0];
-    const monthEndStr = monthEnd.toISOString().split("T")[0];
+    // Fetch budget for selected month
+    const { data: budgetData } = await supabase
+      .from("monthly_budgets")
+      .select("*")
+      .eq("year", selectedYear)
+      .eq("month", selectedMonth)
+      .maybeSingle();
 
-    const projectFinancials: Map<string, ProjectFinancials> = new Map();
-
-    // =====================================================
-    // 1. REVENUE PER PROJECT (Pro-rated allocation with phasing override)
-    // =====================================================
+    setBudgetRevenue(budgetData?.budget_revenue || null);
+    setBudgetCost(budgetData?.budget_cost || null);
 
     // Fetch all projects
     const { data: projectsData } = await supabase
@@ -73,272 +111,215 @@ function FinancialsContent() {
         id,
         code,
         name,
-        agreed_fee_value,
+        status,
         start_date,
         end_date,
+        agreed_fee_value,
+        client_company_id,
         companies!projects_client_company_id_fkey (
           name
         )
-      `);
+      `)
+      .in("status", ["live", "pipeline"]);
 
-    // Fetch all phasing data
+    if (!projectsData) {
+      setLoading(false);
+      return;
+    }
+
+    // Fetch all phasing data for these projects
+    const projectIds = projectsData.map(p => p.id);
     const { data: phasingData } = await supabase
       .from("project_monthly_phasing")
-      .select("project_id, year, month, revenue_amount")
-      .eq("year", selectedYear)
-      .eq("month", selectedMonth);
+      .select("*")
+      .in("project_id", projectIds);
 
-    // Create phasing lookup map
-    const phasingMap: Record<string, number> = {};
-    if (phasingData) {
-      phasingData.forEach((p) => {
-        phasingMap[p.project_id] = p.revenue_amount;
-      });
-    }
-
-    if (projectsData) {
-      for (const project of projectsData) {
-        let monthRevenue = 0;
-
-        // Check if manual phasing exists for this project/month
-        if (phasingMap[project.id] !== undefined) {
-          // Use manual phasing
-          monthRevenue = phasingMap[project.id];
-        } else {
-          // Use automatic spread
-          if (!project.start_date || !project.end_date) continue;
-
-          const projectStart = new Date(project.start_date);
-          const projectEnd = new Date(project.end_date);
-
-          // Check if project overlaps with selected month
-          if (projectEnd < monthStart || projectStart > monthEnd) {
-            continue; // No overlap
-          }
-
-          // Calculate overlap
-          const effectiveStart = projectStart < monthStart ? monthStart : projectStart;
-          const effectiveEnd = projectEnd > monthEnd ? monthEnd : projectEnd;
-
-          const totalProjectDays = Math.ceil((projectEnd.getTime() - projectStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-          const overlapDays = Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-
-          // Base fee value
-          let totalFee = project.agreed_fee_value || 0;
-
-          // Add accepted variations
-          const { data: variationsData } = await supabase
-            .from("variations")
-            .select("value")
-            .eq("project_id", project.id)
-            .eq("status", "accepted");
-
-          if (variationsData) {
-            totalFee += variationsData.reduce((sum, v) => sum + v.value, 0);
-          }
-
-          // Pro-rate revenue for this month
-          monthRevenue = totalFee * (overlapDays / totalProjectDays);
-        }
-
-        // Only create entry if there's revenue or costs
-        if (monthRevenue > 0) {
-          projectFinancials.set(project.id, {
-            project_id: project.id,
-            project_code: project.code,
-            project_name: project.name,
-            client_name: project.companies?.name || "Unknown",
-            revenue: monthRevenue,
-            internal_cost: 0,
-            subcontractor_cost: 0,
-            margin_value: 0,
-            margin_percent: 0,
-          });
-        }
+    const phasingMap = new Map<string, PhasingRow[]>();
+    (phasingData || []).forEach((row) => {
+      const key = row.project_id;
+      if (!phasingMap.has(key)) {
+        phasingMap.set(key, []);
       }
-    }
+      phasingMap.get(key)!.push(row as PhasingRow);
+    });
 
-    // =====================================================
-    // 2. INTERNAL COST PER PROJECT (from timesheets)
-    // =====================================================
+    // Fetch timesheets for internal cost
+    const startOfMonth = new Date(selectedYear, selectedMonth - 1, 1);
+    const endOfMonth = new Date(selectedYear, selectedMonth, 0);
 
     const { data: timesheetsData } = await supabase
       .from("timesheets")
       .select(`
-        project_id,
         hours,
-        profiles (
+        project_id,
+        profiles!timesheets_user_id_fkey (
           default_hourly_cost_rate
         )
       `)
-      .gte("date", monthStartStr)
-      .lte("date", monthEndStr);
+      .in("project_id", projectIds)
+      .gte("date", startOfMonth.toISOString().split("T")[0])
+      .lte("date", endOfMonth.toISOString().split("T")[0]);
 
-    if (timesheetsData) {
-      timesheetsData.forEach((ts) => {
-        const rate = ts.profiles?.default_hourly_cost_rate || 0;
-        const cost = ts.hours * rate;
+    const timesheetsByProject = new Map<string, number>();
+    (timesheetsData || []).forEach((ts: any) => {
+      const cost = ts.hours * (ts.profiles?.default_hourly_cost_rate || 0);
+      timesheetsByProject.set(
+        ts.project_id,
+        (timesheetsByProject.get(ts.project_id) || 0) + cost
+      );
+    });
 
-        const existing = projectFinancials.get(ts.project_id);
-        if (existing) {
-          existing.internal_cost += cost;
-        } else {
-          // Project exists but has no revenue (not in date range)
-          // We still want to show costs for projects with activity this month
-          projectFinancials.set(ts.project_id, {
-            project_id: ts.project_id,
-            project_code: "UNKNOWN",
-            project_name: "Unknown Project",
-            client_name: "Unknown",
-            revenue: 0,
-            internal_cost: cost,
-            subcontractor_cost: 0,
-            margin_value: 0,
-            margin_percent: 0,
-          });
-        }
-      });
-    }
-
-    // Fetch project details for projects that only have costs
-    for (const [projectId, projectData] of projectFinancials.entries()) {
-      if (projectData.project_code === "UNKNOWN") {
-        const { data: projectDetails } = await supabase
-          .from("projects")
-          .select(`
-            code,
-            name,
-            companies!projects_client_company_id_fkey (
-              name
-            )
-          `)
-          .eq("id", projectId)
-          .single();
-
-        if (projectDetails) {
-          projectData.project_code = projectDetails.code;
-          projectData.project_name = projectDetails.name;
-          projectData.client_name = projectDetails.companies?.name || "Unknown";
-        }
-      }
-    }
-
-    // =====================================================
-    // 3. SUBCONTRACTOR COST PER PROJECT
-    // =====================================================
-
+    // Fetch subcontractor costs
     const { data: costsData } = await supabase
       .from("subcontractor_costs")
       .select("project_id, cost_amount")
-      .gte("cost_date", monthStartStr)
-      .lte("cost_date", monthEndStr);
+      .in("project_id", projectIds)
+      .gte("cost_date", startOfMonth.toISOString().split("T")[0])
+      .lte("cost_date", endOfMonth.toISOString().split("T")[0]);
 
-    if (costsData) {
-      costsData.forEach((cost) => {
-        const existing = projectFinancials.get(cost.project_id);
-        if (existing) {
-          existing.subcontractor_cost += cost.cost_amount;
+    const subcontractorByProject = new Map<string, number>();
+    (costsData || []).forEach((cost) => {
+      subcontractorByProject.set(
+        cost.project_id,
+        (subcontractorByProject.get(cost.project_id) || 0) + cost.cost_amount
+      );
+    });
+
+    // Calculate revenue for each project based on mode
+    const breakdown: any[] = [];
+    let totalRev = 0;
+    let totalIntCost = 0;
+    let totalSubCost = 0;
+    const toInvoice: ToInvoiceItem[] = [];
+
+    for (const project of projectsData) {
+      const phasingRows = phasingMap.get(project.id) || [];
+      const phasingRow = phasingRows.find(
+        (p) => p.year === selectedYear && p.month === selectedMonth
+      );
+
+      let projectRevenue = 0;
+
+      if (revenueMode === "forecast") {
+        // Forecast mode
+        if (phasingRow) {
+          projectRevenue = phasingRow.revenue_amount || 0;
         } else {
-          // Project exists but has no revenue
-          projectFinancials.set(cost.project_id, {
-            project_id: cost.project_id,
-            project_code: "UNKNOWN",
-            project_name: "Unknown Project",
-            client_name: "Unknown",
-            revenue: 0,
-            internal_cost: 0,
-            subcontractor_cost: cost.cost_amount,
-            margin_value: 0,
-            margin_percent: 0,
-          });
+          // Fallback to automatic spread
+          projectRevenue = calculateAutoSpread(project, selectedYear, selectedMonth);
         }
+      } else {
+        // Actual mode
+        if (phasingRow && phasingRow.actual_revenue !== null) {
+          projectRevenue = phasingRow.actual_revenue;
+        } else {
+          projectRevenue = 0;
+        }
+      }
+
+      const internalCost = timesheetsByProject.get(project.id) || 0;
+      const subcontractorCost = subcontractorByProject.get(project.id) || 0;
+      const totalCost = internalCost + subcontractorCost;
+      const margin = projectRevenue - totalCost;
+      const marginPercent = projectRevenue > 0 ? (margin / projectRevenue) * 100 : 0;
+
+      breakdown.push({
+        project_id: project.id,
+        project_code: project.code,
+        project_name: project.name,
+        client_name: project.companies?.name || "—",
+        revenue: projectRevenue,
+        internal_cost: internalCost,
+        subcontractor_cost: subcontractorCost,
+        total_cost: totalCost,
+        margin,
+        margin_percent: marginPercent,
       });
-    }
 
-    // Fetch project details for projects that only have subcontractor costs
-    for (const [projectId, projectData] of projectFinancials.entries()) {
-      if (projectData.project_code === "UNKNOWN") {
-        const { data: projectDetails } = await supabase
-          .from("projects")
-          .select(`
-            code,
-            name,
-            companies!projects_client_company_id_fkey (
-              name
-            )
-          `)
-          .eq("id", projectId)
-          .single();
+      totalRev += projectRevenue;
+      totalIntCost += internalCost;
+      totalSubCost += subcontractorCost;
 
-        if (projectDetails) {
-          projectData.project_code = projectDetails.code;
-          projectData.project_name = projectDetails.name;
-          projectData.client_name = projectDetails.companies?.name || "Unknown";
-        }
+      // Check for to_invoice items
+      if (
+        phasingRow &&
+        phasingRow.actual_revenue !== null &&
+        phasingRow.actual_revenue > 0 &&
+        phasingRow.invoice_status === "to_invoice"
+      ) {
+        toInvoice.push({
+          project_id: project.id,
+          project_code: project.code,
+          project_name: project.name,
+          client_name: project.companies?.name || "—",
+          year: selectedYear,
+          month: selectedMonth,
+          actual_revenue: phasingRow.actual_revenue,
+          phasing_id: phasingRow.id,
+        });
       }
     }
 
-    // =====================================================
-    // 4. CALCULATE MARGINS PER PROJECT
-    // =====================================================
-
-    const projectsArray: ProjectFinancials[] = [];
-    let totalRevenue = 0;
-    let totalInternalCost = 0;
-    let totalSubcontractorCost = 0;
-
-    projectFinancials.forEach((project) => {
-      const totalCost = project.internal_cost + project.subcontractor_cost;
-      project.margin_value = project.revenue - totalCost;
-      project.margin_percent = project.revenue > 0 
-        ? (project.margin_value / project.revenue) * 100 
-        : 0;
-
-      totalRevenue += project.revenue;
-      totalInternalCost += project.internal_cost;
-      totalSubcontractorCost += project.subcontractor_cost;
-
-      projectsArray.push(project);
-    });
-
-    // Sort by revenue descending
-    projectsArray.sort((a, b) => b.revenue - a.revenue);
-
-    // =====================================================
-    // 5. FETCH BUDGET
-    // =====================================================
-
-    const { data: budgetData } = await supabase
-      .from("monthly_budgets")
-      .select("budget_revenue")
-      .eq("year", selectedYear)
-      .eq("month", selectedMonth)
-      .maybeSingle();
-
-    // =====================================================
-    // 6. CALCULATE TOTALS
-    // =====================================================
-
-    const totalCost = totalInternalCost + totalSubcontractorCost;
-    const totalMarginValue = totalRevenue - totalCost;
-    const totalMarginPercent = totalRevenue > 0 
-      ? (totalMarginValue / totalRevenue) * 100 
-      : 0;
-
-    setFinancials({
-      total_revenue: totalRevenue,
-      total_internal_cost: totalInternalCost,
-      total_subcontractor_cost: totalSubcontractorCost,
-      total_margin_value: totalMarginValue,
-      total_margin_percent: totalMarginPercent,
-      budget_revenue: budgetData?.budget_revenue || null,
-      projects: projectsArray,
-    });
-
+    setTotalRevenue(totalRev);
+    setTotalInternalCost(totalIntCost);
+    setTotalSubcontractorCost(totalSubCost);
+    setProjectBreakdown(breakdown);
+    setToInvoiceItems(toInvoice);
     setLoading(false);
   };
 
-  const formatCurrency = (value: number) => {
+  const calculateAutoSpread = (project: any, year: number, month: number): number => {
+    if (!project.start_date || !project.end_date) return 0;
+
+    const startDate = new Date(project.start_date);
+    const endDate = new Date(project.end_date);
+    const targetMonth = new Date(year, month - 1, 1);
+    const targetMonthEnd = new Date(year, month, 0);
+
+    if (targetMonth > endDate || targetMonthEnd < startDate) return 0;
+
+    const totalDays = Math.ceil(
+      (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+    ) + 1;
+
+    const monthStart = targetMonth < startDate ? startDate : targetMonth;
+    const monthEnd = targetMonthEnd > endDate ? endDate : targetMonthEnd;
+
+    const daysInMonth = Math.ceil(
+      (monthEnd.getTime() - monthStart.getTime()) / (1000 * 60 * 60 * 24)
+    ) + 1;
+
+    const totalFee = project.agreed_fee_value || 0;
+    return (totalFee / totalDays) * daysInMonth;
+  };
+
+  const handleMarkInvoiced = async () => {
+    if (!markingInvoice) return;
+
+    const { error } = await supabase
+      .from("project_monthly_phasing")
+      .update({
+        invoice_status: "invoiced",
+        invoice_ref: invoiceForm.invoice_ref,
+        invoice_date: invoiceForm.invoice_date,
+      })
+      .eq("id", markingInvoice.phasing_id);
+
+    if (error) {
+      alert("Error marking as invoiced: " + error.message);
+      return;
+    }
+
+    setMarkingInvoice(null);
+    setInvoiceForm({
+      invoice_ref: "",
+      invoice_date: new Date().toISOString().split("T")[0],
+    });
+    await fetchFinancials();
+  };
+
+  const formatCurrency = (value: number | null) => {
+    if (value === null) return "—";
     return new Intl.NumberFormat("en-GB", {
       style: "currency",
       currency: "GBP",
@@ -350,8 +331,9 @@ function FinancialsContent() {
     return new Date(2000, month - 1, 1).toLocaleDateString("en-GB", { month: "long" });
   };
 
-  const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i);
-  const months = Array.from({ length: 12 }, (_, i) => i + 1);
+  const totalCost = totalInternalCost + totalSubcontractorCost;
+  const margin = totalRevenue - totalCost;
+  const marginPercent = totalRevenue > 0 ? (margin / totalRevenue) * 100 : 0;
 
   if (loading) {
     return (
@@ -363,155 +345,234 @@ function FinancialsContent() {
     );
   }
 
-  const revenueVariance = financials.budget_revenue 
-    ? financials.total_revenue - financials.budget_revenue 
-    : null;
-  const revenueVariancePercent = financials.budget_revenue && financials.budget_revenue > 0
-    ? (revenueVariance! / financials.budget_revenue) * 100
-    : null;
-
   return (
     <Layout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Financial Dashboard</h1>
-            <p className="text-slate-600 mt-1">Monthly revenue, costs, and margins</p>
-          </div>
-          <div className="flex gap-3">
-            <Select value={selectedMonth.toString()} onValueChange={(v) => setSelectedMonth(parseInt(v))}>
-              <SelectTrigger className="w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {months.map((m) => (
-                  <SelectItem key={m} value={m.toString()}>
-                    {getMonthName(m)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(parseInt(v))}>
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {years.map((y) => (
-                  <SelectItem key={y} value={y.toString()}>
-                    {y}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <p className="text-slate-600 mt-1">Monthly financial analysis</p>
           </div>
         </div>
 
-        {/* Monthly Performance Cards */}
-        <div>
-          <h2 className="text-lg font-semibold text-slate-900 mb-3">Monthly Performance</h2>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-slate-600">Total Revenue</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-slate-900">
-                  {formatCurrency(financials.total_revenue)}
-                </div>
-                {financials.budget_revenue && (
-                  <div className="text-xs text-slate-500 mt-1">
-                    Budget: {formatCurrency(financials.budget_revenue)}
-                    {financials.total_revenue >= financials.budget_revenue ? (
-                      <TrendingUp className="inline w-3 h-3 ml-1 text-green-600" />
-                    ) : (
-                      <TrendingDown className="inline w-3 h-3 ml-1 text-red-600" />
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+        {/* Month/Year Selector */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Label>Year:</Label>
+                <Select
+                  value={selectedYear.toString()}
+                  onValueChange={(value) => setSelectedYear(parseInt(value))}
+                >
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[2024, 2025, 2026, 2027].map((year) => (
+                      <SelectItem key={year} value={year.toString()}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-slate-600">Internal Cost</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-slate-900">
-                  {formatCurrency(financials.total_internal_cost)}
-                </div>
-                {isAdmin && (
-                  <div className="text-xs text-slate-500 mt-1">
-                    From timesheet hours
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+              <div className="flex items-center gap-2">
+                <Label>Month:</Label>
+                <Select
+                  value={selectedMonth.toString()}
+                  onValueChange={(value) => setSelectedMonth(parseInt(value))}
+                >
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
+                      <SelectItem key={month} value={month.toString()}>
+                        {getMonthName(month)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-slate-600">Subcontractor Cost</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-slate-900">
-                  {formatCurrency(financials.total_subcontractor_cost)}
-                </div>
-                <div className="text-xs text-slate-500 mt-1">
-                  External suppliers
-                </div>
-              </CardContent>
-            </Card>
+              <div className="ml-auto flex items-center gap-2">
+                <Label>Revenue Mode:</Label>
+                <Tabs value={revenueMode} onValueChange={(value) => setRevenueMode(value as "forecast" | "actual")}>
+                  <TabsList>
+                    <TabsTrigger value="forecast">Forecast</TabsTrigger>
+                    <TabsTrigger value="actual">Actual</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-slate-600">Margin</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className={`text-2xl font-bold ${financials.total_margin_value >= 0 ? "text-green-600" : "text-red-600"}`}>
-                  {formatCurrency(financials.total_margin_value)}
-                </div>
-                <div className={`text-xs font-medium mt-1 ${financials.total_margin_percent >= 0 ? "text-green-600" : "text-red-600"}`}>
-                  {financials.total_margin_percent.toFixed(1)}%
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        {/* Revenue vs Budget */}
-        {financials.budget_revenue && (
+        {/* Summary Cards */}
+        <div className="grid grid-cols-4 gap-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Revenue vs Budget</CardTitle>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-slate-600">
+                Total Revenue ({revenueMode === "forecast" ? "Forecast" : "Actual"})
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <div className="text-sm text-slate-500 mb-1">Actual Revenue</div>
-                  <div className="text-lg font-semibold text-slate-900">
-                    {formatCurrency(financials.total_revenue)}
-                  </div>
+              <div className="text-2xl font-bold">{formatCurrency(totalRevenue)}</div>
+              {budgetRevenue && (
+                <div className="text-xs text-slate-500 mt-1">
+                  Budget: {formatCurrency(budgetRevenue)} (
+                  {((totalRevenue / budgetRevenue) * 100).toFixed(0)}%)
                 </div>
-                <div>
-                  <div className="text-sm text-slate-500 mb-1">Budget Revenue</div>
-                  <div className="text-lg font-semibold text-slate-900">
-                    {formatCurrency(financials.budget_revenue)}
-                  </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-slate-600">
+                Internal Cost
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatCurrency(totalInternalCost)}</div>
+              {budgetCost && (
+                <div className="text-xs text-slate-500 mt-1">
+                  Budget: {formatCurrency(budgetCost)} (
+                  {((totalInternalCost / budgetCost) * 100).toFixed(0)}%)
                 </div>
-                <div>
-                  <div className="text-sm text-slate-500 mb-1">Variance</div>
-                  <div className={`text-lg font-semibold ${
-                    revenueVariance && revenueVariance >= 0 
-                      ? "text-green-600" 
-                      : "text-red-600"
-                  }`}>
-                    {revenueVariance !== null && formatCurrency(revenueVariance)}
-                    {revenueVariancePercent !== null && (
-                      <span className="text-sm ml-2">
-                        ({revenueVariancePercent >= 0 ? "+" : ""}{revenueVariancePercent.toFixed(1)}%)
-                      </span>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-slate-600">
+                Subcontractor Cost
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatCurrency(totalSubcontractorCost)}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-slate-600">Margin</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${margin >= 0 ? "text-green-600" : "text-red-600"}`}>
+                {formatCurrency(margin)}
+              </div>
+              <div className="text-xs text-slate-500 mt-1">
+                {marginPercent.toFixed(1)}%
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* To Invoice Section */}
+        {revenueMode === "actual" && toInvoiceItems.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>To Invoice</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {toInvoiceItems.map((item) => (
+                  <div key={item.phasing_id} className="flex items-center justify-between p-4 border rounded-lg bg-orange-50">
+                    <div className="flex-1">
+                      <div className="font-medium text-slate-900">
+                        {item.project_code} - {item.project_name}
+                      </div>
+                      <div className="text-sm text-slate-600">{item.client_name}</div>
+                      <div className="text-sm text-slate-500 mt-1">
+                        {getMonthName(item.month)} {item.year}
+                      </div>
+                    </div>
+                    <div className="text-right mr-4">
+                      <div className="text-lg font-semibold text-slate-900">
+                        {formatCurrency(item.actual_revenue)}
+                      </div>
+                      <Badge variant="outline" className="mt-1 text-orange-600 border-orange-300">
+                        To Invoice
+                      </Badge>
+                    </div>
+                    {canEdit && (
+                      <Dialog
+                        open={markingInvoice?.phasing_id === item.phasing_id}
+                        onOpenChange={(open) => {
+                          if (open) {
+                            setMarkingInvoice(item);
+                            setInvoiceForm({
+                              invoice_ref: "",
+                              invoice_date: new Date().toISOString().split("T")[0],
+                            });
+                          } else {
+                            setMarkingInvoice(null);
+                          }
+                        }}
+                      >
+                        <DialogTrigger asChild>
+                          <Button size="sm">Mark Invoiced</Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Mark as Invoiced</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            <div>
+                              <div className="text-sm text-slate-600 mb-2">
+                                {item.project_code} - {item.project_name}
+                              </div>
+                              <div className="text-lg font-semibold">
+                                {formatCurrency(item.actual_revenue)}
+                              </div>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="invoice_ref">Invoice Reference *</Label>
+                              <Input
+                                id="invoice_ref"
+                                value={invoiceForm.invoice_ref}
+                                onChange={(e) =>
+                                  setInvoiceForm({ ...invoiceForm, invoice_ref: e.target.value })
+                                }
+                                placeholder="INV-2025-001"
+                                required
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="invoice_date">Invoice Date *</Label>
+                              <Input
+                                id="invoice_date"
+                                type="date"
+                                value={invoiceForm.invoice_date}
+                                onChange={(e) =>
+                                  setInvoiceForm({ ...invoiceForm, invoice_date: e.target.value })
+                                }
+                                required
+                              />
+                            </div>
+
+                            <div className="flex gap-3">
+                              <Button onClick={handleMarkInvoiced}>Confirm</Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setMarkingInvoice(null)}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
                     )}
                   </div>
-                </div>
+                ))}
               </div>
             </CardContent>
           </Card>
@@ -523,68 +584,49 @@ function FinancialsContent() {
             <CardTitle>Project Breakdown</CardTitle>
           </CardHeader>
           <CardContent>
-            {financials.projects.length === 0 ? (
+            {projectBreakdown.length === 0 ? (
               <div className="text-center py-8 text-slate-600">
-                No project activity for this period.
+                No projects with activity in {getMonthName(selectedMonth)} {selectedYear}.
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
+                <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b">
-                      <th className="text-left p-3 text-sm font-medium text-slate-600">Project</th>
-                      <th className="text-left p-3 text-sm font-medium text-slate-600">Client</th>
-                      <th className="text-right p-3 text-sm font-medium text-slate-600">Revenue</th>
-                      <th className="text-right p-3 text-sm font-medium text-slate-600">Internal Cost</th>
-                      <th className="text-right p-3 text-sm font-medium text-slate-600">Subcon Cost</th>
-                      <th className="text-right p-3 text-sm font-medium text-slate-600">Margin £</th>
-                      <th className="text-right p-3 text-sm font-medium text-slate-600">Margin %</th>
+                      <th className="text-left p-2 font-medium text-slate-600">Project</th>
+                      <th className="text-left p-2 font-medium text-slate-600">Client</th>
+                      <th className="text-right p-2 font-medium text-slate-600">
+                        Revenue ({revenueMode === "forecast" ? "Forecast" : "Actual"})
+                      </th>
+                      <th className="text-right p-2 font-medium text-slate-600">Internal Cost</th>
+                      <th className="text-right p-2 font-medium text-slate-600">Subcon Cost</th>
+                      <th className="text-right p-2 font-medium text-slate-600">Total Cost</th>
+                      <th className="text-right p-2 font-medium text-slate-600">Margin</th>
+                      <th className="text-right p-2 font-medium text-slate-600">Margin %</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {financials.projects.map((project) => (
-                      <tr 
-                        key={project.project_id} 
+                    {projectBreakdown.map((row) => (
+                      <tr
+                        key={row.project_id}
                         className="border-b hover:bg-slate-50 cursor-pointer"
-                        onClick={() => router.push(`/projects/${project.project_id}`)}
+                        onClick={() => router.push(`/projects/${row.project_id}`)}
                       >
-                        <td className="p-3">
-                          <div className="font-medium text-slate-900">{project.project_code}</div>
-                          <div className="text-sm text-slate-600">{project.project_name}</div>
+                        <td className="p-2">
+                          <div className="font-medium text-slate-900">{row.project_code}</div>
+                          <div className="text-xs text-slate-600">{row.project_name}</div>
                         </td>
-                        <td className="p-3 text-sm text-slate-700">{project.client_name}</td>
-                        <td className="p-3 text-right font-medium">{formatCurrency(project.revenue)}</td>
-                        <td className="p-3 text-right text-slate-700">{formatCurrency(project.internal_cost)}</td>
-                        <td className="p-3 text-right text-slate-700">{formatCurrency(project.subcontractor_cost)}</td>
-                        <td className={`p-3 text-right font-medium ${
-                          project.margin_value >= 0 ? "text-green-600" : "text-red-600"
-                        }`}>
-                          {formatCurrency(project.margin_value)}
+                        <td className="p-2 text-slate-700">{row.client_name}</td>
+                        <td className="p-2 text-right font-medium">{formatCurrency(row.revenue)}</td>
+                        <td className="p-2 text-right">{formatCurrency(row.internal_cost)}</td>
+                        <td className="p-2 text-right">{formatCurrency(row.subcontractor_cost)}</td>
+                        <td className="p-2 text-right font-medium">{formatCurrency(row.total_cost)}</td>
+                        <td className={`p-2 text-right font-medium ${row.margin >= 0 ? "text-green-600" : "text-red-600"}`}>
+                          {formatCurrency(row.margin)}
                         </td>
-                        <td className={`p-3 text-right font-medium ${
-                          project.margin_percent >= 0 ? "text-green-600" : "text-red-600"
-                        }`}>
-                          {project.margin_percent.toFixed(1)}%
-                        </td>
+                        <td className="p-2 text-right">{row.margin_percent.toFixed(1)}%</td>
                       </tr>
                     ))}
-                    {/* Totals Row */}
-                    <tr className="border-t-2 bg-slate-50 font-semibold">
-                      <td className="p-3 text-slate-900" colSpan={2}>TOTALS</td>
-                      <td className="p-3 text-right text-slate-900">{formatCurrency(financials.total_revenue)}</td>
-                      <td className="p-3 text-right text-slate-900">{formatCurrency(financials.total_internal_cost)}</td>
-                      <td className="p-3 text-right text-slate-900">{formatCurrency(financials.total_subcontractor_cost)}</td>
-                      <td className={`p-3 text-right ${
-                        financials.total_margin_value >= 0 ? "text-green-600" : "text-red-600"
-                      }`}>
-                        {formatCurrency(financials.total_margin_value)}
-                      </td>
-                      <td className={`p-3 text-right ${
-                        financials.total_margin_percent >= 0 ? "text-green-600" : "text-red-600"
-                      }`}>
-                        {financials.total_margin_percent.toFixed(1)}%
-                      </td>
-                    </tr>
                   </tbody>
                 </table>
               </div>
