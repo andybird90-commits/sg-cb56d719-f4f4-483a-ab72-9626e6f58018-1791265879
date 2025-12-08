@@ -102,6 +102,45 @@ function DashboardContent() {
       .from("opportunities")
       .select("stage, expected_fee_value, expected_start_date, expected_end_date, tender_due_date");
 
+    // Fetch all projects with phasing data
+    const { data: projectsData } = await supabase
+      .from("projects")
+      .select("id, agreed_fee_value, start_date, end_date, status");
+
+    // Fetch all phasing data for projects
+    const { data: phasingData } = await supabase
+      .from("project_monthly_phasing")
+      .select("project_id, year, month, revenue_amount");
+
+    // Create phasing lookup map
+    const phasingMap: Record<string, Record<string, number>> = {};
+    if (phasingData) {
+      phasingData.forEach((p) => {
+        if (!phasingMap[p.project_id]) {
+          phasingMap[p.project_id] = {};
+        }
+        phasingMap[p.project_id][`${p.year}-${p.month}`] = p.revenue_amount;
+      });
+    }
+
+    // Fetch variations for projects
+    const { data: variationsData } = await supabase
+      .from("variations")
+      .select("project_id, value, status");
+
+    // Create variations lookup map
+    const variationsMap: Record<string, number> = {};
+    if (variationsData) {
+      variationsData.forEach((v) => {
+        if (v.status === "accepted") {
+          if (!variationsMap[v.project_id]) {
+            variationsMap[v.project_id] = 0;
+          }
+          variationsMap[v.project_id] += v.value;
+        }
+      });
+    }
+
     // Process each opportunity with pro-rated allocation
     const monthlyAllocations: Record<number, { secured: number; highPotential: number; bid: number }> = {};
     
@@ -168,6 +207,56 @@ function DashboardContent() {
             } else if (opp.stage === "bid") {
               monthlyAllocations[monthIndex].bid += monthAllocation;
             }
+          }
+        });
+      });
+    }
+
+    // Process projects - use phasing if available, otherwise auto-spread
+    if (projectsData) {
+      projectsData.forEach((project) => {
+        if (!project.start_date || !project.end_date) return;
+
+        const projectStart = new Date(project.start_date);
+        const projectEnd = new Date(project.end_date);
+
+        // Check if project overlaps with window
+        if (projectEnd < windowStart || projectStart > windowEnd) {
+          return;
+        }
+
+        // Get total fee for project
+        let totalFee = project.agreed_fee_value || 0;
+        totalFee += variationsMap[project.id] || 0;
+
+        // Check if project has manual phasing
+        const projectPhasing = phasingMap[project.id];
+        const hasPhasing = projectPhasing && Object.keys(projectPhasing).length > 0;
+
+        windowMonths.forEach((monthWindow, monthIndex) => {
+          const year = monthWindow.start.getFullYear();
+          const month = monthWindow.start.getMonth() + 1;
+
+          let monthRevenue = 0;
+
+          if (hasPhasing) {
+            // Use manual phasing if available
+            monthRevenue = projectPhasing[`${year}-${month}`] || 0;
+          } else {
+            // Use automatic spread
+            const effectiveStart = projectStart > monthWindow.start ? projectStart : monthWindow.start;
+            const effectiveEnd = projectEnd < monthWindow.end ? projectEnd : monthWindow.end;
+
+            if (effectiveEnd >= effectiveStart) {
+              const totalProjectDays = Math.ceil((projectEnd.getTime() - projectStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+              const overlapDays = Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+              monthRevenue = totalFee * (overlapDays / totalProjectDays);
+            }
+          }
+
+          // Add to secured bucket (projects are always treated as secured)
+          if (monthRevenue > 0) {
+            monthlyAllocations[monthIndex].secured += monthRevenue;
           }
         });
       });

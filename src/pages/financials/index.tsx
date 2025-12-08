@@ -63,7 +63,7 @@ function FinancialsContent() {
     const projectFinancials: Map<string, ProjectFinancials> = new Map();
 
     // =====================================================
-    // 1. REVENUE PER PROJECT (Pro-rated allocation)
+    // 1. REVENUE PER PROJECT (Pro-rated allocation with phasing override)
     // =====================================================
 
     // Fetch all projects
@@ -81,53 +81,80 @@ function FinancialsContent() {
         )
       `);
 
+    // Fetch all phasing data
+    const { data: phasingData } = await supabase
+      .from("project_monthly_phasing")
+      .select("project_id, year, month, revenue_amount")
+      .eq("year", selectedYear)
+      .eq("month", selectedMonth);
+
+    // Create phasing lookup map
+    const phasingMap: Record<string, number> = {};
+    if (phasingData) {
+      phasingData.forEach((p) => {
+        phasingMap[p.project_id] = p.revenue_amount;
+      });
+    }
+
     if (projectsData) {
       for (const project of projectsData) {
-        if (!project.start_date || !project.end_date) continue;
+        let monthRevenue = 0;
 
-        const projectStart = new Date(project.start_date);
-        const projectEnd = new Date(project.end_date);
+        // Check if manual phasing exists for this project/month
+        if (phasingMap[project.id] !== undefined) {
+          // Use manual phasing
+          monthRevenue = phasingMap[project.id];
+        } else {
+          // Use automatic spread
+          if (!project.start_date || !project.end_date) continue;
 
-        // Check if project overlaps with selected month
-        if (projectEnd < monthStart || projectStart > monthEnd) {
-          continue; // No overlap
+          const projectStart = new Date(project.start_date);
+          const projectEnd = new Date(project.end_date);
+
+          // Check if project overlaps with selected month
+          if (projectEnd < monthStart || projectStart > monthEnd) {
+            continue; // No overlap
+          }
+
+          // Calculate overlap
+          const effectiveStart = projectStart < monthStart ? monthStart : projectStart;
+          const effectiveEnd = projectEnd > monthEnd ? monthEnd : projectEnd;
+
+          const totalProjectDays = Math.ceil((projectEnd.getTime() - projectStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+          const overlapDays = Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+          // Base fee value
+          let totalFee = project.agreed_fee_value || 0;
+
+          // Add accepted variations
+          const { data: variationsData } = await supabase
+            .from("variations")
+            .select("value")
+            .eq("project_id", project.id)
+            .eq("status", "accepted");
+
+          if (variationsData) {
+            totalFee += variationsData.reduce((sum, v) => sum + v.value, 0);
+          }
+
+          // Pro-rate revenue for this month
+          monthRevenue = totalFee * (overlapDays / totalProjectDays);
         }
 
-        // Calculate overlap
-        const effectiveStart = projectStart < monthStart ? monthStart : projectStart;
-        const effectiveEnd = projectEnd > monthEnd ? monthEnd : projectEnd;
-
-        const totalProjectDays = Math.ceil((projectEnd.getTime() - projectStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-        const overlapDays = Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-
-        // Base fee value
-        let totalFee = project.agreed_fee_value || 0;
-
-        // Add accepted variations
-        const { data: variationsData } = await supabase
-          .from("variations")
-          .select("value")
-          .eq("project_id", project.id)
-          .eq("status", "accepted");
-
-        if (variationsData) {
-          totalFee += variationsData.reduce((sum, v) => sum + v.value, 0);
+        // Only create entry if there's revenue or costs
+        if (monthRevenue > 0) {
+          projectFinancials.set(project.id, {
+            project_id: project.id,
+            project_code: project.code,
+            project_name: project.name,
+            client_name: project.companies?.name || "Unknown",
+            revenue: monthRevenue,
+            internal_cost: 0,
+            subcontractor_cost: 0,
+            margin_value: 0,
+            margin_percent: 0,
+          });
         }
-
-        // Pro-rate revenue for this month
-        const monthRevenue = totalFee * (overlapDays / totalProjectDays);
-
-        projectFinancials.set(project.id, {
-          project_id: project.id,
-          project_code: project.code,
-          project_name: project.name,
-          client_name: project.companies?.name || "Unknown",
-          revenue: monthRevenue,
-          internal_cost: 0,
-          subcontractor_cost: 0,
-          margin_value: 0,
-          margin_percent: 0,
-        });
       }
     }
 
