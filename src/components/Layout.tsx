@@ -2,7 +2,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
-import { Building2, Users, Target, Briefcase, LogOut, LayoutDashboard, Clock, Calendar, DollarSign, Settings } from "lucide-react";
+import { Building2, Users, Target, Briefcase, LogOut, LayoutDashboard, Clock, Calendar, PoundSterling, Settings } from "lucide-react";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading, signOut } = useAuth();
@@ -110,7 +110,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     size="sm"
                     className="gap-2"
                   >
-                    <DollarSign className="w-4 h-4" />
+                    <PoundSterling className="w-4 h-4" />
                     Financials
                   </Button>
                 </Link>
