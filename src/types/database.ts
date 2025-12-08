@@ -207,7 +207,7 @@ export interface Database {
           client_company_id: string
           start_date: string | null
           end_date: string | null
-          status: "pipeline" | "live" | "on_hold" | "completed"
+          status: "pipeline" | "live" | "on_hold" | "completed" | "cancelled"
           agreed_fee_value: number | null
           notes: string | null
           created_at: string
@@ -221,7 +221,7 @@ export interface Database {
           client_company_id: string
           start_date?: string | null
           end_date?: string | null
-          status?: "pipeline" | "live" | "on_hold" | "completed"
+          status?: "pipeline" | "live" | "on_hold" | "completed" | "cancelled"
           agreed_fee_value?: number | null
           notes?: string | null
           created_at?: string
@@ -235,7 +235,7 @@ export interface Database {
           client_company_id?: string
           start_date?: string | null
           end_date?: string | null
-          status?: "pipeline" | "live" | "on_hold" | "completed"
+          status?: "pipeline" | "live" | "on_hold" | "completed" | "cancelled"
           agreed_fee_value?: number | null
           notes?: string | null
           created_at?: string
@@ -547,7 +547,7 @@ export interface Database {
       company_status: "active" | "prospect" | "inactive"
       opportunity_stage: "secured" | "high_potential" | "bid"
       opportunity_status: "open" | "closed_won" | "closed_lost"
-      project_status: "pipeline" | "live" | "on_hold" | "completed"
+      project_status: "pipeline" | "live" | "on_hold" | "completed" | "cancelled"
       activity_status: "not_started" | "in_progress" | "complete"
       variation_status: "proposed" | "accepted" | "rejected"
     }
