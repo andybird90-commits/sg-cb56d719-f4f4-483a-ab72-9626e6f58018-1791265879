@@ -3,9 +3,10 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
 import { Building2, Users, Target, Briefcase, LogOut, LayoutDashboard, Clock, Calendar, PoundSterling, Settings } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const { user, profile, loading, signOut } = useAuth();
+  const { user, profile, loading, signOut, profileError } = useAuth();
   const router = useRouter();
 
   // If still loading auth, show loading state
@@ -134,6 +135,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   <div className="font-medium text-slate-900">{profile.full_name}</div>
                   <div className="text-slate-500 capitalize">{profile.role}</div>
                 </div>
+              ) : profileError ? (
+                <div className="text-sm">
+                  <div className="font-medium text-slate-900">{user.email}</div>
+                  <div className="text-xs text-red-600">Profile error</div>
+                </div>
               ) : (
                 <div className="text-sm">
                   <div className="font-medium text-slate-900">{user.email}</div>
@@ -149,6 +155,23 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </nav>
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {profileError && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertDescription>
+              <strong>Profile Error:</strong> {profileError}
+              <br />
+              <span className="text-sm mt-2 block">
+                Please check that:
+                <br />
+                1. Supabase is connected (check .env.local or Softgen settings)
+                <br />
+                2. Database tables exist (run DATABASE_SETUP.md SQL migrations)
+                <br />
+                3. Your profile row exists in the profiles table
+              </span>
+            </AlertDescription>
+          </Alert>
+        )}
         {children}
       </main>
     </div>
