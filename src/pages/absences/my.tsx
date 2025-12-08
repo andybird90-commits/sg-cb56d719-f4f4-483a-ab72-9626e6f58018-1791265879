@@ -11,7 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit, Trash2, Calendar } from "lucide-react";
+import { Plus, Edit, Trash2, Calendar, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
 
 interface Absence {
@@ -30,6 +31,7 @@ function MyAbsencesContent() {
   const { user, profile } = useAuth();
   const [absences, setAbsences] = useState<Absence[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pendingCount, setPendingCount] = useState(0);
   const [holidayStats, setHolidayStats] = useState({
     annual: 0,
     taken: 0,
@@ -69,7 +71,13 @@ function MyAbsencesContent() {
       .eq("user_id", user.id)
       .order("start_date", { ascending: false });
 
-    setAbsences(data || []);
+    const absencesList = data || [];
+    setAbsences(absencesList);
+    
+    // Count pending absences
+    const pending = absencesList.filter(a => a.approved_by === null).length;
+    setPendingCount(pending);
+    
     setLoading(false);
   };
 
@@ -79,13 +87,13 @@ function MyAbsencesContent() {
     const currentYear = new Date().getFullYear();
     const annual = (profile as any).annual_holiday_days || 0;
 
-    // Get approved holidays for current year
+    // Get APPROVED holidays only for current year
     const { data: holidays } = await supabase
       .from("absences")
       .select("start_date, end_date")
       .eq("user_id", user.id)
       .eq("type", "holiday")
-      .not("approved_by", "is", null)
+      .not("approved_by", "is", null) // Only approved holidays
       .gte("start_date", `${currentYear}-01-01`)
       .lte("start_date", `${currentYear}-12-31`);
 
@@ -325,6 +333,19 @@ function MyAbsencesContent() {
           </div>
         </div>
 
+        {/* Pending Approvals Alert */}
+        {pendingCount > 0 && (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Pending approvals: {pendingCount}</strong>
+              {pendingCount === 1 
+                ? " - You have 1 absence request awaiting approval."
+                : ` - You have ${pendingCount} absence requests awaiting approval.`}
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Holiday Balance Card */}
         <Card>
           <CardHeader>
@@ -333,19 +354,22 @@ function MyAbsencesContent() {
           <CardContent>
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <div className="text-sm text-slate-500 mb-1">Annual Holiday Entitlement</div>
+                <div className="text-sm text-slate-500 mb-1">Annual Entitlement</div>
                 <div className="text-2xl font-bold text-slate-900">{holidayStats.annual} days</div>
               </div>
               <div>
-                <div className="text-sm text-slate-500 mb-1">Holiday Taken This Year</div>
+                <div className="text-sm text-slate-500 mb-1">Approved & Taken</div>
                 <div className="text-2xl font-bold text-blue-600">{holidayStats.taken} days</div>
               </div>
               <div>
-                <div className="text-sm text-slate-500 mb-1">Holiday Remaining</div>
+                <div className="text-sm text-slate-500 mb-1">Remaining</div>
                 <div className={`text-2xl font-bold ${holidayStats.remaining < 5 ? "text-red-600" : "text-green-600"}`}>
                   {holidayStats.remaining} days
                 </div>
               </div>
+            </div>
+            <div className="mt-3 text-xs text-slate-500">
+              * Only approved holidays count towards your balance. Pending requests are shown below.
             </div>
           </CardContent>
         </Card>
@@ -374,7 +398,9 @@ function MyAbsencesContent() {
                               Approved
                             </Badge>
                           ) : (
-                            <Badge variant="outline">Pending</Badge>
+                            <Badge variant="outline" className="text-orange-600 border-orange-300">
+                              Pending approval
+                            </Badge>
                           )}
                         </div>
                         <div className="text-sm text-slate-900 mb-1">

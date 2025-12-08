@@ -4,9 +4,12 @@ import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Users, Target, ArrowRight, Calendar } from "lucide-react";
+import { Building2, Users, Target, ArrowRight, Calendar, AlertCircle, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useAuth } from "@/contexts/AuthContext";
+import Link from "next/link";
 
 interface MonthPipeline {
   month: string;
@@ -28,14 +31,48 @@ interface CurrentAbsence {
 
 function DashboardContent() {
   const router = useRouter();
+  const { user, profile } = useAuth();
   const [pipelineData, setPipelineData] = useState<MonthPipeline[]>([]);
   const [currentAbsences, setCurrentAbsences] = useState<CurrentAbsence[]>([]);
+  const [userPendingCount, setUserPendingCount] = useState(0);
+  const [teamPendingCount, setTeamPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  const isAdmin = profile?.role === "admin" || profile?.role === "director";
 
   useEffect(() => {
     fetchPipelineData();
     fetchCurrentAbsences();
-  }, []);
+    if (user) {
+      fetchUserPendingHolidays();
+    }
+    if (isAdmin) {
+      fetchTeamPendingHolidays();
+    }
+  }, [user, isAdmin]);
+
+  const fetchUserPendingHolidays = async () => {
+    if (!user) return;
+
+    const { data, count } = await supabase
+      .from("absences")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("type", "holiday")
+      .is("approved_by", null);
+
+    setUserPendingCount(count || 0);
+  };
+
+  const fetchTeamPendingHolidays = async () => {
+    const { data, count } = await supabase
+      .from("absences")
+      .select("*", { count: "exact", head: true })
+      .eq("type", "holiday")
+      .is("approved_by", null);
+
+    setTeamPendingCount(count || 0);
+  };
 
   const fetchPipelineData = async () => {
     const months: MonthPipeline[] = [];
@@ -158,6 +195,53 @@ function DashboardContent() {
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
           <p className="text-slate-600 mt-1">Welcome to Conexa DT</p>
+        </div>
+
+        {/* Holiday Approval Widgets */}
+        <div className="grid gap-4 md:grid-cols-2">
+          {/* User's Pending Holiday Requests */}
+          {userPendingCount > 0 && (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <strong>Your pending holiday requests</strong>
+                    <p className="text-sm mt-1">
+                      You have {userPendingCount} holiday {userPendingCount === 1 ? "request" : "requests"} awaiting approval.
+                    </p>
+                  </div>
+                  <Link href="/absences/my">
+                    <Button size="sm" variant="outline">
+                      View My Absences
+                    </Button>
+                  </Link>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Team Pending Approvals (Admin/Director Only) */}
+          {isAdmin && teamPendingCount > 0 && (
+            <Alert>
+              <CheckCircle className="h-4 w-4" />
+              <AlertDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <strong>Team approvals pending</strong>
+                    <p className="text-sm mt-1">
+                      There {teamPendingCount === 1 ? "is" : "are"} {teamPendingCount} holiday {teamPendingCount === 1 ? "request" : "requests"} awaiting your approval.
+                    </p>
+                  </div>
+                  <Link href="/absences/team">
+                    <Button size="sm">
+                      Review Approvals
+                    </Button>
+                  </Link>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
 
         <div className="grid gap-6 md:grid-cols-3">

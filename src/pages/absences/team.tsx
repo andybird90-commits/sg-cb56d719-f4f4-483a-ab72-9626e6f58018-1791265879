@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Check } from "lucide-react";
 
 interface Absence {
@@ -29,6 +30,7 @@ function TeamAbsencesContent() {
   const router = useRouter();
   const [absences, setAbsences] = useState<Absence[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("pending");
 
   const canView = profile?.role === "admin" || profile?.role === "director";
 
@@ -118,98 +120,125 @@ function TeamAbsencesContent() {
           <p className="text-slate-600 mt-1">Review and approve absence requests</p>
         </div>
 
-        {pendingAbsences.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Pending Approvals ({pendingAbsences.length})</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {pendingAbsences.map((absence) => (
-                  <div key={absence.id} className="p-4 border rounded-lg">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className="font-medium text-slate-900">
-                            {absence.profiles?.full_name}
-                          </div>
-                          <Badge className={getTypeColor(absence.type)}>
-                            {absence.type}
-                          </Badge>
-                          <Badge variant="outline">Pending</Badge>
-                        </div>
-                        <div className="text-sm text-slate-700 mb-1">
-                          {formatDate(absence.start_date)} → {formatDate(absence.end_date)}
-                        </div>
-                        {absence.notes && (
-                          <div className="text-sm text-slate-600 whitespace-pre-wrap">
-                            {absence.notes}
-                          </div>
-                        )}
-                      </div>
-                      <Button size="sm" onClick={() => handleApprove(absence.id)} className="gap-2">
-                        <Check className="w-4 h-4" />
-                        Approve
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="pending">
+              Pending Approvals {pendingAbsences.length > 0 && `(${pendingAbsences.length})`}
+            </TabsTrigger>
+            <TabsTrigger value="all">All Absences</TabsTrigger>
+          </TabsList>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>All Absences</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {absences.length === 0 ? (
-              <div className="text-center py-8 text-slate-600">
-                No absence requests yet.
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {absences.map((absence) => (
-                  <div key={absence.id} className="p-4 border rounded-lg">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className="font-medium text-slate-900">
-                            {absence.profiles?.full_name}
+          <TabsContent value="pending">
+            <Card>
+              <CardHeader>
+                <CardTitle>Pending Approvals</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {pendingAbsences.length === 0 ? (
+                  <div className="text-center py-8 text-slate-600">
+                    No pending approvals. All absence requests have been reviewed.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {pendingAbsences.map((absence) => (
+                      <div key={absence.id} className="p-4 border rounded-lg bg-orange-50 border-orange-200">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <div className="font-medium text-slate-900">
+                                {absence.profiles?.full_name}
+                              </div>
+                              <Badge className={getTypeColor(absence.type)}>
+                                {absence.type}
+                              </Badge>
+                              <Badge variant="outline" className="text-orange-600 border-orange-300">
+                                Pending approval
+                              </Badge>
+                            </div>
+                            <div className="text-sm text-slate-700 mb-1">
+                              {formatDate(absence.start_date)} → {formatDate(absence.end_date)}
+                            </div>
+                            {absence.notes && (
+                              <div className="text-sm text-slate-600 whitespace-pre-wrap">
+                                {absence.notes}
+                              </div>
+                            )}
                           </div>
-                          <Badge className={getTypeColor(absence.type)}>
-                            {absence.type}
-                          </Badge>
-                          {absence.approved_by ? (
-                            <Badge className="bg-green-100 text-green-800">
-                              Approved
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline">Pending</Badge>
+                          <Button size="sm" onClick={() => handleApprove(absence.id)} className="gap-2">
+                            <Check className="w-4 h-4" />
+                            Approve
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="all">
+            <Card>
+              <CardHeader>
+                <CardTitle>All Absences</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {absences.length === 0 ? (
+                  <div className="text-center py-8 text-slate-600">
+                    No absence requests yet.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {absences.map((absence) => (
+                      <div key={absence.id} className="p-4 border rounded-lg">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <div className="font-medium text-slate-900">
+                                {absence.profiles?.full_name}
+                              </div>
+                              <Badge className={getTypeColor(absence.type)}>
+                                {absence.type}
+                              </Badge>
+                              {absence.approved_by ? (
+                                <Badge className="bg-green-100 text-green-800">
+                                  Approved
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-orange-600 border-orange-300">
+                                  Pending approval
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="text-sm text-slate-700 mb-1">
+                              {formatDate(absence.start_date)} → {formatDate(absence.end_date)}
+                            </div>
+                            {absence.notes && (
+                              <div className="text-sm text-slate-600 whitespace-pre-wrap">
+                                {absence.notes}
+                              </div>
+                            )}
+                            {absence.approved_by && absence.approver && (
+                              <div className="text-xs text-slate-500 mt-2">
+                                Approved by {absence.approver.full_name}
+                              </div>
+                            )}
+                          </div>
+                          {!absence.approved_by && (
+                            <Button size="sm" onClick={() => handleApprove(absence.id)} className="gap-2">
+                              <Check className="w-4 h-4" />
+                              Approve
+                            </Button>
                           )}
                         </div>
-                        <div className="text-sm text-slate-700 mb-1">
-                          {formatDate(absence.start_date)} → {formatDate(absence.end_date)}
-                        </div>
-                        {absence.notes && (
-                          <div className="text-sm text-slate-600 whitespace-pre-wrap">
-                            {absence.notes}
-                          </div>
-                        )}
-                        {absence.approved_by && absence.approver && (
-                          <div className="text-xs text-slate-500 mt-2">
-                            Approved by {absence.approver.full_name}
-                          </div>
-                        )}
                       </div>
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </Layout>
   );
