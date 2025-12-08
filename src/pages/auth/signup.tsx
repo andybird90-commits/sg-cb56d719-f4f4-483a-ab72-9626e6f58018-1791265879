@@ -13,6 +13,7 @@ export default function SignUpPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -23,44 +24,41 @@ export default function SignUpPage() {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setSuccess("");
 
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email: formData.email,
-      password: formData.password,
-      options: {
-        data: {
-          full_name: formData.fullName,
+    try {
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            full_name: formData.fullName,
+          },
         },
-      },
-    });
+      });
 
-    if (signUpError) {
-      setError(signUpError.message);
-      setLoading(false);
-      return;
-    }
-
-    if (data.user) {
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .insert({
-          id: data.user.id,
-          email: formData.email,
-          full_name: formData.fullName,
-          role: "user",
-          is_active: true,
-        });
-
-      if (profileError) {
-        setError("Account created but profile setup failed. Please contact support.");
+      if (signUpError) {
+        console.error("Sign-up error:", signUpError);
+        setError(signUpError.message || "Failed to create account.");
         setLoading(false);
         return;
       }
 
-      router.push("/dashboard");
-    }
+      // SUCCESS - Database trigger will create the profile row automatically
+      console.log("✅ Account created successfully:", data.user?.email);
+      setSuccess("Account created successfully! Please check your email to confirm your address.");
+      setLoading(false);
 
-    setLoading(false);
+      // Optional: Redirect to sign-in after a delay
+      setTimeout(() => {
+        router.push("/auth/signin");
+      }, 3000);
+
+    } catch (err) {
+      console.error("Unexpected sign-up error:", err);
+      setError("Unexpected error creating account. Please try again.");
+      setLoading(false);
+    }
   };
 
   return (
@@ -89,6 +87,11 @@ export default function SignUpPage() {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
+            {success && (
+              <Alert className="bg-green-50 text-green-900 border-green-200">
+                <AlertDescription>{success}</AlertDescription>
+              </Alert>
+            )}
             <div className="space-y-2">
               <Label htmlFor="fullName">Full Name</Label>
               <Input
@@ -98,6 +101,7 @@ export default function SignUpPage() {
                 value={formData.fullName}
                 onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                 required
+                disabled={loading || !!success}
               />
             </div>
             <div className="space-y-2">
@@ -109,6 +113,7 @@ export default function SignUpPage() {
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 required
+                disabled={loading || !!success}
               />
             </div>
             <div className="space-y-2">
@@ -120,10 +125,11 @@ export default function SignUpPage() {
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 required
+                disabled={loading || !!success}
               />
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Creating account..." : "Sign Up"}
+            <Button type="submit" className="w-full" disabled={loading || !!success}>
+              {loading ? "Creating account..." : success ? "Redirecting to sign in..." : "Sign Up"}
             </Button>
           </form>
           <div className="mt-4 text-center text-sm">
