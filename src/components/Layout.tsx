@@ -116,7 +116,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   </Button>
                 </Link>
                 {isAdmin && (
-                  <Link href="/admin/budgets">
+                  <Link href="/admin">
                     <Button
                       variant={router.pathname.startsWith("/admin") ? "default" : "ghost"}
                       size="sm"
