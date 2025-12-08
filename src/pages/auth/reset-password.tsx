@@ -45,7 +45,7 @@ export default function ResetPasswordPage() {
         <CardHeader className="space-y-4">
           <div className="flex justify-center">
             <Image 
-              src="/rd-group-logo.png" 
+              src="/RDME_Logo.png" 
               alt="RD GROUP M&E" 
               width={200} 
               height={50}

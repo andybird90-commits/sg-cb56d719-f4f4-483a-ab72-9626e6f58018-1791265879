@@ -34,7 +34,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-8">
               <Link href="/dashboard" className="flex items-center">
                 <Image 
-                  src="/rd-group-logo.png" 
+                  src="/RDME_Logo.png" 
                   alt="RD GROUP M&E" 
                   width={180} 
                   height={45}
