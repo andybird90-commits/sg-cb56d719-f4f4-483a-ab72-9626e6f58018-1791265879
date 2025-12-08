@@ -57,68 +57,71 @@ function NewCompanyContent() {
 
   return (
     <Layout>
-      <div className="max-w-2xl mx-auto space-y-6">
-        <div className="flex items-center gap-4">
+      <div className="max-w-2xl mx-auto space-y-4 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
           <Link href="/companies">
-            <Button variant="ghost" size="sm" className="gap-2">
+            <Button variant="ghost" size="sm" className="gap-2 self-start">
               <ArrowLeft className="w-4 h-4" />
               Back
             </Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">Add New Company</h1>
-            <p className="text-slate-600 mt-1">Create a new company record</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Add New Company</h1>
+            <p className="text-sm sm:text-base text-slate-600 mt-1">Create a new company record</p>
           </div>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Company Information</CardTitle>
+            <CardTitle className="text-lg sm:text-xl">Company Information</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
                 <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
+                  <AlertDescription className="text-sm">{error}</AlertDescription>
                 </Alert>
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="name">Company Name *</Label>
+                <Label htmlFor="name" className="text-sm sm:text-base">Company Name *</Label>
                 <Input
                   id="name"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
+                  className="h-10 sm:h-11"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="short_name">Short Name</Label>
+                <Label htmlFor="short_name" className="text-sm sm:text-base">Short Name</Label>
                 <Input
                   id="short_name"
                   value={formData.short_name}
                   onChange={(e) => setFormData({ ...formData, short_name: e.target.value })}
+                  className="h-10 sm:h-11"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="sector">Sector</Label>
+                <Label htmlFor="sector" className="text-sm sm:text-base">Sector</Label>
                 <Input
                   id="sector"
                   value={formData.sector}
                   onChange={(e) => setFormData({ ...formData, sector: e.target.value })}
                   placeholder="e.g., Healthcare, Education, Commercial"
+                  className="h-10 sm:h-11"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
+                <Label htmlFor="status" className="text-sm sm:text-base">Status</Label>
                 <Select
                   value={formData.status}
                   onValueChange={(value) => setFormData({ ...formData, status: value })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="h-10 sm:h-11">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -130,21 +133,22 @@ function NewCompanyContent() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="notes">Notes</Label>
+                <Label htmlFor="notes" className="text-sm sm:text-base">Notes</Label>
                 <Textarea
                   id="notes"
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   rows={4}
+                  className="text-sm sm:text-base"
                 />
               </div>
 
-              <div className="flex gap-3">
-                <Button type="submit" disabled={loading}>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button type="submit" disabled={loading} className="h-10 sm:h-11">
                   {loading ? "Creating..." : "Create Company"}
                 </Button>
-                <Link href="/companies">
-                  <Button type="button" variant="outline">
+                <Link href="/companies" className="w-full sm:w-auto">
+                  <Button type="button" variant="outline" className="w-full h-10 sm:h-11">
                     Cancel
                   </Button>
                 </Link>

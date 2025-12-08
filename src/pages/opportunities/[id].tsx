@@ -173,7 +173,7 @@ function OpportunityDetailContent() {
   if (error || !opportunity) {
     return (
       <Layout>
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
@@ -190,10 +190,10 @@ function OpportunityDetailContent() {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
+      <div className="space-y-4 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
           <Link href="/opportunities">
-            <Button variant="ghost" size="sm" className="gap-2">
+            <Button variant="ghost" size="sm" className="gap-2 self-start">
               <ArrowLeft className="w-4 h-4" />
               Back
             </Button>
@@ -201,16 +201,16 @@ function OpportunityDetailContent() {
         </div>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div className="flex items-center gap-3">
-              <CardTitle className="text-2xl">{opportunity.name}</CardTitle>
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 flex-wrap">
+              <CardTitle className="text-xl sm:text-2xl">{opportunity.name}</CardTitle>
               <Badge className={getStageColor(opportunity.stage)}>
                 {opportunity.stage.replace("_", " ")}
               </Badge>
               <Badge variant="outline">{opportunity.status}</Badge>
             </div>
             {canEdit && !isEditing && (
-              <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="gap-2">
+              <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="gap-2 w-full sm:w-auto">
                 <Edit className="w-4 h-4" />
                 Edit
               </Button>
@@ -220,33 +220,35 @@ function OpportunityDetailContent() {
             {isEditing ? (
               <form onSubmit={handleUpdate} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Opportunity Name *</Label>
+                  <Label htmlFor="name" className="text-sm sm:text-base">Opportunity Name *</Label>
                   <Input
                     id="name"
                     value={editData.name}
                     onChange={(e) => setEditData({ ...editData, name: e.target.value })}
                     required
+                    className="h-10 sm:h-11"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
+                  <Label htmlFor="description" className="text-sm sm:text-base">Description</Label>
                   <Textarea
                     id="description"
                     value={editData.description}
                     onChange={(e) => setEditData({ ...editData, description: e.target.value })}
                     rows={4}
+                    className="text-sm sm:text-base"
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="stage">Stage</Label>
+                    <Label htmlFor="stage" className="text-sm sm:text-base">Stage</Label>
                     <Select
                       value={editData.stage}
                       onValueChange={(value) => setEditData({ ...editData, stage: value })}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="h-10 sm:h-11">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -258,12 +260,12 @@ function OpportunityDetailContent() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="status">Status</Label>
+                    <Label htmlFor="status" className="text-sm sm:text-base">Status</Label>
                     <Select
                       value={editData.status}
                       onValueChange={(value) => setEditData({ ...editData, status: value })}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="h-10 sm:h-11">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -275,20 +277,21 @@ function OpportunityDetailContent() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="expected_fee_value">Expected Fee Value (£)</Label>
+                    <Label htmlFor="expected_fee_value" className="text-sm sm:text-base">Expected Fee Value (£)</Label>
                     <Input
                       id="expected_fee_value"
                       type="number"
                       step="0.01"
                       value={editData.expected_fee_value}
                       onChange={(e) => setEditData({ ...editData, expected_fee_value: e.target.value })}
+                      className="h-10 sm:h-11"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="probability_percent">Probability (%)</Label>
+                    <Label htmlFor="probability_percent" className="text-sm sm:text-base">Probability (%)</Label>
                     <Input
                       id="probability_percent"
                       type="number"
@@ -296,45 +299,49 @@ function OpportunityDetailContent() {
                       max="100"
                       value={editData.probability_percent}
                       onChange={(e) => setEditData({ ...editData, probability_percent: e.target.value })}
+                      className="h-10 sm:h-11"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="tender_due_date">Tender Due Date</Label>
+                    <Label htmlFor="tender_due_date" className="text-sm sm:text-base">Tender Due Date</Label>
                     <Input
                       id="tender_due_date"
                       type="date"
                       value={editData.tender_due_date}
                       onChange={(e) => setEditData({ ...editData, tender_due_date: e.target.value })}
+                      className="h-10 sm:h-11"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="expected_start_date">Expected Start Date</Label>
+                    <Label htmlFor="expected_start_date" className="text-sm sm:text-base">Expected Start Date</Label>
                     <Input
                       id="expected_start_date"
                       type="date"
                       value={editData.expected_start_date}
                       onChange={(e) => setEditData({ ...editData, expected_start_date: e.target.value })}
+                      className="h-10 sm:h-11"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="expected_end_date">Expected End Date</Label>
+                    <Label htmlFor="expected_end_date" className="text-sm sm:text-base">Expected End Date</Label>
                     <Input
                       id="expected_end_date"
                       type="date"
                       value={editData.expected_end_date}
                       onChange={(e) => setEditData({ ...editData, expected_end_date: e.target.value })}
+                      className="h-10 sm:h-11"
                     />
                   </div>
                 </div>
 
-                <div className="flex gap-3">
-                  <Button type="submit">Save Changes</Button>
-                  <Button type="button" variant="outline" onClick={() => setIsEditing(false)}>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button type="submit" className="h-10 sm:h-11">Save Changes</Button>
+                  <Button type="button" variant="outline" onClick={() => setIsEditing(false)} className="h-10 sm:h-11">
                     Cancel
                   </Button>
                 </div>
@@ -344,7 +351,7 @@ function OpportunityDetailContent() {
                 <div>
                   <div className="text-sm font-medium text-slate-500 mb-1">Company</div>
                   <div 
-                    className="text-blue-600 hover:underline cursor-pointer"
+                    className="text-blue-600 hover:underline cursor-pointer text-sm sm:text-base"
                     onClick={() => router.push(`/companies/${opportunity.company_id}`)}
                   >
                     {opportunity.companies?.name}
@@ -354,51 +361,51 @@ function OpportunityDetailContent() {
                 {opportunity.contacts && (
                   <div>
                     <div className="text-sm font-medium text-slate-500 mb-1">Contact</div>
-                    <div className="text-slate-900">{opportunity.contacts.name}</div>
+                    <div className="text-slate-900 text-sm sm:text-base">{opportunity.contacts.name}</div>
                   </div>
                 )}
 
                 {opportunity.description && (
                   <div>
                     <div className="text-sm font-medium text-slate-500 mb-1">Description</div>
-                    <div className="text-slate-900 whitespace-pre-wrap">{opportunity.description}</div>
+                    <div className="text-slate-900 whitespace-pre-wrap text-sm sm:text-base">{opportunity.description}</div>
                   </div>
                 )}
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <div className="text-sm font-medium text-slate-500">Expected Value</div>
-                    <div className="text-slate-900 font-semibold">{formatCurrency(opportunity.expected_fee_value)}</div>
+                    <div className="text-slate-900 font-semibold text-sm sm:text-base">{formatCurrency(opportunity.expected_fee_value)}</div>
                   </div>
                   
                   {opportunity.probability_percent !== null && (
                     <div>
                       <div className="text-sm font-medium text-slate-500">Probability</div>
-                      <div className="text-slate-900">{opportunity.probability_percent}%</div>
+                      <div className="text-slate-900 text-sm sm:text-base">{opportunity.probability_percent}%</div>
                     </div>
                   )}
 
                   {opportunity.tender_due_date && (
                     <div>
                       <div className="text-sm font-medium text-slate-500">Tender Due</div>
-                      <div className="text-slate-900">{formatDate(opportunity.tender_due_date)}</div>
+                      <div className="text-slate-900 text-sm sm:text-base">{formatDate(opportunity.tender_due_date)}</div>
                     </div>
                   )}
                 </div>
 
                 {(opportunity.expected_start_date || opportunity.expected_end_date) && (
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {opportunity.expected_start_date && (
                       <div>
                         <div className="text-sm font-medium text-slate-500">Expected Start</div>
-                        <div className="text-slate-900">{formatDate(opportunity.expected_start_date)}</div>
+                        <div className="text-slate-900 text-sm sm:text-base">{formatDate(opportunity.expected_start_date)}</div>
                       </div>
                     )}
 
                     {opportunity.expected_end_date && (
                       <div>
                         <div className="text-sm font-medium text-slate-500">Expected End</div>
-                        <div className="text-slate-900">{formatDate(opportunity.expected_end_date)}</div>
+                        <div className="text-slate-900 text-sm sm:text-base">{formatDate(opportunity.expected_end_date)}</div>
                       </div>
                     )}
                   </div>

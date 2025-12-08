@@ -136,14 +136,15 @@ function AdminContent() {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
+      <div className="space-y-4 sm:space-y-6">
+        {/* Header - Mobile optimized */}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">Admin Panel</h1>
-            <p className="text-slate-600 mt-1">Manage users and system settings</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Admin Panel</h1>
+            <p className="text-sm sm:text-base text-slate-600 mt-1">Manage users and system settings</p>
           </div>
           <Link href="/admin/budgets">
-            <Button variant="outline">Monthly Budgets</Button>
+            <Button variant="outline" className="w-full sm:w-auto">Monthly Budgets</Button>
           </Link>
         </div>
 
@@ -152,7 +153,7 @@ function AdminContent() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Users className="w-5 h-5 text-slate-600" />
-                <CardTitle>User Management</CardTitle>
+                <CardTitle className="text-base sm:text-lg">User Management</CardTitle>
               </div>
             </div>
           </CardHeader>
@@ -165,10 +166,10 @@ function AdminContent() {
               <div className="space-y-3">
                 {users.map((u) => (
                   <div key={u.id} className="p-4 border rounded-lg">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className="font-medium text-slate-900">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                          <div className="font-medium text-sm sm:text-base text-slate-900">
                             {u.full_name}
                           </div>
                           <Badge className={getRoleBadgeColor(u.role)}>
@@ -180,10 +181,10 @@ function AdminContent() {
                             </Badge>
                           )}
                         </div>
-                        <div className="text-sm text-slate-600 mb-2">
+                        <div className="text-sm text-slate-600 mb-2 break-all">
                           {u.email}
                         </div>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                           <div>
                             <span className="text-slate-500">Hourly Rate:</span>{" "}
                             <span className="font-medium">{formatCurrency(u.default_hourly_cost_rate)}</span>
@@ -192,13 +193,13 @@ function AdminContent() {
                             <span className="text-slate-500">Holiday Days:</span>{" "}
                             <span className="font-medium">{u.annual_holiday_days} days</span>
                           </div>
-                          <div>
+                          <div className="sm:col-span-2">
                             <span className="text-slate-500">Holiday Rate:</span>{" "}
                             <span className="font-medium">{formatCurrency(u.holiday_cost_rate)}</span>
                           </div>
                         </div>
                       </div>
-                      <Button variant="ghost" size="sm" onClick={() => handleEdit(u)}>
+                      <Button variant="ghost" size="sm" onClick={() => handleEdit(u)} className="w-full sm:w-auto">
                         <Edit className="w-4 h-4" />
                       </Button>
                     </div>
@@ -210,7 +211,7 @@ function AdminContent() {
         </Card>
 
         <Dialog open={formOpen} onOpenChange={setFormOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="w-[95vw] max-w-md">
             <DialogHeader>
               <DialogTitle>Edit User</DialogTitle>
             </DialogHeader>
@@ -219,8 +220,8 @@ function AdminContent() {
                 <div className="space-y-2">
                   <Label>User</Label>
                   <div className="text-sm text-slate-900">
-                    <div className="font-medium">{editingUser.full_name}</div>
-                    <div className="text-slate-600">{editingUser.email}</div>
+                    <div className="font-medium break-all">{editingUser.full_name}</div>
+                    <div className="text-slate-600 break-all">{editingUser.email}</div>
                   </div>
                 </div>
 
@@ -292,9 +293,9 @@ function AdminContent() {
                   </Label>
                 </div>
 
-                <div className="flex gap-3">
-                  <Button type="submit">Save Changes</Button>
-                  <Button type="button" variant="outline" onClick={() => setFormOpen(false)}>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button type="submit" className="w-full sm:w-auto">Save Changes</Button>
+                  <Button type="button" variant="outline" onClick={() => setFormOpen(false)} className="w-full sm:w-auto">
                     Cancel
                   </Button>
                 </div>

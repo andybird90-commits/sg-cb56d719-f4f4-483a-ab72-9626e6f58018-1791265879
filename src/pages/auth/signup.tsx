@@ -13,50 +13,38 @@ export default function SignUpPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [formData, setFormData] = useState({
+    full_name: "",
     email: "",
     password: "",
-    fullName: "",
   });
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
-    setSuccess("");
 
-    try {
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            full_name: formData.fullName,
-          },
+    const { data: authData, error: signUpError } = await supabase.auth.signUp({
+      email: formData.email,
+      password: formData.password,
+      options: {
+        data: {
+          full_name: formData.full_name,
         },
-      });
+      },
+    });
 
-      if (signUpError) {
-        console.error("Sign-up error:", signUpError);
-        setError(signUpError.message || "Failed to create account.");
-        setLoading(false);
-        return;
-      }
-
-      // SUCCESS - Database trigger will create the profile row automatically
-      console.log("✅ Account created successfully:", data.user?.email);
-      setSuccess("Account created successfully! Please check your email to confirm your address.");
+    if (signUpError) {
+      setError(signUpError.message);
       setLoading(false);
+      return;
+    }
 
-      // Optional: Redirect to sign-in after a delay
-      setTimeout(() => {
-        router.push("/auth/signin");
-      }, 3000);
-
-    } catch (err) {
-      console.error("Unexpected sign-up error:", err);
-      setError("Unexpected error creating account. Please try again.");
+    if (authData.user) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      router.push("/dashboard");
+    } else {
+      setError("Signup succeeded but user data is missing. Please try signing in.");
       setLoading(false);
     }
   };
@@ -72,40 +60,34 @@ export default function SignUpPage() {
               width={400}
               height={100}
               priority
-              className="h-16 w-auto object-contain"
+              className="h-12 sm:h-16 w-auto object-contain"
             />
           </div>
-          <CardTitle className="text-2xl font-bold text-center">Create Account</CardTitle>
-          <CardDescription className="text-center">
-            Sign up to get started
+          <CardTitle className="text-xl sm:text-2xl font-bold text-center">Create Account</CardTitle>
+          <CardDescription className="text-center text-sm sm:text-base">
+            Sign up for Conexa DT
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSignUp} className="space-y-4">
             {error && (
               <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-            {success && (
-              <Alert className="bg-green-50 text-green-900 border-green-200">
-                <AlertDescription>{success}</AlertDescription>
+                <AlertDescription className="text-sm">{error}</AlertDescription>
               </Alert>
             )}
             <div className="space-y-2">
-              <Label htmlFor="fullName">Full Name</Label>
+              <Label htmlFor="full_name" className="text-sm sm:text-base">Full Name</Label>
               <Input
-                id="fullName"
-                type="text"
+                id="full_name"
+                value={formData.full_name}
+                onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                 placeholder="John Doe"
-                value={formData.fullName}
-                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                 required
-                disabled={loading || !!success}
+                className="h-10 sm:h-11"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-sm sm:text-base">Email</Label>
               <Input
                 id="email"
                 type="email"
@@ -113,11 +95,11 @@ export default function SignUpPage() {
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 required
-                disabled={loading || !!success}
+                className="h-10 sm:h-11"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-sm sm:text-base">Password</Label>
               <Input
                 id="password"
                 type="password"
@@ -125,11 +107,11 @@ export default function SignUpPage() {
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 required
-                disabled={loading || !!success}
+                className="h-10 sm:h-11"
               />
             </div>
-            <Button type="submit" className="w-full" disabled={loading || !!success}>
-              {loading ? "Creating account..." : success ? "Redirecting to sign in..." : "Sign Up"}
+            <Button type="submit" className="w-full h-10 sm:h-11" disabled={loading}>
+              {loading ? "Creating Account..." : "Sign Up"}
             </Button>
           </form>
           <div className="mt-4 text-center text-sm">

@@ -233,16 +233,17 @@ function MyAbsencesContent() {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
+      <div className="space-y-4 sm:space-y-6">
+        {/* Header - Mobile optimized */}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">My Absences</h1>
-            <p className="text-slate-600 mt-1">Request and manage time off</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">My Absences</h1>
+            <p className="text-sm sm:text-base text-slate-600 mt-1">Request and manage time off</p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             {isAdmin && (
               <Link href="/absences/heatmap">
-                <Button variant="outline" className="gap-2">
+                <Button variant="outline" className="w-full sm:w-auto gap-2">
                   <Calendar className="w-4 h-4" />
                   Team Heatmap
                 </Button>
@@ -250,7 +251,7 @@ function MyAbsencesContent() {
             )}
             <Dialog open={formOpen} onOpenChange={setFormOpen}>
               <DialogTrigger asChild>
-                <Button className="gap-2" onClick={() => {
+                <Button className="w-full sm:w-auto gap-2" onClick={() => {
                   setEditingAbsence(null);
                   setFormData({
                     type: "holiday",
@@ -263,7 +264,7 @@ function MyAbsencesContent() {
                   Request Absence
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="w-[95vw] max-w-md">
                 <DialogHeader>
                   <DialogTitle>{editingAbsence ? "Edit Absence" : "Request Absence"}</DialogTitle>
                 </DialogHeader>
@@ -285,7 +286,7 @@ function MyAbsencesContent() {
                     </Select>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="start_date">Start Date *</Label>
                       <Input
@@ -319,11 +320,11 @@ function MyAbsencesContent() {
                     />
                   </div>
 
-                  <div className="flex gap-3">
-                    <Button type="submit">
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Button type="submit" className="w-full sm:w-auto">
                       {editingAbsence ? "Update" : "Submit Request"}
                     </Button>
-                    <Button type="button" variant="outline" onClick={() => setFormOpen(false)}>
+                    <Button type="button" variant="outline" onClick={() => setFormOpen(false)} className="w-full sm:w-auto">
                       Cancel
                     </Button>
                   </div>
@@ -346,24 +347,24 @@ function MyAbsencesContent() {
           </Alert>
         )}
 
-        {/* Holiday Balance Card */}
+        {/* Holiday Balance Card - Mobile optimized */}
         <Card>
           <CardHeader>
-            <CardTitle>Holiday Balance ({new Date().getFullYear()})</CardTitle>
+            <CardTitle className="text-base sm:text-lg">Holiday Balance ({new Date().getFullYear()})</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <div className="text-sm text-slate-500 mb-1">Annual Entitlement</div>
-                <div className="text-2xl font-bold text-slate-900">{holidayStats.annual} days</div>
+                <div className="text-xl sm:text-2xl font-bold text-slate-900">{holidayStats.annual} days</div>
               </div>
               <div>
                 <div className="text-sm text-slate-500 mb-1">Approved & Taken</div>
-                <div className="text-2xl font-bold text-blue-600">{holidayStats.taken} days</div>
+                <div className="text-xl sm:text-2xl font-bold text-blue-600">{holidayStats.taken} days</div>
               </div>
               <div>
                 <div className="text-sm text-slate-500 mb-1">Remaining</div>
-                <div className={`text-2xl font-bold ${holidayStats.remaining < 5 ? "text-red-600" : "text-green-600"}`}>
+                <div className={`text-xl sm:text-2xl font-bold ${holidayStats.remaining < 5 ? "text-red-600" : "text-green-600"}`}>
                   {holidayStats.remaining} days
                 </div>
               </div>
@@ -374,9 +375,10 @@ function MyAbsencesContent() {
           </CardContent>
         </Card>
 
+        {/* Absence Requests - Card based on all screens */}
         <Card>
           <CardHeader>
-            <CardTitle>Absence Requests</CardTitle>
+            <CardTitle className="text-base sm:text-lg">Absence Requests</CardTitle>
           </CardHeader>
           <CardContent>
             {absences.length === 0 ? (
@@ -387,9 +389,9 @@ function MyAbsencesContent() {
               <div className="space-y-3">
                 {absences.map((absence) => (
                   <div key={absence.id} className="p-4 border rounded-lg">
-                    <div className="flex items-start justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                       <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
                           <Badge className={getTypeColor(absence.type)}>
                             {absence.type}
                           </Badge>
@@ -418,11 +420,11 @@ function MyAbsencesContent() {
                         )}
                       </div>
                       {!absence.approved_by && (
-                        <div className="flex gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => handleEdit(absence)}>
+                        <div className="flex flex-row sm:flex-col gap-2">
+                          <Button variant="ghost" size="sm" onClick={() => handleEdit(absence)} className="flex-1 sm:flex-none">
                             <Edit className="w-4 h-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDelete(absence.id, absence.approved_by)}>
+                          <Button variant="ghost" size="sm" onClick={() => handleDelete(absence.id, absence.approved_by)} className="flex-1 sm:flex-none">
                             <Trash2 className="w-4 h-4 text-red-600" />
                           </Button>
                         </div>

@@ -210,19 +210,20 @@ function PipelineGanttContent() {
           <CardHeader>
             <CardTitle>Timeline View</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0 sm:p-6">
             <div className="overflow-x-auto">
-              <div className="min-w-[1200px]">
+              <div className="min-w-[800px] p-4 sm:p-0">
                 {/* Timeline Header */}
-                <div className="flex mb-4 pb-2 border-b">
-                  <div className="w-64 flex-shrink-0 font-medium text-sm text-slate-600">
+                <div className="flex mb-4 pb-2 border-b border-slate-200">
+                  <div className="w-48 sm:w-64 flex-shrink-0 font-medium text-sm text-slate-600 pr-2 sm:pr-4">
                     Item
                   </div>
-                  <div className="flex-1 flex">
+                  <div className="flex-1 flex min-w-0">
                     {timelineMonths.map((month, idx) => (
                       <div
                         key={idx}
                         className="flex-1 text-center text-xs text-slate-500 border-l border-slate-200 px-1"
+                        style={{ minWidth: "60px" }}
                       >
                         {month.toLocaleDateString("en-GB", { month: "short", year: "2-digit" })}
                       </div>
@@ -231,35 +232,37 @@ function PipelineGanttContent() {
                 </div>
 
                 {/* Gantt Rows */}
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {items.map((item) => {
                     const totalDays = (latestEnd.getTime() - earliestStart.getTime()) / (1000 * 60 * 60 * 24);
                     const startOffset = (item.startDate.getTime() - earliestStart.getTime()) / (1000 * 60 * 60 * 24);
                     const duration = (item.endDate.getTime() - item.startDate.getTime()) / (1000 * 60 * 60 * 24);
 
-                    const leftPercent = (startOffset / totalDays) * 100;
-                    const widthPercent = (duration / totalDays) * 100;
+                    const leftPercent = Math.max(0, (startOffset / totalDays) * 100);
+                    const widthPercent = Math.max(2, (duration / totalDays) * 100);
 
                     return (
                       <div key={item.id} className="flex items-center group">
-                        <div className="w-64 flex-shrink-0 pr-4">
-                          <div className={`text-sm font-medium ${getTextColor(item)}`}>
+                        <div className="w-48 sm:w-64 flex-shrink-0 pr-2 sm:pr-4">
+                          <div className={`text-xs sm:text-sm font-medium ${getTextColor(item)} truncate`}>
                             {item.name}
                           </div>
-                          <div className="text-xs text-slate-500">
+                          <div className="text-xs text-slate-500 truncate">
                             {item.companyShortName}
                           </div>
                         </div>
-                        <div className="flex-1 relative h-8">
+                        <div className="flex-1 relative h-10 min-w-0">
                           <div
-                            className={`absolute h-6 ${getBarColor(item)} rounded text-white text-xs flex items-center justify-center px-2 overflow-hidden`}
+                            className={`absolute h-7 ${getBarColor(item)} rounded text-white text-xs flex items-center justify-center px-2 overflow-hidden shadow-sm hover:shadow-md transition-shadow`}
                             style={{
                               left: `${leftPercent}%`,
                               width: `${widthPercent}%`,
+                              minWidth: "40px",
                             }}
+                            title={`${item.name}: ${formatDate(item.startDate)} - ${formatDate(item.endDate)}`}
                           >
-                            <span className="truncate">
-                              {formatDate(item.startDate)} - {formatDate(item.endDate)}
+                            <span className="truncate text-[10px] sm:text-xs">
+                              {widthPercent > 15 ? `${formatDate(item.startDate)} - ${formatDate(item.endDate)}` : ""}
                             </span>
                           </div>
                         </div>
@@ -269,24 +272,24 @@ function PipelineGanttContent() {
                 </div>
 
                 {/* Legend */}
-                <div className="mt-6 pt-4 border-t">
-                  <div className="text-sm font-medium text-slate-600 mb-2">Legend:</div>
-                  <div className="flex flex-wrap gap-4 text-xs">
+                <div className="mt-6 pt-4 border-t border-slate-200">
+                  <div className="text-sm font-medium text-slate-600 mb-3">Legend:</div>
+                  <div className="flex flex-wrap gap-3 sm:gap-4 text-xs">
                     <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 bg-green-700 rounded"></div>
-                      <span>Project</span>
+                      <div className="w-4 h-4 bg-green-700 rounded shadow-sm"></div>
+                      <span className="text-slate-700">Project</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 bg-green-500 rounded"></div>
-                      <span>Secured</span>
+                      <div className="w-4 h-4 bg-green-500 rounded shadow-sm"></div>
+                      <span className="text-slate-700">Secured</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 bg-orange-500 rounded"></div>
-                      <span>High Potential</span>
+                      <div className="w-4 h-4 bg-orange-500 rounded shadow-sm"></div>
+                      <span className="text-slate-700">High Potential</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 bg-blue-500 rounded"></div>
-                      <span>Bid</span>
+                      <div className="w-4 h-4 bg-blue-500 rounded shadow-sm"></div>
+                      <span className="text-slate-700">Bid</span>
                     </div>
                   </div>
                 </div>

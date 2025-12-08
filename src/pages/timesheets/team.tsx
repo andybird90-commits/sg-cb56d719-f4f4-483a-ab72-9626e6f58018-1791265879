@@ -137,20 +137,23 @@ function TeamTimesheetsContent() {
 
   return (
     <Layout>
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
+        {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Team Timesheets</h1>
-          <p className="text-slate-600 mt-1">View team time entries</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Team Timesheets</h1>
+          <p className="text-sm sm:text-base text-slate-600 mt-1">View team time entries</p>
         </div>
 
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>
+            <div className="space-y-3">
+              <CardTitle className="text-base sm:text-lg">
                 Week of {currentWeekStart.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
               </CardTitle>
-              <div className="flex items-center gap-4">
-                <div className="w-64">
+              
+              {/* Controls - Stack on mobile */}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="flex-1">
                   <Select value={selectedUser} onValueChange={setSelectedUser}>
                     <SelectTrigger>
                       <SelectValue />
@@ -169,7 +172,7 @@ function TeamTimesheetsContent() {
                   <Button variant="outline" size="sm" onClick={prevWeek}>
                     <ChevronLeft className="w-4 h-4" />
                   </Button>
-                  <Button variant="outline" size="sm" onClick={thisWeek}>
+                  <Button variant="outline" size="sm" onClick={thisWeek} className="text-xs sm:text-sm whitespace-nowrap">
                     This Week
                   </Button>
                   <Button variant="outline" size="sm" onClick={nextWeek}>
@@ -181,20 +184,20 @@ function TeamTimesheetsContent() {
           </CardHeader>
           <CardContent>
             {timesheets.length === 0 ? (
-              <div className="text-center py-8 text-slate-600">
+              <div className="text-center py-8 text-slate-600 text-sm">
                 No time entries for this period.
               </div>
             ) : (
               <div className="space-y-3">
                 {timesheets.map((ts) => (
                   <div key={ts.id} className="p-4 border rounded-lg">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-1">
-                          <div className="font-medium text-slate-900">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 mb-1">
+                          <div className="font-medium text-sm sm:text-base text-slate-900">
                             {ts.profiles?.full_name}
                           </div>
-                          <div className="text-sm text-slate-500">
+                          <div className="text-xs sm:text-sm text-slate-500">
                             {new Date(ts.date).toLocaleDateString("en-GB", {
                               day: "numeric",
                               month: "short",
@@ -202,7 +205,7 @@ function TeamTimesheetsContent() {
                             })}
                           </div>
                         </div>
-                        <div className="text-sm text-slate-700">
+                        <div className="text-sm text-slate-700 mb-1">
                           {ts.projects?.code} - {ts.projects?.name}
                         </div>
                         {ts.project_activities && (
@@ -216,13 +219,13 @@ function TeamTimesheetsContent() {
                           </div>
                         )}
                         {ts.notes && (
-                          <div className="text-xs text-slate-600 mt-1">
+                          <div className="text-xs text-slate-600 mt-1 line-clamp-2">
                             {ts.notes}
                           </div>
                         )}
                       </div>
-                      <div className="text-right">
-                        <div className="text-lg font-semibold text-slate-900">
+                      <div className="text-right flex-shrink-0">
+                        <div className="text-base sm:text-lg font-semibold text-slate-900">
                           {ts.hours}h
                         </div>
                       </div>
@@ -233,7 +236,7 @@ function TeamTimesheetsContent() {
                 <div className="pt-4 border-t">
                   <div className="text-right">
                     <div className="text-sm text-slate-600">Total Hours</div>
-                    <div className="text-2xl font-bold text-slate-900">
+                    <div className="text-xl sm:text-2xl font-bold text-slate-900">
                       {getTotalHours()}h
                     </div>
                   </div>

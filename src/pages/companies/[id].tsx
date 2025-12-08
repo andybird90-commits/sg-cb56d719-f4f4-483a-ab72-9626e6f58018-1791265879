@@ -120,7 +120,7 @@ function CompanyDetailContent() {
   if (error || !company) {
     return (
       <Layout>
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
@@ -137,10 +137,10 @@ function CompanyDetailContent() {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
+      <div className="space-y-4 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
           <Link href="/companies">
-            <Button variant="ghost" size="sm" className="gap-2">
+            <Button variant="ghost" size="sm" className="gap-2 self-start">
               <ArrowLeft className="w-4 h-4" />
               Back
             </Button>
@@ -148,9 +148,9 @@ function CompanyDetailContent() {
         </div>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div className="flex items-center gap-3">
-              <CardTitle className="text-2xl">{company.name}</CardTitle>
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+              <CardTitle className="text-xl sm:text-2xl">{company.name}</CardTitle>
               <Badge className={getStatusColor(company.status)}>
                 {company.status}
               </Badge>
@@ -158,7 +158,7 @@ function CompanyDetailContent() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {company.short_name && (
                   <div>
                     <div className="text-sm font-medium text-slate-500">Short Name</div>
@@ -184,11 +184,11 @@ function CompanyDetailContent() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Contacts</CardTitle>
+            <CardTitle className="text-lg sm:text-xl">Contacts</CardTitle>
           </CardHeader>
           <CardContent>
             {contacts.length === 0 ? (
-              <div className="text-center py-8 text-slate-600">
+              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm sm:text-base">
                 No contacts for this company yet.
               </div>
             ) : (
@@ -196,26 +196,26 @@ function CompanyDetailContent() {
                 {contacts.map((contact) => (
                   <div
                     key={contact.id}
-                    className="p-4 border rounded-lg"
+                    className="p-3 sm:p-4 border rounded-lg"
                   >
-                    <div className="flex items-center gap-2 mb-1">
-                      <h4 className="font-medium text-slate-900">{contact.name}</h4>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
+                      <h4 className="font-medium text-sm sm:text-base text-slate-900">{contact.name}</h4>
                       {contact.job_title && (
-                        <span className="text-sm text-slate-500">• {contact.job_title}</span>
+                        <span className="text-xs sm:text-sm text-slate-500">• {contact.job_title}</span>
                       )}
                     </div>
                     <div className="space-y-1">
                       {contact.email && (
-                        <div className="flex items-center gap-2 text-sm text-slate-600">
-                          <Mail className="w-3 h-3" />
-                          <a href={`mailto:${contact.email}`} className="hover:text-blue-600">
+                        <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-600">
+                          <Mail className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                          <a href={`mailto:${contact.email}`} className="hover:text-blue-600 break-all">
                             {contact.email}
                           </a>
                         </div>
                       )}
                       {contact.phone && (
-                        <div className="flex items-center gap-2 text-sm text-slate-600">
-                          <Phone className="w-3 h-3" />
+                        <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-600">
+                          <Phone className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                           <a href={`tel:${contact.phone}`} className="hover:text-blue-600">
                             {contact.phone}
                           </a>
@@ -231,11 +231,11 @@ function CompanyDetailContent() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Opportunities</CardTitle>
+            <CardTitle className="text-lg sm:text-xl">Opportunities</CardTitle>
           </CardHeader>
           <CardContent>
             {opportunities.length === 0 ? (
-              <div className="text-center py-8 text-slate-600">
+              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm sm:text-base">
                 No opportunities for this company yet.
               </div>
             ) : (
@@ -243,20 +243,20 @@ function CompanyDetailContent() {
                 {opportunities.map((opp) => (
                   <div
                     key={opp.id}
-                    className="p-4 border rounded-lg cursor-pointer hover:bg-slate-50"
+                    className="p-3 sm:p-4 border rounded-lg cursor-pointer hover:bg-slate-50 transition-colors"
                     onClick={() => router.push(`/opportunities/${opp.id}`)}
                   >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="font-medium text-slate-900">{opp.name}</h4>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="outline">{opp.stage}</Badge>
-                          <Badge variant="outline">{opp.status}</Badge>
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium text-sm sm:text-base text-slate-900 mb-2">{opp.name}</h4>
+                        <div className="flex flex-wrap gap-2 mb-2">
+                          <Badge variant="outline" className="text-xs">{opp.stage}</Badge>
+                          <Badge variant="outline" className="text-xs">{opp.status}</Badge>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-sm text-slate-500">Expected Value</div>
-                        <div className="font-medium">{formatCurrency(opp.expected_fee_value)}</div>
+                      <div className="text-left sm:text-right flex-shrink-0">
+                        <div className="text-xs sm:text-sm text-slate-500">Expected Value</div>
+                        <div className="font-medium text-sm sm:text-base">{formatCurrency(opp.expected_fee_value)}</div>
                       </div>
                     </div>
                   </div>

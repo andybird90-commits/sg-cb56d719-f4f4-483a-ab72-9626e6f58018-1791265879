@@ -117,51 +117,52 @@ function NewProjectContent() {
 
   return (
     <Layout>
-      <div className="max-w-3xl mx-auto space-y-6">
-        <div className="flex items-center gap-4">
+      <div className="max-w-3xl mx-auto space-y-4 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
           <Link href="/projects">
-            <Button variant="ghost" size="sm" className="gap-2">
+            <Button variant="ghost" size="sm" className="gap-2 self-start">
               <ArrowLeft className="w-4 h-4" />
               Back
             </Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">Add New Project</h1>
-            <p className="text-slate-600 mt-1">Create a new project</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Add New Project</h1>
+            <p className="text-sm sm:text-base text-slate-600 mt-1">Create a new project</p>
           </div>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Project Information</CardTitle>
+            <CardTitle className="text-lg sm:text-xl">Project Information</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
                 <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
+                  <AlertDescription className="text-sm">{error}</AlertDescription>
                 </Alert>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="code">Project Code *</Label>
+                  <Label htmlFor="code" className="text-sm sm:text-base">Project Code *</Label>
                   <Input
                     id="code"
                     value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                     placeholder="e.g., PRJ-2025-001"
                     required
+                    className="h-10 sm:h-11"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
+                  <Label htmlFor="status" className="text-sm sm:text-base">Status</Label>
                   <Select
                     value={formData.status}
                     onValueChange={(value) => setFormData({ ...formData, status: value })}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-10 sm:h-11">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -176,22 +177,23 @@ function NewProjectContent() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="name">Project Name *</Label>
+                <Label htmlFor="name" className="text-sm sm:text-base">Project Name *</Label>
                 <Input
                   id="name"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
+                  className="h-10 sm:h-11"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="client_company_id">Client Company *</Label>
+                <Label htmlFor="client_company_id" className="text-sm sm:text-base">Client Company *</Label>
                 <Select
                   value={formData.client_company_id}
                   onValueChange={(value) => setFormData({ ...formData, client_company_id: value })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="h-10 sm:h-11">
                     <SelectValue placeholder="Select a company" />
                   </SelectTrigger>
                   <SelectContent>
@@ -205,12 +207,12 @@ function NewProjectContent() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="opportunity_id">Linked Opportunity</Label>
+                <Label htmlFor="opportunity_id" className="text-sm sm:text-base">Linked Opportunity</Label>
                 <Select
                   value={formData.opportunity_id}
                   onValueChange={(value) => setFormData({ ...formData, opportunity_id: value })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="h-10 sm:h-11">
                     <SelectValue placeholder="Select an opportunity (optional)" />
                   </SelectTrigger>
                   <SelectContent>
@@ -223,55 +225,59 @@ function NewProjectContent() {
                 </Select>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="start_date">Start Date</Label>
+                  <Label htmlFor="start_date" className="text-sm sm:text-base">Start Date</Label>
                   <Input
                     id="start_date"
                     type="date"
                     value={formData.start_date}
                     onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                    className="h-10 sm:h-11"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="end_date">End Date</Label>
+                  <Label htmlFor="end_date" className="text-sm sm:text-base">End Date</Label>
                   <Input
                     id="end_date"
                     type="date"
                     value={formData.end_date}
                     onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                    className="h-10 sm:h-11"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="agreed_fee_value">Agreed Fee Value (£)</Label>
+                  <Label htmlFor="agreed_fee_value" className="text-sm sm:text-base">Agreed Fee Value (£)</Label>
                   <Input
                     id="agreed_fee_value"
                     type="number"
                     step="0.01"
                     value={formData.agreed_fee_value}
                     onChange={(e) => setFormData({ ...formData, agreed_fee_value: e.target.value })}
+                    className="h-10 sm:h-11"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="notes">Notes</Label>
+                <Label htmlFor="notes" className="text-sm sm:text-base">Notes</Label>
                 <Textarea
                   id="notes"
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   rows={4}
+                  className="text-sm sm:text-base"
                 />
               </div>
 
-              <div className="flex gap-3">
-                <Button type="submit" disabled={loading}>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button type="submit" disabled={loading} className="h-10 sm:h-11">
                   {loading ? "Creating..." : "Create Project"}
                 </Button>
-                <Link href="/projects">
-                  <Button type="button" variant="outline">
+                <Link href="/projects" className="w-full sm:w-auto">
+                  <Button type="button" variant="outline" className="w-full h-10 sm:h-11">
                     Cancel
                   </Button>
                 </Link>

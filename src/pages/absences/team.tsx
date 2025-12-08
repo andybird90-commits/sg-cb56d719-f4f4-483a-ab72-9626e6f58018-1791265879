@@ -114,38 +114,39 @@ function TeamAbsencesContent() {
 
   return (
     <Layout>
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
+        {/* Header - Mobile optimized */}
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Team Absences</h1>
-          <p className="text-slate-600 mt-1">Review and approve absence requests</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Team Absences</h1>
+          <p className="text-sm sm:text-base text-slate-600 mt-1">Review and approve absence requests</p>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
-            <TabsTrigger value="pending">
-              Pending Approvals {pendingAbsences.length > 0 && `(${pendingAbsences.length})`}
+          <TabsList className="w-full grid grid-cols-2">
+            <TabsTrigger value="pending" className="text-sm sm:text-base">
+              Pending {pendingAbsences.length > 0 && `(${pendingAbsences.length})`}
             </TabsTrigger>
-            <TabsTrigger value="all">All Absences</TabsTrigger>
+            <TabsTrigger value="all" className="text-sm sm:text-base">All Absences</TabsTrigger>
           </TabsList>
 
           <TabsContent value="pending">
             <Card>
               <CardHeader>
-                <CardTitle>Pending Approvals</CardTitle>
+                <CardTitle className="text-base sm:text-lg">Pending Approvals</CardTitle>
               </CardHeader>
               <CardContent>
                 {pendingAbsences.length === 0 ? (
-                  <div className="text-center py-8 text-slate-600">
+                  <div className="text-center py-8 text-slate-600 text-sm">
                     No pending approvals. All absence requests have been reviewed.
                   </div>
                 ) : (
                   <div className="space-y-3">
                     {pendingAbsences.map((absence) => (
                       <div key={absence.id} className="p-4 border rounded-lg bg-orange-50 border-orange-200">
-                        <div className="flex items-start justify-between">
+                        <div className="flex flex-col gap-3">
                           <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <div className="font-medium text-slate-900">
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
+                              <div className="font-medium text-sm sm:text-base text-slate-900">
                                 {absence.profiles?.full_name}
                               </div>
                               <Badge className={getTypeColor(absence.type)}>
@@ -164,7 +165,7 @@ function TeamAbsencesContent() {
                               </div>
                             )}
                           </div>
-                          <Button size="sm" onClick={() => handleApprove(absence.id)} className="gap-2">
+                          <Button size="sm" onClick={() => handleApprove(absence.id)} className="w-full sm:w-auto gap-2">
                             <Check className="w-4 h-4" />
                             Approve
                           </Button>
@@ -180,21 +181,21 @@ function TeamAbsencesContent() {
           <TabsContent value="all">
             <Card>
               <CardHeader>
-                <CardTitle>All Absences</CardTitle>
+                <CardTitle className="text-base sm:text-lg">All Absences</CardTitle>
               </CardHeader>
               <CardContent>
                 {absences.length === 0 ? (
-                  <div className="text-center py-8 text-slate-600">
+                  <div className="text-center py-8 text-slate-600 text-sm">
                     No absence requests yet.
                   </div>
                 ) : (
                   <div className="space-y-3">
                     {absences.map((absence) => (
                       <div key={absence.id} className="p-4 border rounded-lg">
-                        <div className="flex items-start justify-between">
+                        <div className="flex flex-col gap-3">
                           <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <div className="font-medium text-slate-900">
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
+                              <div className="font-medium text-sm sm:text-base text-slate-900">
                                 {absence.profiles?.full_name}
                               </div>
                               <Badge className={getTypeColor(absence.type)}>
@@ -225,7 +226,7 @@ function TeamAbsencesContent() {
                             )}
                           </div>
                           {!absence.approved_by && (
-                            <Button size="sm" onClick={() => handleApprove(absence.id)} className="gap-2">
+                            <Button size="sm" onClick={() => handleApprove(absence.id)} className="w-full sm:w-auto gap-2">
                               <Check className="w-4 h-4" />
                               Approve
                             </Button>
