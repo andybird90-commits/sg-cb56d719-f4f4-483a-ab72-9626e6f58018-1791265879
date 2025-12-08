@@ -1,212 +1,81 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { Layout } from "@/components/Layout";
 import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
-import { supabase, Opportunity, Project, Company } from "@/lib/supabase";
+import { useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Calendar } from "lucide-react";
-
-interface PipelineItem {
-  id: string;
-  type: "opportunity" | "project";
-  name: string;
-  clientName: string;
-  startDate: Date;
-  endDate: Date;
-  status: string;
-  stage?: string;
-  value: number;
-}
+import { AlertCircle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function PipelinePage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
-  const [items, setItems] = useState<PipelineItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState("year"); // quarter, year
 
   useEffect(() => {
     if (!authLoading && !user) {
       router.push("/auth/signin");
-    } else if (user) {
-      fetchPipelineData();
     }
   }, [user, authLoading, router]);
 
-  const fetchPipelineData = async () => {
-    setLoading(true);
-    const pipelineItems: PipelineItem[] = [];
-
-    // Fetch Opportunities
-    const { data: opps } = await supabase
-      .from("opportunities")
-      .select(`*, companies(name)`)
-      .in("status", ["open"]);
-
-    if (opps) {
-      opps.forEach((opp: any) => {
-        if (opp.expected_start_date && opp.expected_end_date) {
-          pipelineItems.push({
-            id: opp.id,
-            type: "opportunity",
-            name: opp.name,
-            clientName: opp.companies?.name || "Unknown",
-            startDate: new Date(opp.expected_start_date),
-            endDate: new Date(opp.expected_end_date),
-            status: opp.status,
-            stage: opp.stage,
-            value: opp.expected_fee_value || 0,
-          });
-        }
-      });
-    }
-
-    // Fetch Live Projects
-    const { data: projs } = await supabase
-      .from("projects")
-      .select(`*, companies(name)`)
-      .in("status", ["live", "pipeline"]);
-
-    if (projs) {
-      projs.forEach((proj: any) => {
-        if (proj.start_date && proj.end_date) {
-          pipelineItems.push({
-            id: proj.id,
-            type: "project",
-            name: proj.name,
-            clientName: proj.companies?.name || "Unknown",
-            startDate: new Date(proj.start_date),
-            endDate: new Date(proj.end_date),
-            status: proj.status,
-            value: proj.agreed_fee_value || 0,
-          });
-        }
-      });
-    }
-
-    // Sort by start date
-    pipelineItems.sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
-    setItems(pipelineItems);
-    setLoading(false);
-  };
-
-  const getStatusColor = (item: PipelineItem) => {
-    if (item.type === "project") {
-      return "bg-emerald-500";
-    }
-    // Opportunity colors
-    switch (item.stage) {
-      case "secured": return "bg-blue-600";
-      case "high_potential": return "bg-blue-400";
-      default: return "bg-blue-200"; // bid
-    }
-  };
-
-  // Helper to calculate grid position
-  const getGridStyles = (item: PipelineItem, startMonth: Date, totalMonths: number) => {
-    const startOffset = (item.startDate.getFullYear() - startMonth.getFullYear()) * 12 + 
-                        (item.startDate.getMonth() - startMonth.getMonth());
-    
-    const durationMonths = ((item.endDate.getFullYear() - item.startDate.getFullYear()) * 12 + 
-                           (item.endDate.getMonth() - item.startDate.getMonth())) + 1;
-
-    // Constrain to view
-    const visibleStart = Math.max(0, startOffset);
-    const visibleEnd = Math.min(totalMonths, startOffset + durationMonths);
-    const visibleDuration = Math.max(0, visibleEnd - visibleStart);
-
-    return {
-      gridColumnStart: visibleStart + 2, // +2 for label column offset
-      gridColumnEnd: `span ${visibleDuration || 1}`,
-    };
-  };
-
-  if (authLoading || loading) {
-    return <Layout>Loading...</Layout>;
+  if (authLoading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center py-12">
+          <div className="text-slate-600">Loading...</div>
+        </div>
+      </Layout>
+    );
   }
-
-  // Gantt Chart Configuration
-  const today = new Date();
-  const viewStart = new Date(today.getFullYear(), today.getMonth(), 1);
-  const totalMonths = 12; // Show next 12 months
-  
-  const months = Array.from({ length: totalMonths }, (_, i) => {
-    const d = new Date(viewStart);
-    d.setMonth(d.getMonth() + i);
-    return d;
-  });
 
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">Pipeline</h1>
-            <p className="text-slate-600 mt-1">Project and opportunity timeline</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 text-sm text-slate-600">
-              <span className="w-3 h-3 rounded-full bg-emerald-500"></span> Live Project
-              <span className="w-3 h-3 rounded-full bg-blue-600"></span> Secured Opp
-              <span className="w-3 h-3 rounded-full bg-blue-400"></span> High Potential
-              <span className="w-3 h-3 rounded-full bg-blue-200"></span> Bid
-            </div>
-          </div>
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900">Pipeline</h1>
+          <p className="text-slate-600 mt-1">Project and opportunity timeline</p>
         </div>
 
-        <Card className="overflow-hidden">
-          <CardContent className="p-0 overflow-x-auto">
-            <div className="min-w-[1000px] p-6">
-              {/* Header Row */}
-              <div className="grid grid-cols-[250px_repeat(12,1fr)] gap-0 border-b mb-4">
-                <div className="font-semibold text-slate-900 py-2">Project / Opportunity</div>
-                {months.map((m, i) => (
-                  <div key={i} className="text-xs text-slate-500 text-center border-l py-2">
-                    {m.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })}
-                  </div>
-                ))}
-              </div>
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Database Setup Required</AlertTitle>
+          <AlertDescription>
+            <p className="mb-2">
+              The Pipeline module requires additional database tables that haven't been set up yet.
+            </p>
+            <p className="mb-2">
+              To enable this feature, please run the SQL migrations from:
+            </p>
+            <ul className="list-disc list-inside space-y-1 ml-2">
+              <li><strong>DATABASE_SETUP_PART_B.md</strong> - Creates opportunities and projects tables</li>
+            </ul>
+            <p className="mt-3 text-sm">
+              After running the migrations, refresh this page to see your pipeline timeline.
+            </p>
+          </AlertDescription>
+        </Alert>
 
-              {/* Data Rows */}
-              <div className="space-y-2">
-                {items.length === 0 ? (
-                  <div className="text-center py-8 text-slate-500">
-                    No items with scheduled dates found.
-                  </div>
-                ) : (
-                  items.map((item) => {
-                    const styles = getGridStyles(item, viewStart, totalMonths);
-                    if (Number(styles.gridColumnEnd.split(' ')[1]) <= 0) return null; // Skip if out of range
-
-                    return (
-                      <div key={item.id} className="grid grid-cols-[250px_repeat(12,1fr)] gap-0 items-center hover:bg-slate-50 rounded">
-                        <div className="pr-4 py-2">
-                          <div className="font-medium text-sm truncate" title={item.name}>
-                            {item.name}
-                          </div>
-                          <div className="text-xs text-slate-500 truncate">{item.clientName}</div>
-                        </div>
-                        
-                        {/* Bar */}
-                        <div 
-                          className={`h-6 rounded-full relative group cursor-pointer ${getStatusColor(item)} opacity-90 hover:opacity-100 transition-opacity`}
-                          style={styles}
-                        >
-                          {/* Tooltip */}
-                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10 w-max max-w-[200px] bg-slate-900 text-white text-xs rounded p-2 pointer-events-none">
-                            <div className="font-bold">{item.name}</div>
-                            <div>{item.startDate.toLocaleDateString()} - {item.endDate.toLocaleDateString()}</div>
-                            {item.value > 0 && <div>£{item.value.toLocaleString()}</div>}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
+        <Card>
+          <CardContent className="p-12 text-center">
+            <div className="text-slate-400 mb-4">
+              <svg
+                className="w-16 h-16 mx-auto"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                />
+              </svg>
             </div>
+            <h3 className="text-lg font-medium text-slate-900 mb-1">
+              Pipeline View Coming Soon
+            </h3>
+            <p className="text-slate-600 text-sm">
+              Complete the database setup to visualize your opportunities and projects on a timeline
+            </p>
           </CardContent>
         </Card>
       </div>
