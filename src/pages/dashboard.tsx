@@ -1,603 +1,564 @@
 import { RequireAuth } from "@/components/RequireAuth";
 import { Layout } from "@/components/Layout";
+import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Users, Target, ArrowRight, Calendar, AlertCircle, CheckCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useAuth } from "@/contexts/AuthContext";
+import { Building2, Users, Target, Briefcase, TrendingUp, Calendar, Clock, AlertCircle } from "lucide-react";
 import Link from "next/link";
 
-interface MonthPipeline {
-  month: string;
-  secured: number;
-  highPotential: number;
-  bid: number;
-  budget: number;
+interface DashboardStats {
+  companiesCount: number;
+  contactsCount: number;
+  opportunitiesCount: number;
+  projectsCount: number;
+  liveProjectsCount: number;
 }
 
-interface CurrentAbsence {
+interface Opportunity {
+  id: string;
+  name: string;
+  stage: string;
+  tender_due_date: string | null;
+  companies?: { name: string };
+}
+
+interface Project {
+  id: string;
+  code: string;
+  name: string;
+  status: string;
+  companies?: { name: string };
+}
+
+interface Absence {
   id: string;
   type: string;
   start_date: string;
   end_date: string;
-  profiles?: {
-    full_name: string;
-  };
+  profiles?: { full_name: string };
+}
+
+interface PipelineData {
+  month: string;
+  forecast: number;
+  budget: number;
+}
+
+interface PhasingRow {
+  project_id: string;
+  year: number;
+  month: number;
+  revenue_amount: number;
 }
 
 function DashboardContent() {
+  const { profile } = useAuth();
   const router = useRouter();
-  const { user, profile } = useAuth();
-  const [pipelineData, setPipelineData] = useState<MonthPipeline[]>([]);
-  const [currentAbsences, setCurrentAbsences] = useState<CurrentAbsence[]>([]);
-  const [userPendingCount, setUserPendingCount] = useState(0);
-  const [teamPendingCount, setTeamPendingCount] = useState(0);
+  const [stats, setStats] = useState<DashboardStats>({
+    companiesCount: 0,
+    contactsCount: 0,
+    opportunitiesCount: 0,
+    projectsCount: 0,
+    liveProjectsCount: 0,
+  });
+  const [upcomingTenders, setUpcomingTenders] = useState<Opportunity[]>([]);
+  const [liveProjects, setLiveProjects] = useState<Project[]>([]);
+  const [thisWeekAbsences, setThisWeekAbsences] = useState<Absence[]>([]);
+  const [pipelineData, setPipelineData] = useState<PipelineData[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const isAdmin = profile?.role === "admin" || profile?.role === "director";
-
   useEffect(() => {
-    fetchPipelineData();
-    fetchCurrentAbsences();
-    if (user) {
-      fetchUserPendingHolidays();
-    }
-    if (isAdmin) {
-      fetchTeamPendingHolidays();
-    }
-  }, [user, isAdmin]);
+    fetchDashboardData();
+  }, []);
 
-  const fetchUserPendingHolidays = async () => {
-    if (!user) return;
+  const fetchDashboardData = async () => {
+    setLoading(true);
 
-    const { data, count } = await supabase
+    const { data: companies } = await supabase.from("companies").select("id");
+    const { data: contacts } = await supabase.from("contacts").select("id");
+    const { data: opportunities } = await supabase.from("opportunities").select("id");
+    const { data: projects } = await supabase.from("projects").select("id, status");
+    
+    const liveCount = projects?.filter(p => p.status === "live").length || 0;
+
+    setStats({
+      companiesCount: companies?.length || 0,
+      contactsCount: contacts?.length || 0,
+      opportunitiesCount: opportunities?.length || 0,
+      projectsCount: projects?.length || 0,
+      liveProjectsCount: liveCount,
+    });
+
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+
+    const { data: tenders } = await supabase
+      .from("opportunities")
+      .select(`
+        id,
+        name,
+        stage,
+        tender_due_date,
+        companies (
+          name
+        )
+      `)
+      .not("tender_due_date", "is", null)
+      .lte("tender_due_date", thirtyDaysFromNow.toISOString().split("T")[0])
+      .order("tender_due_date")
+      .limit(5);
+
+    const { data: liveProjs } = await supabase
+      .from("projects")
+      .select(`
+        id,
+        code,
+        name,
+        status,
+        companies!projects_client_company_id_fkey (
+          name
+        )
+      `)
+      .eq("status", "live")
+      .order("name")
+      .limit(5);
+
+    const startOfWeek = new Date();
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay() + 1);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(endOfWeek.getDate() + 6);
+
+    const { data: absences } = await supabase
       .from("absences")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .eq("type", "holiday")
-      .is("approved_by", null);
+      .select(`
+        id,
+        type,
+        start_date,
+        end_date,
+        profiles!absences_user_id_fkey (
+          full_name
+        )
+      `)
+      .not("approved_by", "is", null)
+      .lte("start_date", endOfWeek.toISOString().split("T")[0])
+      .gte("end_date", startOfWeek.toISOString().split("T")[0])
+      .order("start_date")
+      .limit(10);
 
-    setUserPendingCount(count || 0);
-  };
+    setUpcomingTenders(tenders || []);
+    setLiveProjects(liveProjs || []);
+    setThisWeekAbsences(absences || []);
 
-  const fetchTeamPendingHolidays = async () => {
-    const { data, count } = await supabase
-      .from("absences")
-      .select("*", { count: "exact", head: true })
-      .eq("type", "holiday")
-      .is("approved_by", null);
-
-    setTeamPendingCount(count || 0);
+    await fetchPipelineData();
+    
+    setLoading(false);
   };
 
   const fetchPipelineData = async () => {
-    const months: MonthPipeline[] = [];
-    const currentDate = new Date();
-    
-    // Build 12-month window
-    const windowMonths: { start: Date; end: Date; label: string }[] = [];
+    const today = new Date();
+    const months: PipelineData[] = [];
+
     for (let i = 0; i < 12; i++) {
-      const monthDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + i, 1);
-      const year = monthDate.getFullYear();
-      const month = monthDate.getMonth();
-      const monthStart = new Date(year, month, 1);
-      const monthEnd = new Date(year, month + 1, 0); // Last day of month
-      
-      windowMonths.push({
-        start: monthStart,
-        end: monthEnd,
-        label: monthDate.toLocaleDateString("en-GB", { month: "short", year: "2-digit" }),
+      const date = new Date(today.getFullYear(), today.getMonth() + i, 1);
+      const year = date.getFullYear();
+      const month = date.getMonth() + 1;
+
+      months.push({
+        month: date.toLocaleDateString("en-GB", { month: "short", year: "2-digit" }),
+        forecast: 0,
+        budget: 0,
       });
-    }
 
-    const windowStart = windowMonths[0].start;
-    const windowEnd = windowMonths[windowMonths.length - 1].end;
-
-    // Fetch all opportunities with date ranges
-    const { data: oppsData } = await supabase
-      .from("opportunities")
-      .select("stage, expected_fee_value, expected_start_date, expected_end_date, tender_due_date");
-
-    // Fetch all projects with phasing data
-    const { data: projectsData } = await supabase
-      .from("projects")
-      .select("id, agreed_fee_value, start_date, end_date, status");
-
-    // Fetch all phasing data for projects
-    const { data: phasingData } = await supabase
-      .from("project_monthly_phasing")
-      .select("project_id, year, month, revenue_amount");
-
-    // Create phasing lookup map
-    const phasingMap: Record<string, Record<string, number>> = {};
-    if (phasingData) {
-      phasingData.forEach((p) => {
-        if (!phasingMap[p.project_id]) {
-          phasingMap[p.project_id] = {};
-        }
-        phasingMap[p.project_id][`${p.year}-${p.month}`] = p.revenue_amount;
-      });
-    }
-
-    // Fetch variations for projects
-    const { data: variationsData } = await supabase
-      .from("variations")
-      .select("project_id, value, status");
-
-    // Create variations lookup map
-    const variationsMap: Record<string, number> = {};
-    if (variationsData) {
-      variationsData.forEach((v) => {
-        if (v.status === "accepted") {
-          if (!variationsMap[v.project_id]) {
-            variationsMap[v.project_id] = 0;
-          }
-          variationsMap[v.project_id] += v.value;
-        }
-      });
-    }
-
-    // Process each opportunity with pro-rated allocation
-    const monthlyAllocations: Record<number, { secured: number; highPotential: number; bid: number }> = {};
-    
-    // Initialize all months
-    for (let i = 0; i < 12; i++) {
-      monthlyAllocations[i] = { secured: 0, highPotential: 0, bid: 0 };
-    }
-
-    if (oppsData) {
-      oppsData.forEach((opp) => {
-        // Determine start date
-        let startDate: Date | null = null;
-        if (opp.expected_start_date) {
-          startDate = new Date(opp.expected_start_date);
-        } else if (opp.tender_due_date) {
-          startDate = new Date(opp.tender_due_date);
-        }
-
-        if (!startDate || isNaN(startDate.getTime())) return; // Skip if no valid start
-
-        // Determine end date
-        let endDate: Date | null = null;
-        if (opp.expected_end_date) {
-          endDate = new Date(opp.expected_end_date);
-        } else {
-          // Treat as single-month item
-          endDate = new Date(startDate);
-        }
-
-        if (!endDate || isNaN(endDate.getTime())) return; // Skip if no valid end
-
-        // Check if opportunity overlaps with 12-month window
-        if (endDate < windowStart || startDate > windowEnd) {
-          return; // Entirely outside window
-        }
-
-        // Clamp to window
-        const effectiveStart = startDate < windowStart ? windowStart : startDate;
-        const effectiveEnd = endDate > windowEnd ? windowEnd : endDate;
-
-        // Calculate total duration in days (inclusive)
-        const totalDays = Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-
-        const feeValue = opp.expected_fee_value || 0;
-
-        // Allocate to each month based on overlap
-        windowMonths.forEach((monthWindow, monthIndex) => {
-          // Calculate overlap between opportunity and this month
-          const overlapStart = effectiveStart > monthWindow.start ? effectiveStart : monthWindow.start;
-          const overlapEnd = effectiveEnd < monthWindow.end ? effectiveEnd : monthWindow.end;
-
-          if (overlapEnd >= overlapStart) {
-            // Calculate days in this month
-            const overlapDays = Math.ceil((overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-            
-            // Pro-rate the fee value
-            const monthAllocation = feeValue * (overlapDays / totalDays);
-
-            // Add to correct bucket based on stage
-            if (opp.stage === "secured") {
-              monthlyAllocations[monthIndex].secured += monthAllocation;
-            } else if (opp.stage === "high_potential") {
-              monthlyAllocations[monthIndex].highPotential += monthAllocation;
-            } else if (opp.stage === "bid") {
-              monthlyAllocations[monthIndex].bid += monthAllocation;
-            }
-          }
-        });
-      });
-    }
-
-    // Process projects - use phasing if available, otherwise auto-spread
-    if (projectsData) {
-      projectsData.forEach((project) => {
-        if (!project.start_date || !project.end_date) return;
-
-        const projectStart = new Date(project.start_date);
-        const projectEnd = new Date(project.end_date);
-
-        // Check if project overlaps with window
-        if (projectEnd < windowStart || projectStart > windowEnd) {
-          return;
-        }
-
-        // Get total fee for project
-        let totalFee = project.agreed_fee_value || 0;
-        totalFee += variationsMap[project.id] || 0;
-
-        // Check if project has manual phasing
-        const projectPhasing = phasingMap[project.id];
-        const hasPhasing = projectPhasing && Object.keys(projectPhasing).length > 0;
-
-        windowMonths.forEach((monthWindow, monthIndex) => {
-          const year = monthWindow.start.getFullYear();
-          const month = monthWindow.start.getMonth() + 1;
-
-          let monthRevenue = 0;
-
-          if (hasPhasing) {
-            // Use manual phasing if available
-            monthRevenue = projectPhasing[`${year}-${month}`] || 0;
-          } else {
-            // Use automatic spread
-            const effectiveStart = projectStart > monthWindow.start ? projectStart : monthWindow.start;
-            const effectiveEnd = projectEnd < monthWindow.end ? projectEnd : monthWindow.end;
-
-            if (effectiveEnd >= effectiveStart) {
-              const totalProjectDays = Math.ceil((projectEnd.getTime() - projectStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-              const overlapDays = Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-              monthRevenue = totalFee * (overlapDays / totalProjectDays);
-            }
-          }
-
-          // Add to secured bucket (projects are always treated as secured)
-          if (monthRevenue > 0) {
-            monthlyAllocations[monthIndex].secured += monthRevenue;
-          }
-        });
-      });
-    }
-
-    // Build final month data with budgets
-    for (let i = 0; i < 12; i++) {
-      const monthDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + i, 1);
-      const year = monthDate.getFullYear();
-      const month = monthDate.getMonth() + 1;
-
-      // Get budget for this month
-      const { data: budgetData } = await supabase
+      const { data: budget } = await supabase
         .from("monthly_budgets")
         .select("budget_revenue")
         .eq("year", year)
         .eq("month", month)
         .maybeSingle();
 
-      months.push({
-        month: windowMonths[i].label,
-        secured: monthlyAllocations[i].secured,
-        highPotential: monthlyAllocations[i].highPotential,
-        bid: monthlyAllocations[i].bid,
-        budget: budgetData?.budget_revenue || 0,
-      });
+      if (budget) {
+        months[i].budget = budget.budget_revenue;
+      }
     }
 
+    const { data: allProjects } = await supabase
+      .from("projects")
+      .select("id, start_date, end_date, agreed_fee_value, status")
+      .in("status", ["live", "pipeline"]);
+
+    const { data: allPhasing } = await supabase
+      .from("project_monthly_phasing")
+      .select("project_id, year, month, revenue_amount");
+
+    const phasingMap = new Map<string, PhasingRow[]>();
+    (allPhasing || []).forEach((p) => {
+      if (!phasingMap.has(p.project_id)) {
+        phasingMap.set(p.project_id, []);
+      }
+      phasingMap.get(p.project_id)!.push(p as PhasingRow);
+    });
+
+    (allProjects || []).forEach((project) => {
+      const projectPhasing = phasingMap.get(project.id) || [];
+
+      for (let i = 0; i < 12; i++) {
+        const date = new Date(today.getFullYear(), today.getMonth() + i, 1);
+        const year = date.getFullYear();
+        const month = date.getMonth() + 1;
+
+        const manualPhasing = projectPhasing.find(
+          (p) => p.year === year && p.month === month
+        );
+
+        if (manualPhasing && manualPhasing.revenue_amount > 0) {
+          months[i].forecast += manualPhasing.revenue_amount;
+        } else {
+          const autoRevenue = calculateAutoMonthlyRevenue(project, year, month);
+          months[i].forecast += autoRevenue;
+        }
+      }
+    });
+
     setPipelineData(months);
-    setLoading(false);
   };
 
-  const fetchCurrentAbsences = async () => {
-    // Get current week (Monday to Sunday)
-    const now = new Date();
-    const dayOfWeek = now.getDay();
-    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-    
-    const monday = new Date(now);
-    monday.setDate(now.getDate() + mondayOffset);
-    monday.setHours(0, 0, 0, 0);
-    
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    sunday.setHours(23, 59, 59, 999);
+  const calculateAutoMonthlyRevenue = (
+    project: any,
+    year: number,
+    month: number
+  ): number => {
+    if (!project.start_date || !project.agreed_fee_value) return 0;
 
-    const mondayStr = monday.toISOString().split("T")[0];
-    const sundayStr = sunday.toISOString().split("T")[0];
+    const startDate = new Date(project.start_date);
+    const endDate = project.end_date ? new Date(project.end_date) : new Date(startDate.getFullYear(), startDate.getMonth() + 6, startDate.getDate());
 
-    // Fetch absences that overlap with current week
-    const { data } = await supabase
-      .from("absences")
-      .select(`
-        *,
-        profiles!absences_user_id_fkey (
-          full_name
-        )
-      `)
-      .not("approved_by", "is", null)
-      .or(`and(start_date.lte.${sundayStr},end_date.gte.${mondayStr})`);
+    const monthStart = new Date(year, month - 1, 1);
+    const monthEnd = new Date(year, month, 0);
 
-    setCurrentAbsences(data || []);
+    if (monthEnd < startDate || monthStart > endDate) return 0;
+
+    const overlapStart = monthStart > startDate ? monthStart : startDate;
+    const overlapEnd = monthEnd < endDate ? monthEnd : endDate;
+
+    const overlapDays = Math.max(
+      0,
+      Math.ceil((overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
+    );
+
+    const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+    return (project.agreed_fee_value / totalDays) * overlapDays;
   };
 
   const formatCurrency = (value: number) => {
-    if (value === 0) return "£0";
-    if (value >= 1000000) return `£${(value / 1000000).toFixed(1)}M`;
-    if (value >= 1000) return `£${(value / 1000).toFixed(0)}k`;
-    return `£${value.toFixed(0)}`;
+    return new Intl.NumberFormat("en-GB", {
+      style: "currency",
+      currency: "GBP",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
   };
 
-  const formatDate = (date: string) => {
+  const formatDate = (date: string | null) => {
+    if (!date) return "—";
     return new Date(date).toLocaleDateString("en-GB", {
       day: "numeric",
       month: "short",
+      year: "numeric",
     });
   };
 
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case "holiday":
+  const getStageColor = (stage: string) => {
+    switch (stage) {
+      case "secured":
+        return "bg-green-100 text-green-800";
+      case "high_potential":
         return "bg-blue-100 text-blue-800";
-      case "sick":
-        return "bg-red-100 text-red-800";
-      case "other":
-        return "bg-slate-100 text-slate-800";
+      case "bid":
+        return "bg-yellow-100 text-yellow-800";
       default:
         return "bg-slate-100 text-slate-800";
     }
   };
 
+  const getAbsenceColor = (type: string) => {
+    switch (type) {
+      case "holiday":
+        return "bg-blue-100 text-blue-800";
+      case "sick":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-orange-100 text-orange-800";
+    }
+  };
+
   const maxValue = Math.max(
-    ...pipelineData.map(m => m.secured + m.highPotential + m.bid + m.budget)
+    ...pipelineData.map(d => Math.max(d.forecast, d.budget)),
+    1
   );
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="text-slate-600">Loading...</div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
-          <p className="text-slate-600 mt-1">Welcome to Conexa DT</p>
-        </div>
-
-        {/* Holiday Approval Widgets */}
-        <div className="grid gap-4 md:grid-cols-2">
-          {/* User's Pending Holiday Requests */}
-          {userPendingCount > 0 && (
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <strong>Your pending holiday requests</strong>
-                    <p className="text-sm mt-1">
-                      You have {userPendingCount} holiday {userPendingCount === 1 ? "request" : "requests"} awaiting approval.
-                    </p>
-                  </div>
-                  <Link href="/absences/my">
-                    <Button size="sm" variant="outline">
-                      View My Absences
-                    </Button>
-                  </Link>
-                </div>
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {/* Team Pending Approvals (Admin/Director Only) */}
-          {isAdmin && teamPendingCount > 0 && (
-            <Alert>
-              <CheckCircle className="h-4 w-4" />
-              <AlertDescription>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <strong>Team approvals pending</strong>
-                    <p className="text-sm mt-1">
-                      There {teamPendingCount === 1 ? "is" : "are"} {teamPendingCount} holiday {teamPendingCount === 1 ? "request" : "requests"} awaiting your approval.
-                    </p>
-                  </div>
-                  <Link href="/absences/team">
-                    <Button size="sm">
-                      Review Approvals
-                    </Button>
-                  </Link>
-                </div>
-              </AlertDescription>
-            </Alert>
+      <div className="space-y-4 sm:space-y-6">
+        {/* Welcome Header */}
+        <div className="space-y-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
+            Welcome back{profile?.full_name ? `, ${profile.full_name}` : ""}
+          </h1>
+          {profile?.role && (
+            <p className="text-sm sm:text-base text-slate-600 capitalize">
+              {profile.role} Dashboard
+            </p>
           )}
         </div>
 
-        <div className="grid gap-6 md:grid-cols-3">
-          <Card 
-            onClick={() => router.push("/companies")} 
-            className="cursor-pointer hover:shadow-lg transition-shadow"
-          >
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <Building2 className="w-8 h-8 text-blue-600" />
-                <CardTitle>Companies</CardTitle>
-              </div>
-              <CardDescription>Manage your client companies</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-slate-600">
-                View and manage all companies in your CRM system.
-              </p>
-            </CardContent>
-          </Card>
+        {/* Quick Stats Grid - Mobile: 2 cols, Tablet+: 4 cols */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <Link href="/companies">
+            <Card className="hover:shadow-md transition-shadow cursor-pointer">
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
+                  <div className="text-xl sm:text-2xl font-bold text-slate-900">
+                    {stats.companiesCount}
+                  </div>
+                </div>
+                <div className="text-xs sm:text-sm text-slate-600">Companies</div>
+              </CardContent>
+            </Card>
+          </Link>
 
-          <Card 
-            onClick={() => router.push("/contacts")} 
-            className="cursor-pointer hover:shadow-lg transition-shadow"
-          >
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <Users className="w-8 h-8 text-green-600" />
-                <CardTitle>Contacts</CardTitle>
-              </div>
-              <CardDescription>Manage your contacts</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-slate-600">
-                Access and organize all your business contacts.
-              </p>
-            </CardContent>
-          </Card>
+          <Link href="/contacts">
+            <Card className="hover:shadow-md transition-shadow cursor-pointer">
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <Users className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
+                  <div className="text-xl sm:text-2xl font-bold text-slate-900">
+                    {stats.contactsCount}
+                  </div>
+                </div>
+                <div className="text-xs sm:text-sm text-slate-600">Contacts</div>
+              </CardContent>
+            </Card>
+          </Link>
 
-          <Card 
-            onClick={() => router.push("/opportunities")} 
-            className="cursor-pointer hover:shadow-lg transition-shadow"
-          >
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <Target className="w-8 h-8 text-purple-600" />
-                <CardTitle>Opportunities</CardTitle>
-              </div>
-              <CardDescription>Track sales pipeline</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-slate-600">
-                Monitor and manage your sales opportunities.
-              </p>
-            </CardContent>
-          </Card>
+          <Link href="/opportunities">
+            <Card className="hover:shadow-md transition-shadow cursor-pointer">
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <Target className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" />
+                  <div className="text-xl sm:text-2xl font-bold text-slate-900">
+                    {stats.opportunitiesCount}
+                  </div>
+                </div>
+                <div className="text-xs sm:text-sm text-slate-600">Opportunities</div>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/projects">
+            <Card className="hover:shadow-md transition-shadow cursor-pointer">
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <Briefcase className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
+                  <div className="text-xl sm:text-2xl font-bold text-slate-900">
+                    {stats.liveProjectsCount}
+                  </div>
+                </div>
+                <div className="text-xs sm:text-sm text-slate-600">Live Projects</div>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
 
-        {/* Who's Off This Week Widget */}
+        {/* Pipeline Chart - Full width, responsive */}
         <Card>
           <CardHeader>
-            <div className="flex items-center gap-3">
-              <Calendar className="w-5 h-5 text-slate-600" />
-              <CardTitle>Who's Off This Week</CardTitle>
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-slate-600" />
+              <CardTitle className="text-base sm:text-lg">12-Month Pipeline vs Budget</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
-            {currentAbsences.length === 0 ? (
-              <div className="text-center py-4 text-slate-600">
-                No current absences this week.
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {currentAbsences.map((absence) => (
-                  <div key={absence.id} className="flex items-center justify-between p-3 bg-slate-50 rounded">
-                    <div className="flex items-center gap-3">
-                      <div className="font-medium text-slate-900">
-                        {absence.profiles?.full_name}
+            <div className="overflow-x-auto -mx-2 px-2">
+              <div className="min-w-[600px] h-64 sm:h-80">
+                <div className="flex h-full gap-1 items-end">
+                  {pipelineData.map((data, idx) => (
+                    <div key={idx} className="flex-1 flex flex-col justify-end items-center gap-1">
+                      <div className="w-full flex flex-col gap-0.5">
+                        <div
+                          className="w-full bg-blue-500 rounded-t hover:bg-blue-600 transition-colors"
+                          style={{
+                            height: `${(data.forecast / maxValue) * 200}px`,
+                            minHeight: data.forecast > 0 ? "4px" : "0px",
+                          }}
+                          title={`Forecast: ${formatCurrency(data.forecast)}`}
+                        />
+                        <div
+                          className="w-full bg-slate-300 rounded-b hover:bg-slate-400 transition-colors"
+                          style={{
+                            height: `${(data.budget / maxValue) * 200}px`,
+                            minHeight: data.budget > 0 ? "4px" : "0px",
+                          }}
+                          title={`Budget: ${formatCurrency(data.budget)}`}
+                        />
                       </div>
-                      <Badge className={getTypeColor(absence.type)}>
-                        {absence.type}
-                      </Badge>
+                      <div className="text-[10px] sm:text-xs text-slate-600 text-center whitespace-nowrap">
+                        {data.month}
+                      </div>
                     </div>
-                    <div className="text-sm text-slate-600">
-                      {formatDate(absence.start_date)} → {formatDate(absence.end_date)}
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            )}
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-4 text-xs sm:text-sm justify-center">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 sm:w-4 sm:h-4 bg-blue-500 rounded"></div>
+                <span className="text-slate-600">Forecast Revenue</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 sm:w-4 sm:h-4 bg-slate-300 rounded"></div>
+                <span className="text-slate-600">Budget</span>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Pipeline Chart */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>12-Month Pipeline vs Budget</CardTitle>
-                <CardDescription>Opportunity values by stage and monthly revenue targets</CardDescription>
+        {/* Three Column Section - Stacks on mobile */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+          {/* Upcoming Tenders */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-orange-600" />
+                <CardTitle className="text-base sm:text-lg">Upcoming Tenders</CardTitle>
               </div>
-              <Button variant="outline" onClick={() => router.push("/pipeline/gantt")} className="gap-2">
-                View Gantt
-                <ArrowRight className="w-4 h-4" />
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="text-center py-12 text-slate-600">Loading pipeline data...</div>
-            ) : pipelineData.length === 0 ? (
-              <div className="text-center py-12 text-slate-600">No pipeline data available</div>
-            ) : (
-              <div className="space-y-4">
-                {/* Chart */}
-                <div className="flex items-end justify-between gap-2 h-64">
-                  {pipelineData.map((month, idx) => {
-                    const total = month.secured + month.highPotential + month.bid;
-                    const securedHeight = maxValue > 0 ? (month.secured / maxValue) * 100 : 0;
-                    const highPotentialHeight = maxValue > 0 ? (month.highPotential / maxValue) * 100 : 0;
-                    const bidHeight = maxValue > 0 ? (month.bid / maxValue) * 100 : 0;
-                    const budgetHeight = maxValue > 0 ? (month.budget / maxValue) * 100 : 0;
-
-                    return (
-                      <div key={idx} className="flex-1 flex flex-col items-center gap-1">
-                        <div className="w-full relative" style={{ height: "200px" }}>
-                          {/* Budget line */}
-                          {month.budget > 0 && (
-                            <div
-                              className="absolute w-full border-t-2 border-dashed border-slate-400"
-                              style={{ bottom: `${budgetHeight}%` }}
-                            />
-                          )}
-                          
-                          {/* Stacked bars */}
-                          <div className="absolute bottom-0 w-full flex flex-col">
-                            {month.bid > 0 && (
-                              <div
-                                className="bg-blue-500 w-full rounded-t"
-                                style={{ height: `${bidHeight * 2}px` }}
-                                title={`Bid: ${formatCurrency(month.bid)}`}
-                              />
-                            )}
-                            {month.highPotential > 0 && (
-                              <div
-                                className="bg-orange-500 w-full"
-                                style={{ height: `${highPotentialHeight * 2}px` }}
-                                title={`High Potential: ${formatCurrency(month.highPotential)}`}
-                              />
-                            )}
-                            {month.secured > 0 && (
-                              <div
-                                className="bg-green-500 w-full"
-                                style={{ height: `${securedHeight * 2}px` }}
-                                title={`Secured: ${formatCurrency(month.secured)}`}
-                              />
-                            )}
-                          </div>
+              <p className="text-xs sm:text-sm text-slate-600">Next 30 days</p>
+            </CardHeader>
+            <CardContent>
+              {upcomingTenders.length === 0 ? (
+                <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
+                  No tenders due in the next 30 days
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {upcomingTenders.map((opp) => (
+                    <div
+                      key={opp.id}
+                      className="p-3 border rounded-lg cursor-pointer hover:bg-slate-50"
+                      onClick={() => router.push(`/opportunities/${opp.id}`)}
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="font-medium text-sm text-slate-900 line-clamp-2">
+                          {opp.name}
                         </div>
-                        <div className="text-xs text-slate-600 text-center">{month.month}</div>
-                        {total > 0 && (
-                          <div className="text-xs font-medium text-slate-900">
-                            {formatCurrency(total)}
-                          </div>
-                        )}
+                        <Badge className={`${getStageColor(opp.stage)} flex-shrink-0 text-xs`}>
+                          {opp.stage.replace("_", " ")}
+                        </Badge>
                       </div>
-                    );
-                  })}
+                      <div className="text-xs text-slate-600 mb-1">
+                        {opp.companies?.name}
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        Due: {formatDate(opp.tender_due_date)}
+                      </div>
+                    </div>
+                  ))}
                 </div>
+              )}
+            </CardContent>
+          </Card>
 
-                {/* Legend */}
-                <div className="flex justify-center gap-6 text-xs">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-green-500 rounded"></div>
-                    <span>Secured</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-orange-500 rounded"></div>
-                    <span>High Potential</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-blue-500 rounded"></div>
-                    <span>Bid</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 border-2 border-dashed border-slate-400 rounded"></div>
-                    <span>Budget</span>
-                  </div>
-                </div>
+          {/* Live Projects */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Briefcase className="w-5 h-5 text-green-600" />
+                <CardTitle className="text-base sm:text-lg">Live Projects</CardTitle>
               </div>
-            )}
-          </CardContent>
-        </Card>
+              <p className="text-xs sm:text-sm text-slate-600">Currently active</p>
+            </CardHeader>
+            <CardContent>
+              {liveProjects.length === 0 ? (
+                <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
+                  No live projects
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {liveProjects.map((proj) => (
+                    <div
+                      key={proj.id}
+                      className="p-3 border rounded-lg cursor-pointer hover:bg-slate-50"
+                      onClick={() => router.push(`/projects/${proj.id}`)}
+                    >
+                      <div className="flex items-start gap-2 mb-2">
+                        <span className="font-mono text-xs text-slate-500 flex-shrink-0">
+                          {proj.code}
+                        </span>
+                        <div className="font-medium text-sm text-slate-900 line-clamp-2">
+                          {proj.name}
+                        </div>
+                      </div>
+                      <div className="text-xs text-slate-600">
+                        {proj.companies?.name}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* This Week's Absences */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-blue-600" />
+                <CardTitle className="text-base sm:text-lg">This Week's Absences</CardTitle>
+              </div>
+              <p className="text-xs sm:text-sm text-slate-600">Team availability</p>
+            </CardHeader>
+            <CardContent>
+              {thisWeekAbsences.length === 0 ? (
+                <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
+                  No absences this week
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {thisWeekAbsences.map((absence) => (
+                    <div key={absence.id} className="p-3 border rounded-lg">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="font-medium text-sm text-slate-900">
+                          {absence.profiles?.full_name}
+                        </div>
+                        <Badge className={`${getAbsenceColor(absence.type)} flex-shrink-0 text-xs`}>
+                          {absence.type}
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-slate-600">
+                        {formatDate(absence.start_date)} → {formatDate(absence.end_date)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </Layout>
   );

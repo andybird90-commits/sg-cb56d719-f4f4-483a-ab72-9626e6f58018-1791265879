@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Mail, Phone } from "lucide-react";
+import { Plus, Search, Mail, Phone, Building2, User, Briefcase } from "lucide-react";
 
 interface Contact {
   id: string;
@@ -129,21 +129,22 @@ function ContactsContent() {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
+      <div className="space-y-4 sm:space-y-6">
+        {/* Header - Mobile optimized */}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">Contacts</h1>
-            <p className="text-slate-600 mt-1">All business contacts</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Contacts</h1>
+            <p className="text-sm sm:text-base text-slate-600 mt-1">All business contacts</p>
           </div>
           {canEdit && (
             <Dialog open={formOpen} onOpenChange={setFormOpen}>
               <DialogTrigger asChild>
-                <Button className="gap-2">
+                <Button className="w-full sm:w-auto gap-2">
                   <Plus className="w-4 h-4" />
-                  New Contact
+                  <span>New Contact</span>
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="w-[95vw] max-w-md">
                 <DialogHeader>
                   <DialogTitle>Add New Contact</DialogTitle>
                 </DialogHeader>
@@ -206,9 +207,9 @@ function ContactsContent() {
                     />
                   </div>
 
-                  <div className="flex gap-3">
-                    <Button type="submit">Add Contact</Button>
-                    <Button type="button" variant="outline" onClick={() => setFormOpen(false)}>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Button type="submit" className="w-full sm:w-auto">Add Contact</Button>
+                    <Button type="button" variant="outline" onClick={() => setFormOpen(false)} className="w-full sm:w-auto">
                       Cancel
                     </Button>
                   </div>
@@ -218,6 +219,7 @@ function ContactsContent() {
           )}
         </div>
 
+        {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
           <Input
@@ -228,52 +230,84 @@ function ContactsContent() {
           />
         </div>
 
-        <div className="grid gap-4">
-          {filteredContacts.map((contact) => (
-            <Card key={contact.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-semibold text-slate-900">
-                        {contact.name}
-                      </h3>
-                      {contact.job_title && (
-                        <span className="text-sm text-slate-500">• {contact.job_title}</span>
-                      )}
+        {/* Contacts List - Mobile: Cards, Desktop: Cards with more details */}
+        <div className="space-y-3">
+          {filteredContacts.length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <User className="w-12 h-12 mx-auto text-slate-300 mb-3" />
+                <p className="text-slate-600">
+                  {searchTerm ? "No contacts found" : "No contacts yet"}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            filteredContacts.map((contact) => (
+              <Card key={contact.id} className="hover:shadow-md transition-shadow">
+                <CardContent className="p-4 sm:p-6">
+                  {/* Mobile & Desktop Layout */}
+                  <div className="space-y-3">
+                    {/* Header: Name and Job Title */}
+                    <div>
+                      <div className="flex items-start gap-2">
+                        <User className="w-5 h-5 text-slate-400 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-base sm:text-lg font-semibold text-slate-900 truncate">
+                            {contact.name}
+                          </h3>
+                          {contact.job_title && (
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <Briefcase className="w-3.5 h-3.5 text-slate-400" />
+                              <span className="text-sm text-slate-600">{contact.job_title}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
+                    {/* Company */}
                     <div 
-                      className="text-sm text-blue-600 hover:underline cursor-pointer mb-2"
+                      className="flex items-center gap-2 text-sm text-blue-600 hover:underline cursor-pointer"
                       onClick={() => router.push(`/companies/${contact.company_id}`)}
                     >
-                      {contact.companies?.name}
+                      <Building2 className="w-4 h-4" />
+                      <span>{contact.companies?.name}</span>
                     </div>
 
-                    <div className="space-y-1">
+                    {/* Contact Details */}
+                    <div className="space-y-2">
                       {contact.email && (
-                        <div className="flex items-center gap-2 text-sm text-slate-600">
-                          <Mail className="w-4 h-4" />
-                          <a href={`mailto:${contact.email}`} className="hover:text-blue-600">
-                            {contact.email}
-                          </a>
-                        </div>
+                        <a 
+                          href={`mailto:${contact.email}`}
+                          className="flex items-center gap-2 text-sm text-slate-600 hover:text-blue-600 transition-colors"
+                        >
+                          <Mail className="w-4 h-4 flex-shrink-0" />
+                          <span className="truncate">{contact.email}</span>
+                        </a>
                       )}
                       {contact.phone && (
-                        <div className="flex items-center gap-2 text-sm text-slate-600">
-                          <Phone className="w-4 h-4" />
-                          <a href={`tel:${contact.phone}`} className="hover:text-blue-600">
-                            {contact.phone}
-                          </a>
-                        </div>
+                        <a 
+                          href={`tel:${contact.phone}`}
+                          className="flex items-center gap-2 text-sm text-slate-600 hover:text-blue-600 transition-colors"
+                        >
+                          <Phone className="w-4 h-4 flex-shrink-0" />
+                          <span>{contact.phone}</span>
+                        </a>
                       )}
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
+
+        {/* Results count - Mobile friendly */}
+        {filteredContacts.length > 0 && (
+          <div className="text-center text-sm text-slate-600">
+            Showing {filteredContacts.length} {filteredContacts.length === 1 ? 'contact' : 'contacts'}
+          </div>
+        )}
       </div>
     </Layout>
   );

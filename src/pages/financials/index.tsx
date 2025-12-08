@@ -5,12 +5,10 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TrendingUp, TrendingDown } from "lucide-react";
 import { useRouter } from "next/router";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,18 +21,9 @@ interface ProjectFinancials {
   revenue: number;
   internal_cost: number;
   subcontractor_cost: number;
-  margin_value: number;
+  total_cost: number;
+  margin: number;
   margin_percent: number;
-}
-
-interface FinancialSummary {
-  total_revenue: number;
-  total_internal_cost: number;
-  total_subcontractor_cost: number;
-  total_margin_value: number;
-  total_margin_percent: number;
-  budget_revenue: number | null;
-  projects: ProjectFinancials[];
 }
 
 interface PhasingRow {
@@ -67,6 +56,7 @@ function FinancialsContent() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [revenueMode, setRevenueMode] = useState<"forecast" | "actual">("forecast");
+  const [activeTab, setActiveTab] = useState("overview");
   
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [totalInternalCost, setTotalInternalCost] = useState(0);
@@ -74,7 +64,7 @@ function FinancialsContent() {
   const [budgetRevenue, setBudgetRevenue] = useState<number | null>(null);
   const [budgetCost, setBudgetCost] = useState<number | null>(null);
   
-  const [projectBreakdown, setProjectBreakdown] = useState<any[]>([]);
+  const [projectFinancials, setProjectFinancials] = useState<ProjectFinancials[]>([]);
   const [toInvoiceItems, setToInvoiceItems] = useState<ToInvoiceItem[]>([]);
   
   // Invoice marking dialog state
@@ -186,7 +176,7 @@ function FinancialsContent() {
     });
 
     // Calculate revenue for each project based on mode
-    const breakdown: any[] = [];
+    const breakdown: ProjectFinancials[] = [];
     let totalRev = 0;
     let totalIntCost = 0;
     let totalSubCost = 0;
@@ -263,7 +253,7 @@ function FinancialsContent() {
     setTotalRevenue(totalRev);
     setTotalInternalCost(totalIntCost);
     setTotalSubcontractorCost(totalSubCost);
-    setProjectBreakdown(breakdown);
+    setProjectFinancials(breakdown);
     setToInvoiceItems(toInvoice);
     setLoading(false);
   };
@@ -293,7 +283,14 @@ function FinancialsContent() {
     return (totalFee / totalDays) * daysInMonth;
   };
 
-  const handleMarkInvoiced = async () => {
+  const handleMarkInvoiced = async (item?: ToInvoiceItem) => {
+    // If called with an item, open dialog
+    if (item) {
+      setMarkingInvoice(item);
+      return;
+    }
+
+    // If called without item, it's the confirm action
     if (!markingInvoice) return;
 
     const { error } = await supabase
@@ -333,7 +330,11 @@ function FinancialsContent() {
 
   const totalCost = totalInternalCost + totalSubcontractorCost;
   const margin = totalRevenue - totalCost;
-  const marginPercent = totalRevenue > 0 ? (margin / totalRevenue) * 100 : 0;
+  
+  const budget = {
+    budget_revenue: budgetRevenue,
+    budget_cost: budgetCost
+  };
 
   if (loading) {
     return (
@@ -347,292 +348,438 @@ function FinancialsContent() {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
+      <div className="space-y-4 sm:space-y-6">
+        {/* Header - Mobile optimized */}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">Financial Dashboard</h1>
-            <p className="text-slate-600 mt-1">Monthly financial analysis</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Financials</h1>
+            <p className="text-sm sm:text-base text-slate-600 mt-1">Monthly financial overview</p>
           </div>
         </div>
 
-        {/* Month/Year Selector */}
+        {/* Month/Year Selector - Stack on mobile */}
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Label>Year:</Label>
-                <Select
-                  value={selectedYear.toString()}
-                  onValueChange={(value) => setSelectedYear(parseInt(value))}
-                >
-                  <SelectTrigger className="w-32">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex-1">
+                <Label htmlFor="month" className="text-xs sm:text-sm">Month</Label>
+                <Select value={selectedMonth.toString()} onValueChange={(v) => setSelectedMonth(parseInt(v))}>
+                  <SelectTrigger id="month" className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {[2024, 2025, 2026, 2027].map((year) => (
-                      <SelectItem key={year} value={year.toString()}>
-                        {year}
-                      </SelectItem>
-                    ))}
+                    {Array.from({ length: 12 }, (_, i) => {
+                      const date = new Date(2000, i, 1);
+                      return (
+                        <SelectItem key={i + 1} value={(i + 1).toString()}>
+                          {date.toLocaleDateString("en-GB", { month: "long" })}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="flex items-center gap-2">
-                <Label>Month:</Label>
-                <Select
-                  value={selectedMonth.toString()}
-                  onValueChange={(value) => setSelectedMonth(parseInt(value))}
-                >
-                  <SelectTrigger className="w-32">
+              <div className="flex-1">
+                <Label htmlFor="year" className="text-xs sm:text-sm">Year</Label>
+                <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(parseInt(v))}>
+                  <SelectTrigger id="year" className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
-                      <SelectItem key={month} value={month.toString()}>
-                        {getMonthName(month)}
-                      </SelectItem>
-                    ))}
+                    {Array.from({ length: 5 }, (_, i) => {
+                      const year = new Date().getFullYear() - 2 + i;
+                      return (
+                        <SelectItem key={year} value={year.toString()}>
+                          {year}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div className="ml-auto flex items-center gap-2">
-                <Label>Revenue Mode:</Label>
-                <Tabs value={revenueMode} onValueChange={(value) => setRevenueMode(value as "forecast" | "actual")}>
-                  <TabsList>
-                    <TabsTrigger value="forecast">Forecast</TabsTrigger>
-                    <TabsTrigger value="actual">Actual</TabsTrigger>
-                  </TabsList>
-                </Tabs>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-4 gap-4">
+        {/* Forecast/Actual Toggle - Mobile friendly */}
+        <div className="flex justify-center">
+          <div className="inline-flex rounded-lg border border-slate-200 p-1 bg-slate-50">
+            <button
+              onClick={() => setRevenueMode("forecast")}
+              className={`px-4 sm:px-6 py-2 text-sm font-medium rounded-md transition-colors ${
+                revenueMode === "forecast"
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              Forecast
+            </button>
+            <button
+              onClick={() => setRevenueMode("actual")}
+              className={`px-4 sm:px-6 py-2 text-sm font-medium rounded-md transition-colors ${
+                revenueMode === "actual"
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              Actual
+            </button>
+          </div>
+        </div>
+
+        {/* Summary Cards - Stack on mobile, grid on tablet/desktop */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-slate-600">
-                Total Revenue ({revenueMode === "forecast" ? "Forecast" : "Actual"})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(totalRevenue)}</div>
-              {budgetRevenue && (
-                <div className="text-xs text-slate-500 mt-1">
-                  Budget: {formatCurrency(budgetRevenue)} (
-                  {((totalRevenue / budgetRevenue) * 100).toFixed(0)}%)
+            <CardContent className="p-4 sm:p-6">
+              <div className="space-y-2">
+                <div className="text-xs sm:text-sm text-slate-600">
+                  Total Revenue ({revenueMode === "forecast" ? "Forecast" : "Actual"})
                 </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-slate-600">
-                Internal Cost
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(totalInternalCost)}</div>
-              {budgetCost && (
-                <div className="text-xs text-slate-500 mt-1">
-                  Budget: {formatCurrency(budgetCost)} (
-                  {((totalInternalCost / budgetCost) * 100).toFixed(0)}%)
+                <div className="text-xl sm:text-2xl font-bold text-slate-900">
+                  {formatCurrency(totalRevenue)}
                 </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-slate-600">
-                Subcontractor Cost
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(totalSubcontractorCost)}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-slate-600">Margin</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${margin >= 0 ? "text-green-600" : "text-red-600"}`}>
-                {formatCurrency(margin)}
+                {budget.budget_revenue && (
+                  <div className="text-xs text-slate-500">
+                    vs Budget: {formatCurrency(budget.budget_revenue)}
+                    <span className={totalRevenue >= budget.budget_revenue ? "text-green-600 ml-1" : "text-red-600 ml-1"}>
+                      ({totalRevenue >= budget.budget_revenue ? "+" : ""}
+                      {(((totalRevenue - budget.budget_revenue) / budget.budget_revenue) * 100).toFixed(1)}%)
+                    </span>
+                  </div>
+                )}
               </div>
-              <div className="text-xs text-slate-500 mt-1">
-                {marginPercent.toFixed(1)}%
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4 sm:p-6">
+              <div className="space-y-2">
+                <div className="text-xs sm:text-sm text-slate-600">Internal Cost</div>
+                <div className="text-xl sm:text-2xl font-bold text-slate-900">
+                  {formatCurrency(totalInternalCost)}
+                </div>
+                {budget.budget_cost && (
+                  <div className="text-xs text-slate-500">
+                    vs Budget: {formatCurrency(budget.budget_cost)}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4 sm:p-6">
+              <div className="space-y-2">
+                <div className="text-xs sm:text-sm text-slate-600">Subcontractor Cost</div>
+                <div className="text-xl sm:text-2xl font-bold text-slate-900">
+                  {formatCurrency(totalSubcontractorCost)}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4 sm:p-6">
+              <div className="space-y-2">
+                <div className="text-xs sm:text-sm text-slate-600">Margin</div>
+                <div className={`text-xl sm:text-2xl font-bold ${margin >= 0 ? "text-green-600" : "text-red-600"}`}>
+                  {formatCurrency(margin)}
+                </div>
+                <div className="text-xs text-slate-500">
+                  {totalRevenue > 0 ? `${((margin / totalRevenue) * 100).toFixed(1)}%` : "—"}
+                </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* To Invoice Section */}
-        {revenueMode === "actual" && toInvoiceItems.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>To Invoice</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {toInvoiceItems.map((item) => (
-                  <div key={item.phasing_id} className="flex items-center justify-between p-4 border rounded-lg bg-orange-50">
-                    <div className="flex-1">
-                      <div className="font-medium text-slate-900">
-                        {item.project_code} - {item.project_name}
-                      </div>
-                      <div className="text-sm text-slate-600">{item.client_name}</div>
-                      <div className="text-sm text-slate-500 mt-1">
-                        {getMonthName(item.month)} {item.year}
-                      </div>
-                    </div>
-                    <div className="text-right mr-4">
-                      <div className="text-lg font-semibold text-slate-900">
-                        {formatCurrency(item.actual_revenue)}
-                      </div>
-                      <Badge variant="outline" className="mt-1 text-orange-600 border-orange-300">
-                        To Invoice
-                      </Badge>
-                    </div>
-                    {canEdit && (
-                      <Dialog
-                        open={markingInvoice?.phasing_id === item.phasing_id}
-                        onOpenChange={(open) => {
-                          if (open) {
-                            setMarkingInvoice(item);
-                            setInvoiceForm({
-                              invoice_ref: "",
-                              invoice_date: new Date().toISOString().split("T")[0],
-                            });
-                          } else {
-                            setMarkingInvoice(null);
-                          }
-                        }}
-                      >
-                        <DialogTrigger asChild>
-                          <Button size="sm">Mark Invoiced</Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Mark as Invoiced</DialogTitle>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            <div>
-                              <div className="text-sm text-slate-600 mb-2">
-                                {item.project_code} - {item.project_name}
-                              </div>
-                              <div className="text-lg font-semibold">
-                                {formatCurrency(item.actual_revenue)}
-                              </div>
-                            </div>
+        {/* Tabs for Overview and To Invoice - Mobile friendly */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="w-full grid grid-cols-2">
+            <TabsTrigger value="overview" className="text-sm sm:text-base">Overview</TabsTrigger>
+            <TabsTrigger value="to_invoice" className="text-sm sm:text-base">To Invoice</TabsTrigger>
+          </TabsList>
 
+          <TabsContent value="overview" className="space-y-4 sm:space-y-6">
+            {/* Project Breakdown - Cards on mobile, table on desktop */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base sm:text-lg">Project Breakdown</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {projectFinancials.length === 0 ? (
+                  <div className="text-center py-8 text-slate-600 text-sm">
+                    No project data for this month
+                  </div>
+                ) : (
+                  <>
+                    {/* Mobile: Card View */}
+                    <div className="block lg:hidden space-y-3">
+                      {projectFinancials.map((pf) => (
+                        <Card 
+                          key={pf.project_id}
+                          className="cursor-pointer hover:shadow-md transition-shadow"
+                          onClick={() => router.push(`/projects/${pf.project_id}`)}
+                        >
+                          <CardContent className="p-4">
                             <div className="space-y-2">
-                              <Label htmlFor="invoice_ref">Invoice Reference *</Label>
-                              <Input
-                                id="invoice_ref"
-                                value={invoiceForm.invoice_ref}
-                                onChange={(e) =>
-                                  setInvoiceForm({ ...invoiceForm, invoice_ref: e.target.value })
-                                }
-                                placeholder="INV-2025-001"
-                                required
-                              />
-                            </div>
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-mono text-xs text-slate-500 mb-1">
+                                    {pf.project_code}
+                                  </div>
+                                  <div className="font-semibold text-sm text-slate-900 truncate">
+                                    {pf.project_name}
+                                  </div>
+                                  <div className="text-xs text-slate-600 truncate">
+                                    {pf.client_name}
+                                  </div>
+                                </div>
+                              </div>
 
-                            <div className="space-y-2">
-                              <Label htmlFor="invoice_date">Invoice Date *</Label>
-                              <Input
-                                id="invoice_date"
-                                type="date"
-                                value={invoiceForm.invoice_date}
-                                onChange={(e) =>
-                                  setInvoiceForm({ ...invoiceForm, invoice_date: e.target.value })
-                                }
-                                required
-                              />
+                              <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t">
+                                <div>
+                                  <span className="text-slate-500">Revenue:</span>
+                                  <div className="font-semibold text-slate-900">
+                                    {formatCurrency(pf.revenue)}
+                                  </div>
+                                </div>
+                                <div>
+                                  <span className="text-slate-500">Cost:</span>
+                                  <div className="font-semibold text-slate-900">
+                                    {formatCurrency(pf.total_cost)}
+                                  </div>
+                                </div>
+                                <div>
+                                  <span className="text-slate-500">Margin:</span>
+                                  <div className={`font-semibold ${pf.margin >= 0 ? "text-green-600" : "text-red-600"}`}>
+                                    {formatCurrency(pf.margin)}
+                                  </div>
+                                </div>
+                                <div>
+                                  <span className="text-slate-500">Margin %:</span>
+                                  <div className={`font-semibold ${pf.margin_percent >= 0 ? "text-green-600" : "text-red-600"}`}>
+                                    {pf.margin_percent.toFixed(1)}%
+                                  </div>
+                                </div>
+                              </div>
                             </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
 
-                            <div className="flex gap-3">
-                              <Button onClick={handleMarkInvoiced}>Confirm</Button>
+                    {/* Desktop: Table View */}
+                    <div className="hidden lg:block overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left p-3 text-sm font-medium text-slate-600">Code</th>
+                            <th className="text-left p-3 text-sm font-medium text-slate-600">Project</th>
+                            <th className="text-left p-3 text-sm font-medium text-slate-600">Client</th>
+                            <th className="text-right p-3 text-sm font-medium text-slate-600">Revenue</th>
+                            <th className="text-right p-3 text-sm font-medium text-slate-600">Internal Cost</th>
+                            <th className="text-right p-3 text-sm font-medium text-slate-600">Subbie Cost</th>
+                            <th className="text-right p-3 text-sm font-medium text-slate-600">Total Cost</th>
+                            <th className="text-right p-3 text-sm font-medium text-slate-600">Margin</th>
+                            <th className="text-right p-3 text-sm font-medium text-slate-600">Margin %</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {projectFinancials.map((pf) => (
+                            <tr
+                              key={pf.project_id}
+                              className="border-b hover:bg-slate-50 cursor-pointer"
+                              onClick={() => router.push(`/projects/${pf.project_id}`)}
+                            >
+                              <td className="p-3 text-sm font-mono text-slate-600">{pf.project_code}</td>
+                              <td className="p-3 text-sm font-medium text-slate-900">{pf.project_name}</td>
+                              <td className="p-3 text-sm text-slate-600">{pf.client_name}</td>
+                              <td className="p-3 text-sm text-right font-medium">{formatCurrency(pf.revenue)}</td>
+                              <td className="p-3 text-sm text-right">{formatCurrency(pf.internal_cost)}</td>
+                              <td className="p-3 text-sm text-right">{formatCurrency(pf.subcontractor_cost)}</td>
+                              <td className="p-3 text-sm text-right font-medium">{formatCurrency(pf.total_cost)}</td>
+                              <td className={`p-3 text-sm text-right font-semibold ${pf.margin >= 0 ? "text-green-600" : "text-red-600"}`}>
+                                {formatCurrency(pf.margin)}
+                              </td>
+                              <td className={`p-3 text-sm text-right font-semibold ${pf.margin_percent >= 0 ? "text-green-600" : "text-red-600"}`}>
+                                {pf.margin_percent.toFixed(1)}%
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="to_invoice" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base sm:text-lg">
+                  To Invoice - {getMonthName(selectedMonth)} {selectedYear}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {toInvoiceItems.length === 0 ? (
+                  <div className="text-center py-8 text-slate-600 text-sm">
+                    No items ready to invoice for this month
+                  </div>
+                ) : (
+                  <>
+                    {/* Mobile: Card View */}
+                    <div className="block lg:hidden space-y-3">
+                      {toInvoiceItems.map((item) => (
+                        <Card key={item.phasing_id} className="border-orange-200 bg-orange-50">
+                          <CardContent className="p-4">
+                            <div className="space-y-3">
+                              <div>
+                                <div className="font-mono text-xs text-slate-500 mb-1">
+                                  {item.project_code}
+                                </div>
+                                <div className="font-semibold text-sm text-slate-900">
+                                  {item.project_name}
+                                </div>
+                                <div className="text-xs text-slate-600 mt-1">
+                                  {item.client_name}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between pt-2 border-t">
+                                <div>
+                                  <div className="text-xs text-slate-500">Actual Revenue</div>
+                                  <div className="text-lg font-bold text-slate-900">
+                                    {formatCurrency(item.actual_revenue)}
+                                  </div>
+                                </div>
+                                <Badge className="bg-orange-100 text-orange-800">
+                                  To Invoice
+                                </Badge>
+                              </div>
+
                               <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setMarkingInvoice(null)}
+                                size="sm"
+                                onClick={() => handleMarkInvoiced(item)}
+                                className="w-full"
                               >
-                                Cancel
+                                Mark as Invoiced
                               </Button>
                             </div>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
 
-        {/* Project Breakdown */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Project Breakdown</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {projectBreakdown.length === 0 ? (
-              <div className="text-center py-8 text-slate-600">
-                No projects with activity in {getMonthName(selectedMonth)} {selectedYear}.
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left p-2 font-medium text-slate-600">Project</th>
-                      <th className="text-left p-2 font-medium text-slate-600">Client</th>
-                      <th className="text-right p-2 font-medium text-slate-600">
-                        Revenue ({revenueMode === "forecast" ? "Forecast" : "Actual"})
-                      </th>
-                      <th className="text-right p-2 font-medium text-slate-600">Internal Cost</th>
-                      <th className="text-right p-2 font-medium text-slate-600">Subcon Cost</th>
-                      <th className="text-right p-2 font-medium text-slate-600">Total Cost</th>
-                      <th className="text-right p-2 font-medium text-slate-600">Margin</th>
-                      <th className="text-right p-2 font-medium text-slate-600">Margin %</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {projectBreakdown.map((row) => (
-                      <tr
-                        key={row.project_id}
-                        className="border-b hover:bg-slate-50 cursor-pointer"
-                        onClick={() => router.push(`/projects/${row.project_id}`)}
-                      >
-                        <td className="p-2">
-                          <div className="font-medium text-slate-900">{row.project_code}</div>
-                          <div className="text-xs text-slate-600">{row.project_name}</div>
-                        </td>
-                        <td className="p-2 text-slate-700">{row.client_name}</td>
-                        <td className="p-2 text-right font-medium">{formatCurrency(row.revenue)}</td>
-                        <td className="p-2 text-right">{formatCurrency(row.internal_cost)}</td>
-                        <td className="p-2 text-right">{formatCurrency(row.subcontractor_cost)}</td>
-                        <td className="p-2 text-right font-medium">{formatCurrency(row.total_cost)}</td>
-                        <td className={`p-2 text-right font-medium ${row.margin >= 0 ? "text-green-600" : "text-red-600"}`}>
-                          {formatCurrency(row.margin)}
-                        </td>
-                        <td className="p-2 text-right">{row.margin_percent.toFixed(1)}%</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    {/* Desktop: Table View */}
+                    <div className="hidden lg:block overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left p-3 text-sm font-medium text-slate-600">Code</th>
+                            <th className="text-left p-3 text-sm font-medium text-slate-600">Project</th>
+                            <th className="text-left p-3 text-sm font-medium text-slate-600">Client</th>
+                            <th className="text-right p-3 text-sm font-medium text-slate-600">Actual Revenue</th>
+                            <th className="text-center p-3 text-sm font-medium text-slate-600">Status</th>
+                            <th className="text-center p-3 text-sm font-medium text-slate-600">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {toInvoiceItems.map((item) => (
+                            <tr key={item.phasing_id} className="border-b bg-orange-50">
+                              <td className="p-3 text-sm font-mono text-slate-600">{item.project_code}</td>
+                              <td className="p-3 text-sm font-medium text-slate-900">{item.project_name}</td>
+                              <td className="p-3 text-sm text-slate-600">{item.client_name}</td>
+                              <td className="p-3 text-sm text-right font-semibold">{formatCurrency(item.actual_revenue)}</td>
+                              <td className="p-3 text-center">
+                                <Badge className="bg-orange-100 text-orange-800">To Invoice</Badge>
+                              </td>
+                              <td className="p-3 text-center">
+                                <Button size="sm" onClick={() => handleMarkInvoiced(item)}>
+                                  Mark as Invoiced
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="mt-4 pt-4 border-t">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium text-slate-600">Total To Invoice:</span>
+                        <span className="text-xl font-bold text-slate-900">
+                          {formatCurrency(toInvoiceItems.reduce((sum, item) => sum + item.actual_revenue, 0))}
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        {/* Mark Invoiced Dialog - Full screen on mobile */}
+        <Dialog open={!!markingInvoice} onOpenChange={(open) => !open && setMarkingInvoice(null)}>
+          <DialogContent className="w-[95vw] max-w-md">
+            <DialogHeader>
+              <DialogTitle>Mark as Invoiced</DialogTitle>
+            </DialogHeader>
+            {markingInvoice && (
+              <div className="space-y-4">
+                <div>
+                  <div className="text-sm text-slate-600 mb-2">
+                    {markingInvoice.project_code} - {markingInvoice.project_name}
+                  </div>
+                  <div className="text-lg font-semibold">
+                    {formatCurrency(markingInvoice.actual_revenue)}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="invoice_ref">Invoice Reference *</Label>
+                  <Input
+                    id="invoice_ref"
+                    value={invoiceForm.invoice_ref}
+                    onChange={(e) =>
+                      setInvoiceForm({ ...invoiceForm, invoice_ref: e.target.value })
+                    }
+                    placeholder="INV-2025-001"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="invoice_date">Invoice Date *</Label>
+                  <Input
+                    id="invoice_date"
+                    type="date"
+                    value={invoiceForm.invoice_date}
+                    onChange={(e) =>
+                      setInvoiceForm({ ...invoiceForm, invoice_date: e.target.value })
+                    }
+                    required
+                  />
+                </div>
+
+                <div className="flex gap-3">
+                  <Button onClick={() => handleMarkInvoiced()}>Confirm</Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setMarkingInvoice(null)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );

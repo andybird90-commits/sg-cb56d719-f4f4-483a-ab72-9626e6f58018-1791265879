@@ -280,15 +280,16 @@ function MyTimesheetsContent() {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
+      <div className="space-y-4 sm:space-y-6">
+        {/* Header - Mobile optimized */}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">My Timesheets</h1>
-            <p className="text-slate-600 mt-1">Track your project time</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">My Timesheets</h1>
+            <p className="text-sm sm:text-base text-slate-600 mt-1">Track your project time</p>
           </div>
           <Dialog open={formOpen} onOpenChange={setFormOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2" onClick={() => {
+              <Button className="w-full sm:w-auto gap-2" onClick={() => {
                 setEditingTimesheet(null);
                 setFormData({
                   date: new Date().toISOString().split("T")[0],
@@ -303,7 +304,7 @@ function MyTimesheetsContent() {
                 Log Time
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="w-[95vw] max-w-md">
               <DialogHeader>
                 <DialogTitle>{editingTimesheet ? "Edit Time Entry" : "Log Time"}</DialogTitle>
               </DialogHeader>
@@ -403,9 +404,9 @@ function MyTimesheetsContent() {
                   />
                 </div>
 
-                <div className="flex gap-3">
-                  <Button type="submit">{editingTimesheet ? "Update" : "Log Time"}</Button>
-                  <Button type="button" variant="outline" onClick={() => setFormOpen(false)}>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button type="submit" className="w-full sm:w-auto">{editingTimesheet ? "Update" : "Log Time"}</Button>
+                  <Button type="button" variant="outline" onClick={() => setFormOpen(false)} className="w-full sm:w-auto">
                     Cancel
                   </Button>
                 </div>
@@ -416,15 +417,15 @@ function MyTimesheetsContent() {
 
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <CardTitle className="text-base sm:text-lg">
                 Week of {currentWeekStart.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
               </CardTitle>
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" onClick={prevWeek}>
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
-                <Button variant="outline" size="sm" onClick={thisWeek}>
+                <Button variant="outline" size="sm" onClick={thisWeek} className="text-xs sm:text-sm">
                   This Week
                 </Button>
                 <Button variant="outline" size="sm" onClick={nextWeek}>
@@ -443,11 +444,11 @@ function MyTimesheetsContent() {
                   <div key={date.toISOString()} className="border-b pb-4 last:border-b-0">
                     <div className="flex items-center justify-between mb-3">
                       <div>
-                        <div className="font-medium text-slate-900">
+                        <div className="font-medium text-sm sm:text-base text-slate-900">
                           {date.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" })}
                         </div>
                         {totalHours > 0 && (
-                          <div className="text-sm text-slate-500">
+                          <div className="text-xs sm:text-sm text-slate-500">
                             Total: {totalHours}h
                           </div>
                         )}
@@ -459,13 +460,13 @@ function MyTimesheetsContent() {
                     ) : (
                       <div className="space-y-2">
                         {dayTimesheets.map((ts) => (
-                          <div key={ts.id} className="flex items-start justify-between p-3 bg-slate-50 rounded">
-                            <div className="flex-1">
+                          <div key={ts.id} className="flex items-start justify-between p-3 bg-slate-50 rounded gap-3">
+                            <div className="flex-1 min-w-0">
                               <div className="font-medium text-sm">
                                 {ts.projects?.code} - {ts.projects?.name}
                               </div>
                               {ts.project_activities && (
-                                <div className="text-xs text-slate-600">
+                                <div className="text-xs text-slate-600 truncate">
                                   Activity: {ts.project_activities.name}
                                 </div>
                               )}
@@ -475,7 +476,7 @@ function MyTimesheetsContent() {
                                 </div>
                               )}
                               {ts.notes && (
-                                <div className="text-xs text-slate-600 mt-1">
+                                <div className="text-xs text-slate-600 mt-1 line-clamp-2">
                                   {ts.notes}
                                 </div>
                               )}
@@ -483,7 +484,7 @@ function MyTimesheetsContent() {
                                 {ts.hours}h
                               </div>
                             </div>
-                            <div className="flex gap-1">
+                            <div className="flex gap-1 flex-shrink-0">
                               <Button variant="ghost" size="sm" onClick={() => handleEdit(ts)}>
                                 <Edit className="w-4 h-4" />
                               </Button>
@@ -502,7 +503,7 @@ function MyTimesheetsContent() {
               <div className="pt-4 border-t">
                 <div className="text-right">
                   <div className="text-sm text-slate-600">Week Total</div>
-                  <div className="text-2xl font-bold text-slate-900">
+                  <div className="text-xl sm:text-2xl font-bold text-slate-900">
                     {getTotalHoursForWeek()}h
                   </div>
                 </div>

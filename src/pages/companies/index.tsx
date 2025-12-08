@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Building2, ChevronRight } from "lucide-react";
 import Link from "next/link";
 
 interface Company {
@@ -90,22 +90,24 @@ function CompaniesContent() {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
+      <div className="space-y-4 sm:space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">Companies</h1>
-            <p className="text-slate-600 mt-1">Manage your client companies</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Companies</h1>
+            <p className="text-sm sm:text-base text-slate-600 mt-1">Manage your client companies</p>
           </div>
           {canEdit && (
             <Link href="/companies/new">
-              <Button className="gap-2">
+              <Button className="w-full sm:w-auto gap-2">
                 <Plus className="w-4 h-4" />
-                New Company
+                <span className="sm:inline">New Company</span>
               </Button>
             </Link>
           )}
         </div>
 
+        {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
           <Input
@@ -116,32 +118,45 @@ function CompaniesContent() {
           />
         </div>
 
-        <div className="grid gap-4">
-          {filteredCompanies.map((company) => (
-            <Card 
-              key={company.id} 
-              className="hover:shadow-md transition-shadow cursor-pointer"
-              onClick={() => router.push(`/companies/${company.id}`)}
-            >
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-semibold text-slate-900">
-                        {company.name}
-                      </h3>
-                      <Badge className={getStatusColor(company.status)}>
-                        {company.status}
-                      </Badge>
-                    </div>
-                    {company.sector && (
-                      <p className="text-sm text-slate-600">{company.sector}</p>
-                    )}
-                  </div>
-                </div>
+        {/* Companies List */}
+        <div className="space-y-3">
+          {filteredCompanies.length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <Building2 className="w-12 h-12 mx-auto text-slate-300 mb-3" />
+                <p className="text-slate-600">
+                  {searchTerm ? "No companies found" : "No companies yet"}
+                </p>
               </CardContent>
             </Card>
-          ))}
+          ) : (
+            filteredCompanies.map((company) => (
+              <Card 
+                key={company.id} 
+                className="hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => router.push(`/companies/${company.id}`)}
+              >
+                <CardContent className="p-4 sm:p-6">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
+                        <h3 className="text-base sm:text-lg font-semibold text-slate-900 truncate">
+                          {company.name}
+                        </h3>
+                        <Badge className={`${getStatusColor(company.status)} w-fit text-xs`}>
+                          {company.status}
+                        </Badge>
+                      </div>
+                      {company.sector && (
+                        <p className="text-sm text-slate-600">{company.sector}</p>
+                      )}
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-slate-400 flex-shrink-0" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
       </div>
     </Layout>

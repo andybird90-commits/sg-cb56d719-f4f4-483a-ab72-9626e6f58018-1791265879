@@ -2,15 +2,18 @@ import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
-import { Building2, Users, Target, Briefcase, LogOut, LayoutDashboard, Clock, Calendar, PoundSterling, Settings } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Building2, Users, Target, Briefcase, LogOut, LayoutDashboard, Clock, Calendar, PoundSterling, Settings, Menu, X } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import Image from "next/image";
+import { useState } from "react";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading, signOut, profileError } = useAuth();
   const router = useRouter();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // If still loading auth, show loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -19,16 +22,107 @@ export function Layout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // If no user at all, render without navigation (auth pages)
   if (!user) {
     return <div className="min-h-screen bg-slate-50">{children}</div>;
   }
 
   const isAdmin = profile?.role === "admin" || profile?.role === "director";
 
+  const navItems = [
+    { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+    { href: "/companies", icon: Building2, label: "Companies" },
+    { href: "/contacts", icon: Users, label: "Contacts" },
+    { href: "/opportunities", icon: Target, label: "Opportunities" },
+    { href: "/projects", icon: Briefcase, label: "Projects" },
+    { href: "/timesheets/my", icon: Clock, label: "Timesheets" },
+    { href: "/financials", icon: PoundSterling, label: "Financials" },
+    { href: "/absences/my", icon: Calendar, label: "Absences" },
+  ];
+
+  if (isAdmin) {
+    navItems.push({ href: "/admin", icon: Settings, label: "Admin" });
+  }
+
+  const NavLink = ({ href, icon: Icon, label, onClick }: { href: string; icon: any; label: string; onClick?: () => void }) => {
+    const isActive = router.pathname.startsWith(href);
+    return (
+      <Link href={href} onClick={onClick}>
+        <Button
+          variant={isActive ? "default" : "ghost"}
+          size="sm"
+          className="w-full justify-start gap-2"
+        >
+          <Icon className="w-4 h-4" />
+          <span className="text-sm">{label}</span>
+        </Button>
+      </Link>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
-      <nav className="border-b bg-white shadow-sm">
+      {/* Mobile Top Bar */}
+      <nav className="lg:hidden border-b bg-white shadow-sm sticky top-0 z-50">
+        <div className="flex items-center justify-between h-14 px-4">
+          <Link href="/dashboard" className="flex items-center">
+            <Image 
+              src="/RDME_Logo.png" 
+              alt="RD GROUP M&E" 
+              width={180}
+              height={45}
+              priority
+              className="h-8 w-auto object-contain"
+            />
+          </Link>
+          
+          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="sm" className="p-2">
+                <Menu className="w-6 h-6" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-72 p-0">
+              <SheetHeader className="border-b p-4">
+                <SheetTitle className="text-left">Menu</SheetTitle>
+              </SheetHeader>
+              
+              <ScrollArea className="h-[calc(100vh-140px)]">
+                <div className="flex flex-col gap-1 p-4">
+                  {navItems.map((item) => (
+                    <NavLink
+                      key={item.href}
+                      href={item.href}
+                      icon={item.icon}
+                      label={item.label}
+                      onClick={() => setMobileMenuOpen(false)}
+                    />
+                  ))}
+                </div>
+              </ScrollArea>
+
+              <div className="border-t p-4">
+                {profile ? (
+                  <div className="mb-3">
+                    <div className="font-medium text-sm text-slate-900">{profile.full_name}</div>
+                    <div className="text-xs text-slate-500 capitalize">{profile.role}</div>
+                  </div>
+                ) : (
+                  <div className="mb-3">
+                    <div className="font-medium text-sm text-slate-900">{user.email}</div>
+                  </div>
+                )}
+                <Button variant="outline" size="sm" onClick={signOut} className="w-full gap-2">
+                  <LogOut className="w-4 h-4" />
+                  Sign Out
+                </Button>
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
+      </nav>
+
+      {/* Desktop Navigation */}
+      <nav className="hidden lg:block border-b bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center gap-8">
@@ -43,98 +137,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 />
               </Link>
               <div className="flex gap-1">
-                <Link href="/dashboard">
-                  <Button
-                    variant={router.pathname === "/dashboard" ? "default" : "ghost"}
-                    size="sm"
-                    className="gap-2"
-                  >
-                    <LayoutDashboard className="w-4 h-4" />
-                    Dashboard
-                  </Button>
-                </Link>
-                <Link href="/companies">
-                  <Button
-                    variant={router.pathname.startsWith("/companies") ? "default" : "ghost"}
-                    size="sm"
-                    className="gap-2"
-                  >
-                    <Building2 className="w-4 h-4" />
-                    Companies
-                  </Button>
-                </Link>
-                <Link href="/contacts">
-                  <Button
-                    variant={router.pathname === "/contacts" ? "default" : "ghost"}
-                    size="sm"
-                    className="gap-2"
-                  >
-                    <Users className="w-4 h-4" />
-                    Contacts
-                  </Button>
-                </Link>
-                <Link href="/opportunities">
-                  <Button
-                    variant={router.pathname.startsWith("/opportunities") ? "default" : "ghost"}
-                    size="sm"
-                    className="gap-2"
-                  >
-                    <Target className="w-4 h-4" />
-                    Opportunities
-                  </Button>
-                </Link>
-                <Link href="/projects">
-                  <Button
-                    variant={router.pathname.startsWith("/projects") ? "default" : "ghost"}
-                    size="sm"
-                    className="gap-2"
-                  >
-                    <Briefcase className="w-4 h-4" />
-                    Projects
-                  </Button>
-                </Link>
-                <Link href="/timesheets/my">
-                  <Button
-                    variant={router.pathname.startsWith("/timesheets") ? "default" : "ghost"}
-                    size="sm"
-                    className="gap-2"
-                  >
-                    <Clock className="w-4 h-4" />
-                    Timesheets
-                  </Button>
-                </Link>
-                <Link href="/absences/my">
-                  <Button
-                    variant={router.pathname.startsWith("/absences") ? "default" : "ghost"}
-                    size="sm"
-                    className="gap-2"
-                  >
-                    <Calendar className="w-4 h-4" />
-                    Absences
-                  </Button>
-                </Link>
-                <Link href="/financials">
-                  <Button
-                    variant={router.pathname.startsWith("/financials") ? "default" : "ghost"}
-                    size="sm"
-                    className="gap-2"
-                  >
-                    <PoundSterling className="w-4 h-4" />
-                    Financials
-                  </Button>
-                </Link>
-                {isAdmin && (
-                  <Link href="/admin">
+                {navItems.map((item) => (
+                  <Link key={item.href} href={item.href}>
                     <Button
-                      variant={router.pathname.startsWith("/admin") ? "default" : "ghost"}
+                      variant={router.pathname.startsWith(item.href) ? "default" : "ghost"}
                       size="sm"
                       className="gap-2"
                     >
-                      <Settings className="w-4 h-4" />
-                      Admin
+                      <item.icon className="w-4 h-4" />
+                      {item.label}
                     </Button>
                   </Link>
-                )}
+                ))}
               </div>
             </div>
             <div className="flex items-center gap-4">
@@ -162,9 +176,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </nav>
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
         {profileError && (
-          <Alert variant="destructive" className="mb-6">
+          <Alert variant="destructive" className="mb-4 sm:mb-6">
             <AlertDescription>
               <strong>Profile Error:</strong> {profileError}
               <br />

@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus } from "lucide-react";
+import { Plus, ChevronRight, Briefcase } from "lucide-react";
 import Link from "next/link";
 
 interface Project {
@@ -77,48 +77,74 @@ function ProjectsContent() {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
+      <div className="space-y-4 sm:space-y-6">
+        {/* Header - Mobile optimized */}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">Projects</h1>
-            <p className="text-slate-600 mt-1">Manage active and pipeline projects</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Projects</h1>
+            <p className="text-sm sm:text-base text-slate-600 mt-1">Manage active and pipeline projects</p>
           </div>
           {canEdit && (
             <Link href="/projects/new">
-              <Button className="gap-2">
+              <Button className="w-full sm:w-auto gap-2">
                 <Plus className="w-4 h-4" />
-                New Project
+                <span>New Project</span>
               </Button>
             </Link>
           )}
         </div>
 
-        <div className="grid gap-4">
-          {projects.map((project) => (
-            <Card 
-              key={project.id} 
-              className="hover:shadow-md transition-shadow cursor-pointer"
-              onClick={() => router.push(`/projects/${project.id}`)}
-            >
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className="font-mono text-sm text-slate-500">{project.code}</span>
-                      <h3 className="text-lg font-semibold text-slate-900">
-                        {project.name}
-                      </h3>
-                      <Badge className={getStatusColor(project.status)}>
+        {/* Projects List - Mobile: Cards, Desktop: Cards with more details */}
+        <div className="space-y-3">
+          {projects.length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <Briefcase className="w-12 h-12 mx-auto text-slate-300 mb-3" />
+                <p className="text-slate-600">No projects yet</p>
+              </CardContent>
+            </Card>
+          ) : (
+            projects.map((project) => (
+              <Card 
+                key={project.id} 
+                className="hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => router.push(`/projects/${project.id}`)}
+              >
+                <CardContent className="p-4 sm:p-6">
+                  {/* Mobile & Tablet Layout */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
+                        <span className="font-mono text-xs sm:text-sm text-slate-500 flex-shrink-0">
+                          {project.code}
+                        </span>
+                        <h3 className="text-base sm:text-lg font-semibold text-slate-900 truncate">
+                          {project.name}
+                        </h3>
+                      </div>
+                      
+                      {/* Client */}
+                      <p className="text-sm text-slate-600 mb-2">{project.companies?.name}</p>
+                      
+                      {/* Status Badge */}
+                      <Badge className={`${getStatusColor(project.status)} w-fit text-xs`}>
                         {project.status.replace("_", " ")}
                       </Badge>
                     </div>
-                    <p className="text-sm text-slate-600">{project.companies?.name}</p>
+                    <ChevronRight className="w-5 h-5 text-slate-400 flex-shrink-0 mt-1" />
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
+
+        {/* Results count - Mobile friendly */}
+        {projects.length > 0 && (
+          <div className="text-center text-sm text-slate-600">
+            Showing {projects.length} {projects.length === 1 ? 'project' : 'projects'}
+          </div>
+        )}
       </div>
     </Layout>
   );

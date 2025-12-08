@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus } from "lucide-react";
+import { Plus, ChevronRight, Building2 } from "lucide-react";
 import Link from "next/link";
 
 interface Opportunity {
@@ -83,52 +83,80 @@ function OpportunitiesContent() {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
+      <div className="space-y-4 sm:space-y-6">
+        {/* Header - Mobile optimized */}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">Opportunities</h1>
-            <p className="text-slate-600 mt-1">Track and manage business opportunities</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Opportunities</h1>
+            <p className="text-sm sm:text-base text-slate-600 mt-1">Track and manage business opportunities</p>
           </div>
           {canEdit && (
             <Link href="/opportunities/new">
-              <Button className="gap-2">
+              <Button className="w-full sm:w-auto gap-2">
                 <Plus className="w-4 h-4" />
-                New Opportunity
+                <span>New Opportunity</span>
               </Button>
             </Link>
           )}
         </div>
 
-        <div className="grid gap-4">
-          {opportunities.map((opp) => (
-            <Card 
-              key={opp.id} 
-              className="hover:shadow-md transition-shadow cursor-pointer"
-              onClick={() => router.push(`/opportunities/${opp.id}`)}
-            >
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-semibold text-slate-900">
-                        {opp.name}
-                      </h3>
-                      <Badge className={getStageColor(opp.stage)}>
-                        {opp.stage.replace("_", " ")}
-                      </Badge>
-                      <Badge variant="outline">{opp.status}</Badge>
-                    </div>
-                    <p className="text-sm text-slate-600">{opp.companies?.name}</p>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm text-slate-500">Expected Value</div>
-                    <div className="text-lg font-semibold">{formatCurrency(opp.expected_fee_value)}</div>
-                  </div>
-                </div>
+        {/* Opportunities List - Mobile: Cards, Desktop: Cards with more details */}
+        <div className="space-y-3">
+          {opportunities.length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <Building2 className="w-12 h-12 mx-auto text-slate-300 mb-3" />
+                <p className="text-slate-600">No opportunities yet</p>
               </CardContent>
             </Card>
-          ))}
+          ) : (
+            opportunities.map((opp) => (
+              <Card 
+                key={opp.id} 
+                className="hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => router.push(`/opportunities/${opp.id}`)}
+              >
+                <CardContent className="p-4 sm:p-6">
+                  {/* Mobile & Tablet Layout */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
+                        <h3 className="text-base sm:text-lg font-semibold text-slate-900 truncate">
+                          {opp.name}
+                        </h3>
+                        <div className="flex flex-wrap gap-2">
+                          <Badge className={`${getStageColor(opp.stage)} w-fit text-xs`}>
+                            {opp.stage.replace("_", " ")}
+                          </Badge>
+                          <Badge variant="outline" className="w-fit text-xs">{opp.status}</Badge>
+                        </div>
+                      </div>
+                      
+                      {/* Company */}
+                      <p className="text-sm text-slate-600 mb-2">{opp.companies?.name}</p>
+                      
+                      {/* Expected Value */}
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-slate-500">Expected Value:</span>
+                        <span className="font-semibold text-slate-900">
+                          {formatCurrency(opp.expected_fee_value)}
+                        </span>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-slate-400 flex-shrink-0 mt-1" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
+
+        {/* Results count - Mobile friendly */}
+        {opportunities.length > 0 && (
+          <div className="text-center text-sm text-slate-600">
+            Showing {opportunities.length} {opportunities.length === 1 ? 'opportunity' : 'opportunities'}
+          </div>
+        )}
       </div>
     </Layout>
   );
