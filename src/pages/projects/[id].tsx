@@ -121,18 +121,36 @@ function ProjectDetailContent() {
     const { data: projectData, error: projectError } = await supabase
       .from("projects")
       .select(`
-        *,
+        id,
+        code,
+        name,
+        status,
+        start_date,
+        end_date,
+        agreed_fee_value,
+        notes,
+        client_company_id,
+        opportunity_id,
         companies!projects_client_company_id_fkey (
+          id,
           name
         ),
-        opportunities (
+        opportunities!projects_opportunity_id_fkey (
+          id,
           name
         )
       `)
       .eq("id", projectId)
       .single();
 
-    if (projectError || !projectData) {
+    if (projectError) {
+      console.error("Failed to load project:", projectError);
+      setError(`Failed to load project: ${projectError.message}`);
+      setLoading(false);
+      return;
+    }
+
+    if (!projectData) {
       setError("Project not found");
       setLoading(false);
       return;

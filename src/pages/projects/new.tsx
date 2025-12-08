@@ -87,22 +87,29 @@ function NewProjectContent() {
       const { data, error: insertError } = await supabase
         .from("projects")
         .insert(payload)
-        .select()
+        .select("id")
         .single();
 
       if (insertError) {
-        console.error("Insert error:", insertError);
+        console.error("Failed to create project:", insertError);
         setError("Failed to create project: " + insertError.message);
         setLoading(false);
         return;
       }
 
-      // Success
+      if (!data?.id) {
+        console.error("No project id returned after insert");
+        setError("Project created but id is missing.");
+        setLoading(false);
+        return;
+      }
+
+      // Success - redirect to the new project detail page
       setLoading(false);
-      router.push("/projects");
+      router.push(`/projects/${data.id}`);
       
     } catch (err) {
-      console.error("Unexpected error:", err);
+      console.error("Unexpected error creating project:", err);
       setError("Unexpected error creating project.");
       setLoading(false);
     }
