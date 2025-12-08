@@ -9,6 +9,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   profileError: string | null;
+  authError: string | null;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -18,6 +19,7 @@ const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
   refreshProfile: async () => {},
   profileError: null,
+  authError: null,
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -25,6 +27,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const fetchProfile = async (userId: string) => {
     try {
@@ -64,8 +67,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    // Set timeout to prevent infinite loading
+    const loadingTimeout = setTimeout(() => {
+      if (loading) {
+        console.warn("⚠️ Auth loading timeout - forcing completion");
+        setLoading(false);
+        setAuthError("Authentication check timed out. Please refresh the page.");
+      }
+    }, 10000); // 10 second timeout
+
     // Initial session check
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      clearTimeout(loadingTimeout);
+      
+      if (error) {
+        console.error("❌ Session fetch error:", error);
+        setAuthError(`Authentication error: ${error.message}`);
+        setLoading(false);
+        return;
+      }
+      
       console.log("🔐 Initial session check:", session ? "User logged in" : "No session");
       setUser(session?.user ?? null);
       if (session?.user) {
@@ -73,7 +94,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setLoading(false);
     }).catch((error) => {
+      clearTimeout(loadingTimeout);
       console.error("❌ Auth initialization error:", error);
+      setAuthError("Failed to initialize authentication. Please check your connection.");
       setLoading(false);
     });
 
@@ -82,6 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       async (_event, session) => {
         console.log("🔄 Auth state changed:", _event);
         setUser(session?.user ?? null);
+        setAuthError(null);
         if (session?.user) {
           await fetchProfile(session.user.id);
         } else {
@@ -91,7 +115,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(loadingTimeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signOut = async () => {
@@ -99,10 +126,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setProfile(null);
     setProfileError(null);
+    setAuthError(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signOut, refreshProfile, profileError }}>
+    <AuthContext.Provider value={{ user, profile, loading, signOut, refreshProfile, profileError, authError }}>
       {children}
     </AuthContext.Provider>
   );

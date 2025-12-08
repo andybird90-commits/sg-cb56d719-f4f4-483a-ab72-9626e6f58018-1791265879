@@ -10,7 +10,7 @@ import Image from "next/image";
 import { useState } from "react";
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const { user, profile, loading, signOut, profileError } = useAuth();
+  const { user, profile, loading, signOut, profileError, authError } = useAuth();
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -178,6 +178,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </nav>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+        {authError && (
+          <Alert variant="destructive" className="mb-4 sm:mb-6">
+            <AlertDescription>
+              <strong>Authentication Error:</strong> {authError}
+            </AlertDescription>
+          </Alert>
+        )}
         {profileError && (
           <Alert variant="destructive" className="mb-4 sm:mb-6">
             <AlertDescription>
