@@ -28,12 +28,23 @@ interface Opportunity {
   expected_end_date: string | null;
   expected_fee_value: number | null;
   probability_percent: number | null;
+  added_by_user_id: string | null;
   companies?: {
     name: string;
   };
   contacts?: {
     name: string;
   };
+  added_by_profile?: {
+    full_name: string | null;
+    email: string;
+  };
+}
+
+interface User {
+  id: string;
+  full_name: string | null;
+  email: string;
 }
 
 function OpportunityDetailContent() {
@@ -44,6 +55,7 @@ function OpportunityDetailContent() {
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
   const [editData, setEditData] = useState({
     name: "",
     description: "",
@@ -54,6 +66,7 @@ function OpportunityDetailContent() {
     expected_end_date: "",
     expected_fee_value: "",
     probability_percent: "",
+    added_by_user_id: "",
   });
 
   // Everyone can edit, only directors/admins can delete
@@ -63,8 +76,23 @@ function OpportunityDetailContent() {
   useEffect(() => {
     if (id && typeof id === "string") {
       fetchOpportunity(id);
+      fetchUsers();
     }
   }, [id]);
+
+  const fetchUsers = async () => {
+    try {
+      const { data, error: usersError } = await supabase
+        .from("profiles")
+        .select("id, full_name, email")
+        .order("full_name");
+
+      if (usersError) throw usersError;
+      setUsers(data || []);
+    } catch (err) {
+      console.error("Failed to load users", err);
+    }
+  };
 
   const fetchOpportunity = async (oppId: string) => {
     try {
@@ -80,6 +108,10 @@ function OpportunityDetailContent() {
           ),
           contacts (
             name
+          ),
+          added_by_profile:profiles!opportunities_added_by_user_id_fkey (
+            full_name,
+            email
           )
         `)
         .eq("id", oppId)
@@ -99,6 +131,7 @@ function OpportunityDetailContent() {
         expected_end_date: data.expected_end_date || "",
         expected_fee_value: data.expected_fee_value?.toString() || "",
         probability_percent: data.probability_percent?.toString() || "",
+        added_by_user_id: data.added_by_user_id || "",
       });
     } catch (err) {
       console.error("Failed to load opportunity data", err);
@@ -125,6 +158,7 @@ function OpportunityDetailContent() {
           expected_end_date: editData.expected_end_date || null,
           expected_fee_value: editData.expected_fee_value ? parseFloat(editData.expected_fee_value) : null,
           probability_percent: editData.probability_percent ? parseInt(editData.probability_percent) : null,
+          added_by_user_id: editData.added_by_user_id || null,
         })
         .eq("id", id);
 
@@ -366,6 +400,25 @@ function OpportunityDetailContent() {
                     </div>
                   </div>
 
+                  <div className="space-y-2">
+                    <Label htmlFor="added_by_user_id" className="text-sm sm:text-base">Added by</Label>
+                    <Select
+                      value={editData.added_by_user_id}
+                      onValueChange={(value) => setEditData({ ...editData, added_by_user_id: value })}
+                    >
+                      <SelectTrigger className="h-10 sm:h-11">
+                        <SelectValue placeholder="Select user (optional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {users.map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.full_name || user.email}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                   <div className="flex flex-col sm:flex-row gap-3">
                     <Button type="submit" className="h-10 sm:h-11">Save Changes</Button>
                     <Button type="button" variant="outline" onClick={() => setIsEditing(false)} className="h-10 sm:h-11">
@@ -437,6 +490,14 @@ function OpportunityDetailContent() {
                       )}
                     </div>
                   )}
+                </div>
+              )}
+
+              {opportunity.added_by_user_id && !isEditing && (
+                <div className="pt-4 border-t mt-4">
+                  <div className="text-xs text-slate-500">
+                    Added by {opportunity.added_by_profile?.full_name || opportunity.added_by_profile?.email || "Unknown"}
+                  </div>
                 </div>
               )}
             </CardContent>

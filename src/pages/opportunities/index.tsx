@@ -17,8 +17,13 @@ interface Opportunity {
   stage: string;
   status: string;
   expected_fee_value: number | null;
+  added_by_user_id: string | null;
   companies?: {
     name: string;
+  };
+  added_by_profile?: {
+    full_name: string | null;
+    email: string;
   };
 }
 
@@ -48,6 +53,10 @@ function OpportunitiesContent() {
           *,
           companies (
             name
+          ),
+          added_by_profile:profiles!opportunities_added_by_user_id_fkey (
+            full_name,
+            email
           )
         `)
         .order("created_at", { ascending: false });
@@ -158,6 +167,12 @@ function OpportunitiesContent() {
                             {formatCurrency(opp.expected_fee_value)}
                           </span>
                         </div>
+
+                        {opp.added_by_user_id && (
+                          <div className="text-xs text-slate-500 mt-1">
+                            Added by {opp.added_by_profile?.full_name || opp.added_by_profile?.email || "Unknown"}
+                          </div>
+                        )}
                       </div>
                       <ChevronRight className="w-5 h-5 text-slate-400 flex-shrink-0 mt-1" />
                     </div>

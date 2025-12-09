@@ -14,24 +14,47 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
+interface User {
+  id: string;
+  full_name: string | null;
+  email: string;
+}
+
 function NewCompanyContent() {
   const { profile } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [users, setUsers] = useState<User[]>([]);
   const [formData, setFormData] = useState({
     name: "",
     short_name: "",
     sector: "",
     status: "active",
     notes: "",
+    added_by_user_id: "",
   });
 
   useEffect(() => {
     if (profile && profile.role !== "admin" && profile.role !== "director") {
       router.push("/companies");
     }
+    fetchUsers();
   }, [profile, router]);
+
+  const fetchUsers = async () => {
+    try {
+      const { data, error: usersError } = await supabase
+        .from("profiles")
+        .select("id, full_name, email")
+        .order("full_name");
+
+      if (usersError) throw usersError;
+      setUsers(data || []);
+    } catch (err) {
+      console.error("Failed to load users", err);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,6 +67,7 @@ function NewCompanyContent() {
       sector: formData.sector || null,
       status: formData.status as "active" | "prospect" | "inactive",
       notes: formData.notes || null,
+      added_by_user_id: formData.added_by_user_id || null,
     });
 
     if (insertError) {
@@ -141,6 +165,25 @@ function NewCompanyContent() {
                   rows={4}
                   className="text-sm sm:text-base"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="added_by_user_id" className="text-sm sm:text-base">Added by</Label>
+                <Select
+                  value={formData.added_by_user_id}
+                  onValueChange={(value) => setFormData({ ...formData, added_by_user_id: value })}
+                >
+                  <SelectTrigger className="h-10 sm:h-11">
+                    <SelectValue placeholder="Select user (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {users.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.full_name || user.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3">

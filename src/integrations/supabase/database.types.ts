@@ -68,6 +68,7 @@ export type Database = {
       }
       companies: {
         Row: {
+          added_by_user_id: string | null
           created_at: string
           id: string
           name: string
@@ -78,6 +79,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          added_by_user_id?: string | null
           created_at?: string
           id?: string
           name: string
@@ -88,6 +90,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          added_by_user_id?: string | null
           created_at?: string
           id?: string
           name?: string
@@ -97,10 +100,19 @@ export type Database = {
           status?: Database["public"]["Enums"]["company_status"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "companies_added_by_user_id_fkey"
+            columns: ["added_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       contacts: {
         Row: {
+          added_by_user_id: string | null
           company_id: string
           created_at: string
           email: string | null
@@ -112,6 +124,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          added_by_user_id?: string | null
           company_id: string
           created_at?: string
           email?: string | null
@@ -123,6 +136,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          added_by_user_id?: string | null
           company_id?: string
           created_at?: string
           email?: string | null
@@ -134,6 +148,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "contacts_added_by_user_id_fkey"
+            columns: ["added_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "contacts_company_id_fkey"
             columns: ["company_id"]
@@ -175,6 +196,7 @@ export type Database = {
       }
       opportunities: {
         Row: {
+          added_by_user_id: string | null
           company_id: string
           contact_id: string | null
           created_at: string
@@ -192,6 +214,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          added_by_user_id?: string | null
           company_id: string
           contact_id?: string | null
           created_at?: string
@@ -209,6 +232,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          added_by_user_id?: string | null
           company_id?: string
           contact_id?: string | null
           created_at?: string
@@ -226,6 +250,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "opportunities_added_by_user_id_fkey"
+            columns: ["added_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "opportunities_company_id_fkey"
             columns: ["company_id"]

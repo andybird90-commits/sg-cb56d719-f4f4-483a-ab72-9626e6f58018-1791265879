@@ -22,8 +22,13 @@ interface Contact {
   job_title: string | null;
   notes: string | null;
   company_id: string;
+  added_by_user_id: string | null;
   companies?: {
     name: string;
+  };
+  added_by_profile?: {
+    full_name: string | null;
+    email: string;
   };
 }
 
@@ -32,11 +37,18 @@ interface Company {
   name: string;
 }
 
+interface User {
+  id: string;
+  full_name: string | null;
+  email: string;
+}
+
 function ContactsContent() {
   const { profile } = useAuth();
   const router = useRouter();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [filteredContacts, setFilteredContacts] = useState<Contact[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +62,7 @@ function ContactsContent() {
     job_title: "",
     notes: "",
     company_id: "",
+    added_by_user_id: "",
   });
 
   const canEdit = !!profile; // Everyone can edit
@@ -74,6 +87,10 @@ function ContactsContent() {
           *,
           companies (
             name
+          ),
+          added_by_profile:profiles!contacts_added_by_user_id_fkey (
+            full_name,
+            email
           )
         `)
         .order("name");
@@ -87,8 +104,16 @@ function ContactsContent() {
 
       if (companiesError) throw companiesError;
 
+      const { data: usersData, error: usersError } = await supabase
+        .from("profiles")
+        .select("id, full_name, email")
+        .order("full_name");
+
+      if (usersError) throw usersError;
+
       setContacts(contactsData || []);
       setCompanies(companiesData || []);
+      setUsers(usersData || []);
     } catch (err) {
       console.error("Failed to load contacts data", err);
       setError("Failed to load contacts");
@@ -132,6 +157,7 @@ function ContactsContent() {
             job_title: formData.job_title || null,
             notes: formData.notes || null,
             company_id: formData.company_id,
+            added_by_user_id: formData.added_by_user_id || null,
           })
           .eq("id", editingId);
 
@@ -145,6 +171,7 @@ function ContactsContent() {
           job_title: formData.job_title || null,
           notes: formData.notes || null,
           company_id: formData.company_id,
+          added_by_user_id: formData.added_by_user_id || null,
         });
 
         if (insertError) throw insertError;
@@ -152,7 +179,7 @@ function ContactsContent() {
 
       setFormOpen(false);
       setEditingId(null);
-      setFormData({ name: "", email: "", phone: "", job_title: "", notes: "", company_id: "" });
+      setFormData({ name: "", email: "", phone: "", job_title: "", notes: "", company_id: "", added_by_user_id: "" });
       fetchData();
     } catch (err) {
       console.error("Failed to save contact", err);
@@ -169,6 +196,7 @@ function ContactsContent() {
       job_title: contact.job_title || "",
       notes: contact.notes || "",
       company_id: contact.company_id,
+      added_by_user_id: contact.added_by_user_id || "",
     });
     setFormOpen(true);
   };
@@ -192,7 +220,7 @@ function ContactsContent() {
 
   const openNewContactForm = () => {
     setEditingId(null);
-    setFormData({ name: "", email: "", phone: "", job_title: "", notes: "", company_id: "" });
+    setFormData({ name: "", email: "", phone: "", job_title: "", notes: "", company_id: "", added_by_user_id: "" });
     setFormOpen(true);
   };
 
@@ -274,6 +302,25 @@ function ContactsContent() {
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="added_by_user_id">Added by</Label>
+                    <Select
+                      value={formData.added_by_user_id}
+                      onValueChange={(value) => setFormData({ ...formData, added_by_user_id: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select user (optional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {users.map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.full_name || user.email}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="space-y-2">
@@ -432,6 +479,15 @@ function ContactsContent() {
                               {contact.notes}
                             </div>
                           </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Added by Section */}
+                    {contact.added_by_user_id && (
+                      <div className="pt-2 border-t">
+                        <div className="text-xs text-slate-500">
+                          Added by {contact.added_by_profile?.full_name || contact.added_by_profile?.email || "Unknown"}
                         </div>
                       </div>
                     )}

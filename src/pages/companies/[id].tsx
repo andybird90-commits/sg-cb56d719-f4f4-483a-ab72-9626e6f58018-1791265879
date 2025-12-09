@@ -23,6 +23,11 @@ interface Company {
   sector: string | null;
   status: string;
   notes: string | null;
+  added_by_user_id?: string | null;
+  added_by_profile?: {
+    full_name: string | null;
+    email: string;
+  };
 }
 
 interface Contact {
@@ -41,6 +46,12 @@ interface Opportunity {
   expected_fee_value: number | null;
 }
 
+interface User {
+  id: string;
+  full_name: string | null;
+  email: string;
+}
+
 function CompanyDetailContent() {
   const { profile } = useAuth();
   const router = useRouter();
@@ -54,15 +65,18 @@ function CompanyDetailContent() {
     sector: string;
     status: "active" | "prospect" | "inactive";
     notes: string;
+    added_by_user_id: string;
   }>({
     name: "",
     short_name: "",
     sector: "",
     status: "prospect",
     notes: "",
+    added_by_user_id: "",
   });
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   
   const [companyLoading, setCompanyLoading] = useState(true);
   const [companyError, setCompanyError] = useState<string | null>(null);
@@ -81,8 +95,23 @@ function CompanyDetailContent() {
       fetchCompanyData(id);
       fetchContactsData(id);
       fetchOpportunitiesData(id);
+      fetchUsers();
     }
   }, [id]);
+
+  const fetchUsers = async () => {
+    try {
+      const { data, error: usersError } = await supabase
+        .from("profiles")
+        .select("id, full_name, email")
+        .order("full_name");
+
+      if (usersError) throw usersError;
+      setUsers(data || []);
+    } catch (err) {
+      console.error("Failed to load users", err);
+    }
+  };
 
   const fetchCompanyData = async (companyId: string) => {
     try {
@@ -91,7 +120,13 @@ function CompanyDetailContent() {
 
       const { data, error } = await supabase
         .from("companies")
-        .select("*")
+        .select(`
+          *,
+          added_by_profile:profiles!companies_added_by_user_id_fkey (
+            full_name,
+            email
+          )
+        `)
         .eq("id", companyId)
         .single();
 
@@ -105,6 +140,7 @@ function CompanyDetailContent() {
         sector: data.sector || "",
         status: data.status as "active" | "prospect" | "inactive",
         notes: data.notes || "",
+        added_by_user_id: data.added_by_user_id || "",
       });
     } catch (err) {
       console.error("Failed to load company data", err);
@@ -127,6 +163,7 @@ function CompanyDetailContent() {
           sector: editData.sector || null,
           status: editData.status,
           notes: editData.notes || null,
+          added_by_user_id: editData.added_by_user_id || null,
         })
         .eq("id", id);
 
@@ -331,6 +368,25 @@ function CompanyDetailContent() {
                       />
                     </div>
 
+                    <div className="space-y-2">
+                      <Label htmlFor="added_by_user_id">Added by</Label>
+                      <Select
+                        value={editData.added_by_user_id}
+                        onValueChange={(value) => setEditData({ ...editData, added_by_user_id: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select user (optional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {users.map((user) => (
+                            <SelectItem key={user.id} value={user.id}>
+                              {user.full_name || user.email}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
                     <div className="flex flex-col sm:flex-row gap-3">
                       <Button type="submit">Save Changes</Button>
                       <Button type="button" variant="outline" onClick={() => setIsEditing(false)}>
@@ -363,6 +419,14 @@ function CompanyDetailContent() {
                   </div>
                 )}
               </CardContent>
+
+              {company.added_by_user_id && !isEditing && (
+                <div className="px-6 pb-4 border-t pt-4">
+                  <div className="text-xs text-slate-500">
+                    Added by {company.added_by_profile?.full_name || company.added_by_profile?.email || "Unknown"}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </Card>

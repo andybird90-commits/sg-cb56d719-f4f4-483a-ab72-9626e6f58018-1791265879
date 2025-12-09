@@ -19,6 +19,11 @@ interface Company {
   sector: string | null;
   status: string;
   created_at: string;
+  added_by_user_id?: string | null;
+  added_by_profile?: {
+    full_name: string | null;
+    email: string;
+  };
 }
 
 function CompaniesContent() {
@@ -48,7 +53,13 @@ function CompaniesContent() {
 
       const { data, error: fetchError } = await supabase
         .from("companies")
-        .select("*")
+        .select(`
+          *,
+          added_by_profile:profiles!companies_added_by_user_id_fkey (
+            full_name,
+            email
+          )
+        `)
         .order("name");
 
       if (fetchError) throw fetchError;
@@ -163,6 +174,11 @@ function CompaniesContent() {
                       </div>
                       {company.sector && (
                         <p className="text-sm text-slate-600">{company.sector}</p>
+                      )}
+                      {company.added_by_user_id && (
+                        <p className="text-xs text-slate-500 mt-1">
+                          Added by {company.added_by_profile?.full_name || company.added_by_profile?.email || "Unknown"}
+                        </p>
                       )}
                     </div>
                     <ChevronRight className="w-5 h-5 text-slate-400 flex-shrink-0" />

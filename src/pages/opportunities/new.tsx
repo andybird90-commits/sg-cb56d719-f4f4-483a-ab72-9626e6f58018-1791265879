@@ -24,6 +24,12 @@ interface Contact {
   name: string;
 }
 
+interface User {
+  id: string;
+  full_name: string | null;
+  email: string;
+}
+
 function NewOpportunityContent() {
   const { profile } = useAuth();
   const router = useRouter();
@@ -31,6 +37,7 @@ function NewOpportunityContent() {
   const [error, setError] = useState("");
   const [companies, setCompanies] = useState<Company[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [formData, setFormData] = useState({
     company_id: "",
     contact_id: "",
@@ -43,6 +50,7 @@ function NewOpportunityContent() {
     expected_end_date: "",
     expected_fee_value: "",
     probability_percent: "",
+    added_by_user_id: "",
   });
 
   useEffect(() => {
@@ -50,6 +58,7 @@ function NewOpportunityContent() {
       router.push("/opportunities");
     }
     fetchCompanies();
+    fetchUsers();
   }, [profile, router]);
 
   useEffect(() => {
@@ -75,6 +84,14 @@ function NewOpportunityContent() {
     if (data) setContacts(data);
   };
 
+  const fetchUsers = async () => {
+    const { data } = await supabase
+      .from("profiles")
+      .select("id, full_name, email")
+      .order("full_name");
+    if (data) setUsers(data);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -92,6 +109,7 @@ function NewOpportunityContent() {
       expected_end_date: formData.expected_end_date || null,
       expected_fee_value: formData.expected_fee_value ? parseFloat(formData.expected_fee_value) : null,
       probability_percent: formData.probability_percent ? parseInt(formData.probability_percent) : null,
+      added_by_user_id: formData.added_by_user_id || null,
     });
 
     if (insertError) {
@@ -254,6 +272,25 @@ function NewOpportunityContent() {
                     className="h-10 sm:h-11"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="added_by_user_id" className="text-sm sm:text-base">Added by</Label>
+                <Select
+                  value={formData.added_by_user_id}
+                  onValueChange={(value) => setFormData({ ...formData, added_by_user_id: value })}
+                >
+                  <SelectTrigger className="h-10 sm:h-11">
+                    <SelectValue placeholder="Select user (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {users.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.full_name || user.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
