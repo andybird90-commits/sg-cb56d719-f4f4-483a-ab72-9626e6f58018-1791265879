@@ -725,21 +725,21 @@ function DashboardContent() {
                                     )}
                                   </div>
                                 )}
-                                {/* Secured (green) - top of pipeline */}
-                                {displaySecured > 0 && (
+                                {/* Bid (yellow) - top of pipeline */}
+                                {displayBid > 0 && (
                                   <div
-                                    className="w-full bg-green-500 hover:bg-green-600 transition-colors relative flex items-center justify-center"
+                                    className="w-full bg-yellow-500 hover:bg-yellow-600 transition-colors relative flex items-center justify-center"
                                     style={{
-                                      height: `${securedHeight}px`,
+                                      height: `${bidHeight}px`,
                                       minHeight: "2px",
                                       borderTopLeftRadius: budgetGap === 0 ? "4px" : "0",
                                       borderTopRightRadius: budgetGap === 0 ? "4px" : "0",
                                     }}
-                                    title={`Secured: ${formatCurrency(displaySecured)}`}
+                                    title={`Bid: ${formatCurrency(displayBid)}`}
                                   >
-                                    {securedHeight > 20 && (
+                                    {bidHeight > 20 && (
                                       <span className="text-white text-[10px] font-medium">
-                                        {displaySecured >= 1000 ? `£${(displaySecured / 1000).toFixed(0)}k` : `£${displaySecured.toFixed(0)}`}
+                                        {displayBid >= 1000 ? `£${(displayBid / 1000).toFixed(0)}k` : `£${displayBid.toFixed(0)}`}
                                       </span>
                                     )}
                                   </div>
@@ -751,8 +751,8 @@ function DashboardContent() {
                                     style={{
                                       height: `${prospectHeight}px`,
                                       minHeight: "2px",
-                                      borderTopLeftRadius: displaySecured === 0 && budgetGap === 0 ? "4px" : "0",
-                                      borderTopRightRadius: displaySecured === 0 && budgetGap === 0 ? "4px" : "0",
+                                      borderTopLeftRadius: displayBid === 0 && budgetGap === 0 ? "4px" : "0",
+                                      borderTopRightRadius: displayBid === 0 && budgetGap === 0 ? "4px" : "0",
                                     }}
                                     title={`Prospect: ${formatCurrency(displayProspect)}`}
                                   >
@@ -763,23 +763,23 @@ function DashboardContent() {
                                     )}
                                   </div>
                                 )}
-                                {/* Bid (yellow) - bottom */}
-                                {displayBid > 0 && (
+                                {/* Secured (green) - bottom foundation */}
+                                {displaySecured > 0 && (
                                   <div
-                                    className="w-full bg-yellow-500 hover:bg-yellow-600 transition-colors relative flex items-center justify-center"
+                                    className="w-full bg-green-500 hover:bg-green-600 transition-colors relative flex items-center justify-center"
                                     style={{
-                                      height: `${bidHeight}px`,
+                                      height: `${securedHeight}px`,
                                       minHeight: "2px",
-                                      borderTopLeftRadius: displaySecured === 0 && displayProspect === 0 && budgetGap === 0 ? "4px" : "0",
-                                      borderTopRightRadius: displaySecured === 0 && displayProspect === 0 && budgetGap === 0 ? "4px" : "0",
+                                      borderTopLeftRadius: displayProspect === 0 && displayBid === 0 && budgetGap === 0 ? "4px" : "0",
+                                      borderTopRightRadius: displayProspect === 0 && displayBid === 0 && budgetGap === 0 ? "4px" : "0",
                                       borderBottomLeftRadius: "4px",
                                       borderBottomRightRadius: "4px",
                                     }}
-                                    title={`Bid: ${formatCurrency(displayBid)}`}
+                                    title={`Secured: ${formatCurrency(displaySecured)}`}
                                   >
-                                    {bidHeight > 20 && (
+                                    {securedHeight > 20 && (
                                       <span className="text-white text-[10px] font-medium">
-                                        {displayBid >= 1000 ? `£${(displayBid / 1000).toFixed(0)}k` : `£${displayBid.toFixed(0)}`}
+                                        {displaySecured >= 1000 ? `£${(displaySecured / 1000).toFixed(0)}k` : `£${displaySecured.toFixed(0)}`}
                                       </span>
                                     )}
                                   </div>
