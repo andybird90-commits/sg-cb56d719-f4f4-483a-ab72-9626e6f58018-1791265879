@@ -493,6 +493,13 @@ function DashboardContent() {
 
                           return (
                             <div key={idx} className="flex-1 flex flex-col justify-end items-center gap-1">
+                              {/* Budget label at top */}
+                              {data.budget > 0 && (
+                                <div className="text-[10px] text-slate-600 font-medium mb-1">
+                                  {data.budget >= 1000 ? `£${(data.budget / 1000).toFixed(0)}k` : `£${data.budget.toFixed(0)}`}
+                                </div>
+                              )}
+                              
                               <div className="w-full flex flex-col">
                                 {/* Budget gap bar (red) - top */}
                                 {budgetGap > 0 && (
