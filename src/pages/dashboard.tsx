@@ -103,6 +103,7 @@ function DashboardContent() {
   const [pipelineLoading, setPipelineLoading] = useState(true);
   const [pipelineError, setPipelineError] = useState<string | null>(null);
   const [pipelineData, setPipelineData] = useState<PipelineData[]>([]);
+  const [pipelineView, setPipelineView] = useState<"all" | "secured" | "secured_prospects">("all");
 
   useEffect(() => {
     fetchStats();
@@ -615,9 +616,44 @@ function DashboardContent() {
                 <TrendingUp className="w-5 h-5 text-slate-600" />
                 <CardTitle className="text-base sm:text-lg">12-Month Pipeline</CardTitle>
               </div>
-              <Link href="/pipeline/gantt">
-                <Button variant="outline" size="sm">View Gantt</Button>
-              </Link>
+              <div className="flex items-center gap-2">
+                {/* Pipeline View Toggle */}
+                <div className="flex rounded-lg border border-slate-200 overflow-hidden">
+                  <button
+                    onClick={() => setPipelineView("all")}
+                    className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                      pipelineView === "all"
+                        ? "bg-slate-900 text-white"
+                        : "bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={() => setPipelineView("secured_prospects")}
+                    className={`px-3 py-1.5 text-xs font-medium transition-colors border-x border-slate-200 ${
+                      pipelineView === "secured_prospects"
+                        ? "bg-slate-900 text-white"
+                        : "bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    Secured + Prospects
+                  </button>
+                  <button
+                    onClick={() => setPipelineView("secured")}
+                    className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                      pipelineView === "secured"
+                        ? "bg-slate-900 text-white"
+                        : "bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    Secured Only
+                  </button>
+                </div>
+                <Link href="/pipeline/gantt">
+                  <Button variant="outline" size="sm">View Gantt</Button>
+                </Link>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -636,12 +672,25 @@ function DashboardContent() {
                       {/* Chart area */}
                       <div className="flex-1 flex gap-1 items-end pl-2">
                         {pipelineData.map((data, idx) => {
-                          const total = data.bid + data.prospect + data.secured;
-                          const budgetGap = data.budget > 0 ? data.budget - total : 0;
+                          // Filter data based on selected view
+                          let displayBid = 0;
+                          let displayProspect = 0;
+                          const displaySecured = data.secured;
+
+                          if (pipelineView === "all") {
+                            displayBid = data.bid;
+                            displayProspect = data.prospect;
+                          } else if (pipelineView === "secured_prospects") {
+                            displayProspect = data.prospect;
+                          }
+                          // secured view: only displaySecured (already set)
+
+                          const total = displayBid + displayProspect + displaySecured;
+                          const budgetGap = data.budget > 0 ? Math.max(0, data.budget - total) : 0;
                           const chartHeight = 256; // Fixed chart height in pixels (h-64 = 256px)
-                          const bidHeight = (data.bid / maxValue) * chartHeight;
-                          const prospectHeight = (data.prospect / maxValue) * chartHeight;
-                          const securedHeight = (data.secured / maxValue) * chartHeight;
+                          const bidHeight = (displayBid / maxValue) * chartHeight;
+                          const prospectHeight = (displayProspect / maxValue) * chartHeight;
+                          const securedHeight = (displaySecured / maxValue) * chartHeight;
                           const budgetGapHeight = (budgetGap / maxValue) * chartHeight;
 
                           return (
@@ -674,7 +723,7 @@ function DashboardContent() {
                                   </div>
                                 )}
                                 {/* Secured (green) - top of pipeline */}
-                                {data.secured > 0 && (
+                                {displaySecured > 0 && (
                                   <div
                                     className="w-full bg-green-500 hover:bg-green-600 transition-colors relative flex items-center justify-center"
                                     style={{
@@ -683,51 +732,51 @@ function DashboardContent() {
                                       borderTopLeftRadius: budgetGap === 0 ? "4px" : "0",
                                       borderTopRightRadius: budgetGap === 0 ? "4px" : "0",
                                     }}
-                                    title={`Secured: ${formatCurrency(data.secured)}`}
+                                    title={`Secured: ${formatCurrency(displaySecured)}`}
                                   >
                                     {securedHeight > 20 && (
                                       <span className="text-white text-[10px] font-medium">
-                                        {data.secured >= 1000 ? `£${(data.secured / 1000).toFixed(0)}k` : `£${data.secured.toFixed(0)}`}
+                                        {displaySecured >= 1000 ? `£${(displaySecured / 1000).toFixed(0)}k` : `£${displaySecured.toFixed(0)}`}
                                       </span>
                                     )}
                                   </div>
                                 )}
                                 {/* Prospect (blue) - middle */}
-                                {data.prospect > 0 && (
+                                {displayProspect > 0 && (
                                   <div
                                     className="w-full bg-blue-500 hover:bg-blue-600 transition-colors relative flex items-center justify-center"
                                     style={{
                                       height: `${prospectHeight}px`,
                                       minHeight: "2px",
-                                      borderTopLeftRadius: data.secured === 0 && budgetGap === 0 ? "4px" : "0",
-                                      borderTopRightRadius: data.secured === 0 && budgetGap === 0 ? "4px" : "0",
+                                      borderTopLeftRadius: displaySecured === 0 && budgetGap === 0 ? "4px" : "0",
+                                      borderTopRightRadius: displaySecured === 0 && budgetGap === 0 ? "4px" : "0",
                                     }}
-                                    title={`Prospect: ${formatCurrency(data.prospect)}`}
+                                    title={`Prospect: ${formatCurrency(displayProspect)}`}
                                   >
                                     {prospectHeight > 20 && (
                                       <span className="text-white text-[10px] font-medium">
-                                        {data.prospect >= 1000 ? `£${(data.prospect / 1000).toFixed(0)}k` : `£${data.prospect.toFixed(0)}`}
+                                        {displayProspect >= 1000 ? `£${(displayProspect / 1000).toFixed(0)}k` : `£${displayProspect.toFixed(0)}`}
                                       </span>
                                     )}
                                   </div>
                                 )}
                                 {/* Bid (yellow) - bottom */}
-                                {data.bid > 0 && (
+                                {displayBid > 0 && (
                                   <div
                                     className="w-full bg-yellow-500 hover:bg-yellow-600 transition-colors relative flex items-center justify-center"
                                     style={{
                                       height: `${bidHeight}px`,
                                       minHeight: "2px",
-                                      borderTopLeftRadius: data.secured === 0 && data.prospect === 0 && budgetGap === 0 ? "4px" : "0",
-                                      borderTopRightRadius: data.secured === 0 && data.prospect === 0 && budgetGap === 0 ? "4px" : "0",
+                                      borderTopLeftRadius: displaySecured === 0 && displayProspect === 0 && budgetGap === 0 ? "4px" : "0",
+                                      borderTopRightRadius: displaySecured === 0 && displayProspect === 0 && budgetGap === 0 ? "4px" : "0",
                                       borderBottomLeftRadius: "4px",
                                       borderBottomRightRadius: "4px",
                                     }}
-                                    title={`Bid: ${formatCurrency(data.bid)}`}
+                                    title={`Bid: ${formatCurrency(displayBid)}`}
                                   >
                                     {bidHeight > 20 && (
                                       <span className="text-white text-[10px] font-medium">
-                                        {data.bid >= 1000 ? `£${(data.bid / 1000).toFixed(0)}k` : `£${data.bid.toFixed(0)}`}
+                                        {displayBid >= 1000 ? `£${(displayBid / 1000).toFixed(0)}k` : `£${displayBid.toFixed(0)}`}
                                       </span>
                                     )}
                                   </div>
