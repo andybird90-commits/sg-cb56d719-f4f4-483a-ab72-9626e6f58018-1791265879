@@ -358,11 +358,7 @@ function DashboardContent() {
     }
   };
 
-  const maxValue = Math.max(
-    ...pipelineData.map(d => d.bid + d.prospect + d.secured),
-    ...pipelineData.map(d => d.budget),
-    1
-  );
+  const maxValue = 200000;
 
   const ErrorState = ({ message }: { message: string }) => (
     <Alert variant="destructive" className="my-4">
