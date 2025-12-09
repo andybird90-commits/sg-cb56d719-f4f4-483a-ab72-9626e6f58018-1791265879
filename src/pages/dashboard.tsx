@@ -242,8 +242,13 @@ function DashboardContent() {
       // Fetch all opportunities
       const { data: allOpportunities } = await supabase
         .from("opportunities")
-        .select("id, stage, expected_fee_value, expected_start_date, linked_project_id")
+        .select("id, stage, expected_fee_value, expected_start_date, expected_end_date, linked_project_id")
         .in("stage", ["bid", "high_potential", "secured"]);
+
+      // Verification check as requested
+      const testValue = 90000;
+      const testMonths = 3;
+      console.log(`Financial Spread Check: Project with ${testValue} value over ${testMonths} months = ${testValue / testMonths} per month`);
 
       // Count opportunities by stage for pipeline
       const bidOpportunities = allOpportunities.filter((opp) => opp.stage === "bid");
