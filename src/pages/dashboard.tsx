@@ -164,7 +164,7 @@ function DashboardContent() {
           code,
           name,
           status,
-          companies!projects_client_company_id_fkey (
+          companies (
             name
           )
         `)
@@ -244,20 +244,6 @@ function DashboardContent() {
         .from("opportunities")
         .select("id, stage, expected_fee_value, expected_start_date, expected_end_date, linked_project_id")
         .in("stage", ["bid", "high_potential", "secured"]);
-
-      // Verification check as requested
-      const testValue = 90000;
-      const testMonths = 3;
-      console.log(`Financial Spread Check: Project with ${testValue} value over ${testMonths} months = ${testValue / testMonths} per month`);
-
-      // Count opportunities by stage for pipeline
-      const bidOpportunities = allOpportunities.filter((opp) => opp.stage === "bid");
-      const prospectOpportunities = allOpportunities.filter((opp) => opp.stage === "high_potential");
-      const securedOpportunities = allOpportunities.filter((opp) => opp.stage === "secured");
-
-      // Separate Won opportunities with and without projects
-      const wonWithProjects = securedOpportunities.filter((opp) => opp.linked_project_id);
-      const wonWithoutProjects = securedOpportunities.filter((opp) => !opp.linked_project_id);
 
       // Group opportunities by month and stage
       (allOpportunities || []).forEach((opp) => {
@@ -500,20 +486,6 @@ function DashboardContent() {
                         strokeWidth="3"
                         vectorEffect="non-scaling-stroke"
                       />
-                      {pipelineData.map((data, idx) => {
-                        if (data.budget === 0) return null;
-                        const x = ((idx + 0.5) / pipelineData.length) * 100;
-                        const y = 100 - ((data.budget / maxValue) * 80);
-                        return (
-                          <circle
-                            key={idx}
-                            cx={`${x}%`}
-                            cy={`${y}%`}
-                            r="4"
-                            fill="#ef4444"
-                          />
-                        );
-                      })}
                     </svg>
 
                     {/* Stacked bar chart */}
@@ -594,7 +566,7 @@ function DashboardContent() {
                     <span className="text-slate-600">Bid</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 sm:w-4 sm:h-4 bg-red-500 rounded"></div>
+                    <div className="w-8 h-0.5 bg-red-500" style={{ backgroundImage: 'repeating-linear-gradient(to right, #ef4444 0px, #ef4444 4px, transparent 4px, transparent 8px)' }}></div>
                     <span className="text-slate-600">Budget</span>
                   </div>
                 </div>
