@@ -120,18 +120,19 @@ function OpportunityDetailContent() {
       if (fetchError) throw fetchError;
       if (!data) throw new Error("Opportunity not found");
 
-      setOpportunity(data as unknown as Opportunity);
+      const opportunityData = data as unknown as Opportunity;
+      setOpportunity(opportunityData);
       setEditData({
-        name: data.name,
-        description: data.description || "",
-        stage: data.stage,
-        status: data.status,
-        tender_due_date: data.tender_due_date || "",
-        expected_start_date: data.expected_start_date || "",
-        expected_end_date: data.expected_end_date || "",
-        expected_fee_value: data.expected_fee_value?.toString() || "",
-        probability_percent: data.probability_percent?.toString() || "",
-        added_by_user_id: data.added_by_user_id || "",
+        name: opportunityData.name,
+        description: opportunityData.description || "",
+        stage: opportunityData.stage,
+        status: opportunityData.status,
+        tender_due_date: opportunityData.tender_due_date || "",
+        expected_start_date: opportunityData.expected_start_date || "",
+        expected_end_date: opportunityData.expected_end_date || "",
+        expected_fee_value: opportunityData.expected_fee_value?.toString() || "",
+        probability_percent: opportunityData.probability_percent?.toString() || "",
+        added_by_user_id: opportunityData.added_by_user_id || "",
       });
     } catch (err) {
       console.error("Failed to load opportunity data", err);

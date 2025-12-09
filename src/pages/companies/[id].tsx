@@ -133,14 +133,15 @@ function CompanyDetailContent() {
       if (error) throw error;
       if (!data) throw new Error("Company not found");
       
-      setCompany(data as unknown as Company);
+      const companyData = data as unknown as Company;
+      setCompany(companyData);
       setEditData({
-        name: data.name,
-        short_name: data.short_name || "",
-        sector: data.sector || "",
-        status: data.status as "active" | "prospect" | "inactive",
-        notes: data.notes || "",
-        added_by_user_id: data.added_by_user_id || "",
+        name: companyData.name,
+        short_name: companyData.short_name || "",
+        sector: companyData.sector || "",
+        status: companyData.status as "active" | "prospect" | "inactive",
+        notes: companyData.notes || "",
+        added_by_user_id: companyData.added_by_user_id || "",
       });
     } catch (err) {
       console.error("Failed to load company data", err);
