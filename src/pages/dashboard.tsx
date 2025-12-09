@@ -492,66 +492,78 @@ function DashboardContent() {
                       />
                     </svg>
 
-                    {/* Stacked bar chart */}
-                    <div className="flex h-full gap-1 items-end">
-                      {pipelineData.map((data, idx) => {
-                        const total = data.bid + data.prospect + data.secured;
-                        const totalHeight = (total / maxValue) * 200;
-                        const bidHeight = (data.bid / maxValue) * 200;
-                        const prospectHeight = (data.prospect / maxValue) * 200;
-                        const securedHeight = (data.secured / maxValue) * 200;
+                    {/* Stacked bar chart with Y-axis */}
+                    <div className="flex h-full">
+                      {/* Y-axis labels */}
+                      <div className="w-16 flex flex-col justify-between pr-2 text-xs text-slate-500 text-right">
+                        <div>{formatCurrency(maxValue)}</div>
+                        <div>{formatCurrency(maxValue * 0.75)}</div>
+                        <div>{formatCurrency(maxValue * 0.5)}</div>
+                        <div>{formatCurrency(maxValue * 0.25)}</div>
+                        <div>£0</div>
+                      </div>
 
-                        return (
-                          <div key={idx} className="flex-1 flex flex-col justify-end items-center gap-1">
-                            <div className="w-full flex flex-col">
-                              {/* Secured (green) - top */}
-                              {data.secured > 0 && (
-                                <div
-                                  className="w-full bg-green-500 hover:bg-green-600 transition-colors"
-                                  style={{
-                                    height: `${securedHeight}px`,
-                                    minHeight: "2px",
-                                    borderTopLeftRadius: total === data.secured ? "4px" : "0",
-                                    borderTopRightRadius: total === data.secured ? "4px" : "0",
-                                  }}
-                                  title={`Secured: ${formatCurrency(data.secured)}`}
-                                />
-                              )}
-                              {/* Prospect (blue) - middle */}
-                              {data.prospect > 0 && (
-                                <div
-                                  className="w-full bg-blue-500 hover:bg-blue-600 transition-colors"
-                                  style={{
-                                    height: `${prospectHeight}px`,
-                                    minHeight: "2px",
-                                    borderTopLeftRadius: data.secured === 0 ? "4px" : "0",
-                                    borderTopRightRadius: data.secured === 0 ? "4px" : "0",
-                                  }}
-                                  title={`Prospect: ${formatCurrency(data.prospect)}`}
-                                />
-                              )}
-                              {/* Bid (yellow) - bottom */}
-                              {data.bid > 0 && (
-                                <div
-                                  className="w-full bg-yellow-500 hover:bg-yellow-600 transition-colors"
-                                  style={{
-                                    height: `${bidHeight}px`,
-                                    minHeight: "2px",
-                                    borderTopLeftRadius: data.secured === 0 && data.prospect === 0 ? "4px" : "0",
-                                    borderTopRightRadius: data.secured === 0 && data.prospect === 0 ? "4px" : "0",
-                                    borderBottomLeftRadius: "4px",
-                                    borderBottomRightRadius: "4px",
-                                  }}
-                                  title={`Bid: ${formatCurrency(data.bid)}`}
-                                />
-                              )}
+                      {/* Chart area */}
+                      <div className="flex-1 flex gap-1 items-end border-l border-slate-200 pl-2">
+                        {pipelineData.map((data, idx) => {
+                          const total = data.bid + data.prospect + data.secured;
+                          const totalHeight = (total / maxValue) * 200;
+                          const bidHeight = (data.bid / maxValue) * 200;
+                          const prospectHeight = (data.prospect / maxValue) * 200;
+                          const securedHeight = (data.secured / maxValue) * 200;
+
+                          return (
+                            <div key={idx} className="flex-1 flex flex-col justify-end items-center gap-1">
+                              <div className="w-full flex flex-col">
+                                {/* Secured (green) - top */}
+                                {data.secured > 0 && (
+                                  <div
+                                    className="w-full bg-green-500 hover:bg-green-600 transition-colors"
+                                    style={{
+                                      height: `${securedHeight}px`,
+                                      minHeight: "2px",
+                                      borderTopLeftRadius: total === data.secured ? "4px" : "0",
+                                      borderTopRightRadius: total === data.secured ? "4px" : "0",
+                                    }}
+                                    title={`Secured: ${formatCurrency(data.secured)}`}
+                                  />
+                                )}
+                                {/* Prospect (blue) - middle */}
+                                {data.prospect > 0 && (
+                                  <div
+                                    className="w-full bg-blue-500 hover:bg-blue-600 transition-colors"
+                                    style={{
+                                      height: `${prospectHeight}px`,
+                                      minHeight: "2px",
+                                      borderTopLeftRadius: data.secured === 0 ? "4px" : "0",
+                                      borderTopRightRadius: data.secured === 0 ? "4px" : "0",
+                                    }}
+                                    title={`Prospect: ${formatCurrency(data.prospect)}`}
+                                  />
+                                )}
+                                {/* Bid (yellow) - bottom */}
+                                {data.bid > 0 && (
+                                  <div
+                                    className="w-full bg-yellow-500 hover:bg-yellow-600 transition-colors"
+                                    style={{
+                                      height: `${bidHeight}px`,
+                                      minHeight: "2px",
+                                      borderTopLeftRadius: data.secured === 0 && data.prospect === 0 ? "4px" : "0",
+                                      borderTopRightRadius: data.secured === 0 && data.prospect === 0 ? "4px" : "0",
+                                      borderBottomLeftRadius: "4px",
+                                      borderBottomRightRadius: "4px",
+                                    }}
+                                    title={`Bid: ${formatCurrency(data.bid)}`}
+                                  />
+                                )}
+                              </div>
+                              <div className="text-[10px] sm:text-xs text-slate-600 text-center whitespace-nowrap">
+                                {data.month}
+                              </div>
                             </div>
-                            <div className="text-[10px] sm:text-xs text-slate-600 text-center whitespace-nowrap">
-                              {data.month}
-                            </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 </div>
