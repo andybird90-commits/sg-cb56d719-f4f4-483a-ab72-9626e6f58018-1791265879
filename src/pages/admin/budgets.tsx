@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Edit, Trash2 } from "lucide-react";
+import { Plus, Edit, Trash2, Calendar } from "lucide-react";
 import Link from "next/link";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -29,12 +29,20 @@ function AdminBudgetsContent() {
   const [error, setError] = useState<string | null>(null);
   
   const [formOpen, setFormOpen] = useState(false);
+  const [bulkFormOpen, setBulkFormOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<MonthlyBudget | null>(null);
   const [formData, setFormData] = useState({
     year: new Date().getFullYear().toString(),
     month: (new Date().getMonth() + 1).toString(),
     budget_revenue: "",
     budget_cost: "",
+  });
+
+  const [bulkFormData, setBulkFormData] = useState({
+    startYear: new Date().getFullYear().toString(),
+    startMonth: (new Date().getMonth() + 1).toString(),
+    budgets: Array(13).fill(""),
+    costs: Array(13).fill(""),
   });
 
   const canEdit = profile?.role === "admin" || profile?.role === "director";
@@ -116,6 +124,66 @@ function AdminBudgetsContent() {
     });
   };
 
+  const handleBulkSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const startYear = parseInt(bulkFormData.startYear);
+    const startMonth = parseInt(bulkFormData.startMonth);
+
+    const budgetsToInsert = [];
+
+    for (let i = 0; i < 13; i++) {
+      const budgetValue = bulkFormData.budgets[i];
+      const costValue = bulkFormData.costs[i];
+
+      if (!budgetValue || parseFloat(budgetValue) <= 0) continue;
+
+      const date = new Date(startYear, startMonth - 1 + i, 1);
+      const year = date.getFullYear();
+      const month = date.getMonth() + 1;
+
+      budgetsToInsert.push({
+        year,
+        month,
+        budget_revenue: parseFloat(budgetValue),
+        budget_cost: costValue ? parseFloat(costValue) : null,
+      });
+    }
+
+    if (budgetsToInsert.length === 0) {
+      alert("Please enter at least one budget value");
+      return;
+    }
+
+    // Delete existing budgets for these months first
+    for (const budget of budgetsToInsert) {
+      await supabase
+        .from("monthly_budgets")
+        .delete()
+        .eq("year", budget.year)
+        .eq("month", budget.month);
+    }
+
+    // Insert new budgets
+    const { error } = await supabase
+      .from("monthly_budgets")
+      .insert(budgetsToInsert);
+
+    if (error) {
+      alert("Error creating budgets: " + error.message);
+      return;
+    }
+
+    await fetchBudgets();
+    setBulkFormOpen(false);
+    setBulkFormData({
+      startYear: new Date().getFullYear().toString(),
+      startMonth: (new Date().getMonth() + 1).toString(),
+      budgets: Array(13).fill(""),
+      costs: Array(13).fill(""),
+    });
+  };
+
   const handleEdit = (budget: MonthlyBudget) => {
     setEditingBudget(budget);
     setFormData({
@@ -156,6 +224,11 @@ function AdminBudgetsContent() {
     return new Date(2000, month - 1, 1).toLocaleDateString("en-GB", { month: "long" });
   };
 
+  const getMonthLabel = (startYear: number, startMonth: number, offset: number) => {
+    const date = new Date(startYear, startMonth - 1 + offset, 1);
+    return date.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+  };
+
   return (
     <Layout>
       <div className="space-y-6">
@@ -168,6 +241,103 @@ function AdminBudgetsContent() {
             <Link href="/admin">
               <Button variant="outline">User Management</Button>
             </Link>
+            <Dialog open={bulkFormOpen} onOpenChange={setBulkFormOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="gap-2" onClick={() => {
+                  setBulkFormData({
+                    startYear: new Date().getFullYear().toString(),
+                    startMonth: (new Date().getMonth() + 1).toString(),
+                    budgets: Array(13).fill(""),
+                    costs: Array(13).fill(""),
+                  });
+                }}>
+                  <Calendar className="w-4 h-4" />
+                  13-Month Budget
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Set 13-Month Rolling Budget</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleBulkSubmit} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="bulk-start-year">Start Year</Label>
+                      <Input
+                        id="bulk-start-year"
+                        type="number"
+                        min="2020"
+                        max="2100"
+                        value={bulkFormData.startYear}
+                        onChange={(e) => setBulkFormData({ ...bulkFormData, startYear: e.target.value })}
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="bulk-start-month">Start Month</Label>
+                      <Input
+                        id="bulk-start-month"
+                        type="number"
+                        min="1"
+                        max="12"
+                        value={bulkFormData.startMonth}
+                        onChange={(e) => setBulkFormData({ ...bulkFormData, startMonth: e.target.value })}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label>Monthly Budgets (£)</Label>
+                    <div className="grid gap-3">
+                      {Array.from({ length: 13 }).map((_, i) => (
+                        <div key={i} className="grid grid-cols-[120px_1fr_1fr] gap-3 items-center">
+                          <div className="text-sm font-medium text-slate-700">
+                            {getMonthLabel(
+                              parseInt(bulkFormData.startYear),
+                              parseInt(bulkFormData.startMonth),
+                              i
+                            )}
+                          </div>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="Budget"
+                            value={bulkFormData.budgets[i]}
+                            onChange={(e) => {
+                              const newBudgets = [...bulkFormData.budgets];
+                              newBudgets[i] = e.target.value;
+                              setBulkFormData({ ...bulkFormData, budgets: newBudgets });
+                            }}
+                          />
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="Cost (optional)"
+                            value={bulkFormData.costs[i]}
+                            onChange={(e) => {
+                              const newCosts = [...bulkFormData.costs];
+                              newCosts[i] = e.target.value;
+                              setBulkFormData({ ...bulkFormData, costs: newCosts });
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <Button type="submit">Save All Budgets</Button>
+                    <Button type="button" variant="outline" onClick={() => setBulkFormOpen(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
             <Dialog open={formOpen} onOpenChange={setFormOpen}>
               <DialogTrigger asChild>
                 <Button className="gap-2" onClick={() => {
