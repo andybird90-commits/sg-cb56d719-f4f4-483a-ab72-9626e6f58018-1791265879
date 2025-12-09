@@ -110,6 +110,18 @@ function ProjectDetailContent() {
   const [projectLoading, setProjectLoading] = useState(true);
   const [projectError, setProjectError] = useState<string | null>(null);
 
+  // Project edit state
+  const [isEditingProject, setIsEditingProject] = useState(false);
+  const [projectForm, setProjectForm] = useState({
+    code: "",
+    name: "",
+    status: "pipeline",
+    start_date: "",
+    end_date: "",
+    agreed_fee_value: "",
+    notes: "",
+  });
+
   // Activity form state
   const [activityFormOpen, setActivityFormOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
@@ -232,6 +244,17 @@ function ProjectDetailContent() {
       setCosts(costsData || []);
       setPhasingData((phasingDataResult as unknown as PhasingRow[]) || []);
       
+      // Initialize project form with loaded data
+      setProjectForm({
+        code: projectData.code,
+        name: projectData.name,
+        status: projectData.status,
+        start_date: projectData.start_date || "",
+        end_date: projectData.end_date || "",
+        agreed_fee_value: projectData.agreed_fee_value?.toString() || "",
+        notes: projectData.notes || "",
+      });
+      
       // Generate months grid
       generateMonthsGrid(projectData, (phasingDataResult as unknown as PhasingRow[]) || []);
     } catch (err) {
@@ -272,6 +295,71 @@ function ProjectDetailContent() {
     setMonthsGrid(months);
     setLocalMonthsGrid(months); // Initialize local state with saved data
     setPhasingHasChanges(false); // Reset changes flag
+  };
+
+  const handleUpdateProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id || typeof id !== "string") return;
+
+    try {
+      const { error } = await supabase
+        .from("projects")
+        .update({
+          code: projectForm.code,
+          name: projectForm.name,
+          status: projectForm.status as "pipeline" | "live" | "on_hold" | "completed" | "cancelled",
+          start_date: projectForm.start_date || null,
+          end_date: projectForm.end_date || null,
+          agreed_fee_value: projectForm.agreed_fee_value ? parseFloat(projectForm.agreed_fee_value) : null,
+          notes: projectForm.notes || null,
+        })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Project updated",
+        description: "Project details have been updated successfully.",
+      });
+
+      await fetchProjectData(id);
+      setIsEditingProject(false);
+    } catch (err) {
+      console.error("Failed to update project", err);
+      toast({
+        title: "Error updating project",
+        description: "Failed to update project details. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    if (!id || typeof id !== "string") return;
+    if (!confirm("Are you sure you want to delete this project? This action cannot be undone and will delete all associated activities, variations, costs, and phasing data.")) return;
+
+    try {
+      const { error } = await supabase
+        .from("projects")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Project deleted",
+        description: "Project has been deleted successfully.",
+      });
+
+      router.push("/projects");
+    } catch (err) {
+      console.error("Failed to delete project", err);
+      toast({
+        title: "Error deleting project",
+        description: "Failed to delete project. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handlePhasingUpdate = async (
@@ -852,53 +940,161 @@ function ProjectDetailContent() {
                     {project.status.replace("_", " ")}
                   </Badge>
                 </div>
+                {canDelete && !isEditingProject && (
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setIsEditingProject(true)} className="gap-2">
+                      <Edit className="w-4 h-4" />
+                      Edit
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleDeleteProject} className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50">
+                      <Trash2 className="w-4 h-4" />
+                      Delete
+                    </Button>
+                  </div>
+                )}
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    {project.companies && (
-                      <div>
-                        <div className="text-sm font-medium text-slate-500">Client</div>
-                        <div className="text-slate-900">{project.companies.name}</div>
+                {isEditingProject ? (
+                  <form onSubmit={handleUpdateProject} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-code">Project Code *</Label>
+                        <Input
+                          id="edit-code"
+                          value={projectForm.code}
+                          onChange={(e) => setProjectForm({ ...projectForm, code: e.target.value })}
+                          required
+                        />
                       </div>
-                    )}
-                    
-                    {project.opportunities && (
-                      <div>
-                        <div className="text-sm font-medium text-slate-500">Linked Opportunity</div>
-                        <div className="text-slate-900">{project.opportunities.name}</div>
-                      </div>
-                    )}
 
-                    {project.agreed_fee_value && (
-                      <div>
-                        <div className="text-sm font-medium text-slate-500">Agreed Fee</div>
-                        <div className="text-slate-900 font-semibold">{formatCurrency(project.agreed_fee_value)}</div>
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-status">Status</Label>
+                        <Select
+                          value={projectForm.status}
+                          onValueChange={(value) => setProjectForm({ ...projectForm, status: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pipeline">Pipeline</SelectItem>
+                            <SelectItem value="live">Live</SelectItem>
+                            <SelectItem value="on_hold">On Hold</SelectItem>
+                            <SelectItem value="completed">Completed</SelectItem>
+                            <SelectItem value="cancelled">Cancelled</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
-                    )}
+                    </div>
 
-                    {project.start_date && (
-                      <div>
-                        <div className="text-sm font-medium text-slate-500">Start Date</div>
-                        <div className="text-slate-900">{formatDate(project.start_date)}</div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-name">Project Name *</Label>
+                      <Input
+                        id="edit-name"
+                        value={projectForm.name}
+                        onChange={(e) => setProjectForm({ ...projectForm, name: e.target.value })}
+                        required
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-start-date">Start Date</Label>
+                        <Input
+                          id="edit-start-date"
+                          type="date"
+                          value={projectForm.start_date}
+                          onChange={(e) => setProjectForm({ ...projectForm, start_date: e.target.value })}
+                        />
                       </div>
-                    )}
 
-                    {project.end_date && (
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-end-date">End Date</Label>
+                        <Input
+                          id="edit-end-date"
+                          type="date"
+                          value={projectForm.end_date}
+                          onChange={(e) => setProjectForm({ ...projectForm, end_date: e.target.value })}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-fee">Agreed Fee (£)</Label>
+                        <Input
+                          id="edit-fee"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={projectForm.agreed_fee_value}
+                          onChange={(e) => setProjectForm({ ...projectForm, agreed_fee_value: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-notes">Notes</Label>
+                      <Textarea
+                        id="edit-notes"
+                        value={projectForm.notes}
+                        onChange={(e) => setProjectForm({ ...projectForm, notes: e.target.value })}
+                        rows={4}
+                      />
+                    </div>
+
+                    <div className="flex gap-3">
+                      <Button type="submit">Save Changes</Button>
+                      <Button type="button" variant="outline" onClick={() => setIsEditingProject(false)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      {project.companies && (
+                        <div>
+                          <div className="text-sm font-medium text-slate-500">Client</div>
+                          <div className="text-slate-900">{project.companies.name}</div>
+                        </div>
+                      )}
+                      
+                      {project.opportunities && (
+                        <div>
+                          <div className="text-sm font-medium text-slate-500">Linked Opportunity</div>
+                          <div className="text-slate-900">{project.opportunities.name}</div>
+                        </div>
+                      )}
+
+                      {project.agreed_fee_value && (
+                        <div>
+                          <div className="text-sm font-medium text-slate-500">Agreed Fee</div>
+                          <div className="text-slate-900 font-semibold">{formatCurrency(project.agreed_fee_value)}</div>
+                        </div>
+                      )}
+
+                      {project.start_date && (
+                        <div>
+                          <div className="text-sm font-medium text-slate-500">Start Date</div>
+                          <div className="text-slate-900">{formatDate(project.start_date)}</div>
+                        </div>
+                      )}
+
+                      {project.end_date && (
+                        <div>
+                          <div className="text-sm font-medium text-slate-500">End Date</div>
+                          <div className="text-slate-900">{formatDate(project.end_date)}</div>
+                        </div>
+                      )}
+                    </div>
+
+                    {project.notes && (
                       <div>
-                        <div className="text-sm font-medium text-slate-500">End Date</div>
-                        <div className="text-slate-900">{formatDate(project.end_date)}</div>
+                        <div className="text-sm font-medium text-slate-500 mb-1">Notes</div>
+                        <div className="text-slate-900 whitespace-pre-wrap">{project.notes}</div>
                       </div>
                     )}
                   </div>
-
-                  {project.notes && (
-                    <div>
-                      <div className="text-sm font-medium text-slate-500 mb-1">Notes</div>
-                      <div className="text-slate-900 whitespace-pre-wrap">{project.notes}</div>
-                    </div>
-                  )}
-                </div>
+                )}
               </CardContent>
             </Card>
 
