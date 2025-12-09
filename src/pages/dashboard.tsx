@@ -239,11 +239,12 @@ function DashboardContent() {
         });
       }
 
-      // Fetch all opportunities
+      // Fetch all opportunities (excluding those linked to projects to avoid double-counting)
       const { data: allOpportunities } = await supabase
         .from("opportunities")
         .select("id, stage, expected_fee_value, expected_start_date, expected_end_date, linked_project_id")
-        .in("stage", ["bid", "high_potential", "secured"]);
+        .in("stage", ["bid", "high_potential", "secured"])
+        .is("linked_project_id", null); // Only get opportunities NOT yet converted to projects
 
       // Fetch all live projects (secured work)
       const { data: liveProjects } = await supabase
@@ -251,23 +252,20 @@ function DashboardContent() {
         .select("id, status, agreed_fee_value, start_date, end_date")
         .eq("status", "live");
 
-      // Process opportunities
+      // Process opportunities (only those not converted to projects)
       (allOpportunities || []).forEach((opp) => {
         if (!opp.expected_start_date || !opp.expected_fee_value) return;
 
         const startDate = new Date(opp.expected_start_date);
         const endDate = opp.expected_end_date ? new Date(opp.expected_end_date) : startDate;
         
-        // Calculate duration in months (inclusive)
         const durationMonths = Math.max(1, 
           (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
           (endDate.getMonth() - startDate.getMonth()) + 1
         );
         
-        // Calculate monthly value spread across duration
         const monthlyValue = opp.expected_fee_value / durationMonths;
 
-        // Spread the value across all months in the project duration
         for (let monthOffset = 0; monthOffset < durationMonths; monthOffset++) {
           const currentMonth = new Date(
             startDate.getFullYear(), 
@@ -278,7 +276,6 @@ function DashboardContent() {
           const monthIndex = (currentMonth.getFullYear() - today.getFullYear()) * 12 + 
                             (currentMonth.getMonth() - today.getMonth());
 
-          // Only include if within our 12-month window
           if (monthIndex >= 0 && monthIndex < 12) {
             if (opp.stage === "bid") {
               months[monthIndex].bid += monthlyValue;
@@ -298,16 +295,13 @@ function DashboardContent() {
         const startDate = new Date(project.start_date);
         const endDate = project.end_date ? new Date(project.end_date) : startDate;
         
-        // Calculate duration in months (inclusive)
         const durationMonths = Math.max(1, 
           (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
           (endDate.getMonth() - startDate.getMonth()) + 1
         );
         
-        // Calculate monthly value spread across duration
         const monthlyValue = project.agreed_fee_value / durationMonths;
 
-        // Spread the value across all months in the project duration
         for (let monthOffset = 0; monthOffset < durationMonths; monthOffset++) {
           const currentMonth = new Date(
             startDate.getFullYear(), 
@@ -318,9 +312,7 @@ function DashboardContent() {
           const monthIndex = (currentMonth.getFullYear() - today.getFullYear()) * 12 + 
                             (currentMonth.getMonth() - today.getMonth());
 
-          // Only include if within our 12-month window
           if (monthIndex >= 0 && monthIndex < 12) {
-            // Add to secured (green) since these are live projects
             months[monthIndex].secured += monthlyValue;
           }
         }
