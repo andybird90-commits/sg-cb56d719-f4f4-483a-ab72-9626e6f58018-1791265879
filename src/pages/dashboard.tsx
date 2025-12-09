@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Building2, Users, Target, Briefcase, TrendingUp, Calendar, AlertCircle, AlertTriangle } from "lucide-react";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 interface DashboardStats {
   companiesCount: number;
@@ -23,6 +24,7 @@ interface Opportunity {
   name: string;
   stage: string;
   tender_due_date: string | null;
+  estimated_value: number | null;
   companies?: { name: string };
 }
 
@@ -44,15 +46,10 @@ interface Absence {
 
 interface PipelineData {
   month: string;
-  forecast: number;
+  bid: number;
+  prospect: number;
+  secured: number;
   budget: number;
-}
-
-interface PhasingRow {
-  project_id: string;
-  year: number;
-  month: number;
-  revenue_amount: number;
 }
 
 function DashboardContent() {
@@ -229,16 +226,48 @@ function DashboardContent() {
       const today = new Date();
       const months: PipelineData[] = [];
 
+      // Initialize 12 months
+      for (let i = 0; i < 12; i++) {
+        const date = new Date(today.getFullYear(), today.getMonth() + i, 1);
+        months.push({
+          month: date.toLocaleDateString("en-GB", { month: "short", year: "2-digit" }),
+          bid: 0,
+          prospect: 0,
+          secured: 0,
+          budget: 0,
+        });
+      }
+
+      // Fetch all opportunities
+      const { data: allOpportunities } = await supabase
+        .from("opportunities")
+        .select("id, stage, estimated_value, target_award_date")
+        .in("stage", ["bid", "high_potential", "secured"]);
+
+      // Group opportunities by month and stage
+      (allOpportunities || []).forEach((opp) => {
+        if (!opp.target_award_date || !opp.estimated_value) return;
+
+        const awardDate = new Date(opp.target_award_date);
+        const monthIndex = (awardDate.getFullYear() - today.getFullYear()) * 12 + 
+                          (awardDate.getMonth() - today.getMonth());
+
+        if (monthIndex >= 0 && monthIndex < 12) {
+          if (opp.stage === "bid") {
+            months[monthIndex].bid += opp.estimated_value;
+          } else if (opp.stage === "high_potential") {
+            months[monthIndex].prospect += opp.estimated_value;
+          } else if (opp.stage === "secured") {
+            months[monthIndex].secured += opp.estimated_value;
+          }
+        }
+      });
+
+      // Fetch budgets for each month
       for (let i = 0; i < 12; i++) {
         const date = new Date(today.getFullYear(), today.getMonth() + i, 1);
         const year = date.getFullYear();
         const month = date.getMonth() + 1;
-
-        months.push({
-          month: date.toLocaleDateString("en-GB", { month: "short", year: "2-digit" }),
-          forecast: 0,
-          budget: 0,
-        });
 
         const { data: budget } = await supabase
           .from("monthly_budgets")
@@ -252,44 +281,6 @@ function DashboardContent() {
         }
       }
 
-      const { data: allProjects } = await supabase
-        .from("projects")
-        .select("id, start_date, end_date, agreed_fee_value, status")
-        .in("status", ["live", "pipeline"]);
-
-      const { data: allPhasing } = await supabase
-        .from("project_monthly_phasing")
-        .select("project_id, year, month, revenue_amount");
-
-      const phasingMap = new Map<string, PhasingRow[]>();
-      (allPhasing || []).forEach((p) => {
-        if (!phasingMap.has(p.project_id)) {
-          phasingMap.set(p.project_id, []);
-        }
-        phasingMap.get(p.project_id)!.push(p as PhasingRow);
-      });
-
-      (allProjects || []).forEach((project) => {
-        const projectPhasing = phasingMap.get(project.id) || [];
-
-        for (let i = 0; i < 12; i++) {
-          const date = new Date(today.getFullYear(), today.getMonth() + i, 1);
-          const year = date.getFullYear();
-          const month = date.getMonth() + 1;
-
-          const manualPhasing = projectPhasing.find(
-            (p) => p.year === year && p.month === month
-          );
-
-          if (manualPhasing && manualPhasing.revenue_amount > 0) {
-            months[i].forecast += manualPhasing.revenue_amount;
-          } else {
-            const autoRevenue = calculateAutoMonthlyRevenue(project, year, month);
-            months[i].forecast += autoRevenue;
-          }
-        }
-      });
-
       setPipelineData(months);
     } catch (error) {
       console.error("Failed to load pipeline data", error);
@@ -297,34 +288,6 @@ function DashboardContent() {
     } finally {
       setPipelineLoading(false);
     }
-  };
-
-  const calculateAutoMonthlyRevenue = (
-    project: any,
-    year: number,
-    month: number
-  ): number => {
-    if (!project.start_date || !project.agreed_fee_value) return 0;
-
-    const startDate = new Date(project.start_date);
-    const endDate = project.end_date ? new Date(project.end_date) : new Date(startDate.getFullYear(), startDate.getMonth() + 6, startDate.getDate());
-
-    const monthStart = new Date(year, month - 1, 1);
-    const monthEnd = new Date(year, month, 0);
-
-    if (monthEnd < startDate || monthStart > endDate) return 0;
-
-    const overlapStart = monthStart > startDate ? monthStart : startDate;
-    const overlapEnd = monthEnd < endDate ? monthEnd : endDate;
-
-    const overlapDays = Math.max(
-      0,
-      Math.ceil((overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
-    );
-
-    const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-
-    return (project.agreed_fee_value / totalDays) * overlapDays;
   };
 
   const formatCurrency = (value: number) => {
@@ -370,7 +333,8 @@ function DashboardContent() {
   };
 
   const maxValue = Math.max(
-    ...pipelineData.map(d => Math.max(d.forecast, d.budget)),
+    ...pipelineData.map(d => d.bid + d.prospect + d.secured),
+    ...pipelineData.map(d => d.budget),
     1
   );
 
@@ -462,9 +426,14 @@ function DashboardContent() {
         {/* Pipeline Chart */}
         <Card>
           <CardHeader>
-            <div className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-slate-600" />
-              <CardTitle className="text-base sm:text-lg">12-Month Pipeline vs Budget</CardTitle>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-slate-600" />
+                <CardTitle className="text-base sm:text-lg">12-Month Pipeline</CardTitle>
+              </div>
+              <Link href="/pipeline/gantt">
+                <Button variant="outline" size="sm">View Gantt</Button>
+              </Link>
             </div>
           </CardHeader>
           <CardContent>
@@ -477,44 +446,115 @@ function DashboardContent() {
             ) : (
               <>
                 <div className="overflow-x-auto -mx-2 px-2">
-                  <div className="min-w-[600px] h-64 sm:h-80">
+                  <div className="min-w-[600px] h-64 sm:h-80 relative">
+                    {/* Budget line overlay */}
+                    <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 10 }}>
+                      <polyline
+                        points={pipelineData.map((data, idx) => {
+                          const x = ((idx + 0.5) / pipelineData.length) * 100;
+                          const y = 100 - ((data.budget / maxValue) * 80);
+                          return `${x}%,${y}%`;
+                        }).join(" ")}
+                        fill="none"
+                        stroke="#64748b"
+                        strokeWidth="2"
+                        strokeDasharray="4,4"
+                      />
+                      {pipelineData.map((data, idx) => {
+                        if (data.budget === 0) return null;
+                        const x = ((idx + 0.5) / pipelineData.length) * 100;
+                        const y = 100 - ((data.budget / maxValue) * 80);
+                        return (
+                          <circle
+                            key={idx}
+                            cx={`${x}%`}
+                            cy={`${y}%`}
+                            r="3"
+                            fill="#64748b"
+                          />
+                        );
+                      })}
+                    </svg>
+
+                    {/* Stacked bar chart */}
                     <div className="flex h-full gap-1 items-end">
-                      {pipelineData.map((data, idx) => (
-                        <div key={idx} className="flex-1 flex flex-col justify-end items-center gap-1">
-                          <div className="w-full flex flex-col gap-0.5">
-                            <div
-                              className="w-full bg-blue-500 rounded-t hover:bg-blue-600 transition-colors"
-                              style={{
-                                height: `${(data.forecast / maxValue) * 200}px`,
-                                minHeight: data.forecast > 0 ? "4px" : "0px",
-                              }}
-                              title={`Forecast: ${formatCurrency(data.forecast)}`}
-                            />
-                            <div
-                              className="w-full bg-slate-300 rounded-b hover:bg-slate-400 transition-colors"
-                              style={{
-                                height: `${(data.budget / maxValue) * 200}px`,
-                                minHeight: data.budget > 0 ? "4px" : "0px",
-                              }}
-                              title={`Budget: ${formatCurrency(data.budget)}`}
-                            />
+                      {pipelineData.map((data, idx) => {
+                        const total = data.bid + data.prospect + data.secured;
+                        const totalHeight = (total / maxValue) * 200;
+                        const bidHeight = (data.bid / maxValue) * 200;
+                        const prospectHeight = (data.prospect / maxValue) * 200;
+                        const securedHeight = (data.secured / maxValue) * 200;
+
+                        return (
+                          <div key={idx} className="flex-1 flex flex-col justify-end items-center gap-1">
+                            <div className="w-full flex flex-col">
+                              {/* Secured (green) - top */}
+                              {data.secured > 0 && (
+                                <div
+                                  className="w-full bg-green-500 hover:bg-green-600 transition-colors"
+                                  style={{
+                                    height: `${securedHeight}px`,
+                                    minHeight: "2px",
+                                    borderTopLeftRadius: total === data.secured ? "4px" : "0",
+                                    borderTopRightRadius: total === data.secured ? "4px" : "0",
+                                  }}
+                                  title={`Secured: ${formatCurrency(data.secured)}`}
+                                />
+                              )}
+                              {/* Prospect (blue) - middle */}
+                              {data.prospect > 0 && (
+                                <div
+                                  className="w-full bg-blue-500 hover:bg-blue-600 transition-colors"
+                                  style={{
+                                    height: `${prospectHeight}px`,
+                                    minHeight: "2px",
+                                    borderTopLeftRadius: data.secured === 0 ? "4px" : "0",
+                                    borderTopRightRadius: data.secured === 0 ? "4px" : "0",
+                                  }}
+                                  title={`Prospect: ${formatCurrency(data.prospect)}`}
+                                />
+                              )}
+                              {/* Bid (yellow) - bottom */}
+                              {data.bid > 0 && (
+                                <div
+                                  className="w-full bg-yellow-500 hover:bg-yellow-600 transition-colors"
+                                  style={{
+                                    height: `${bidHeight}px`,
+                                    minHeight: "2px",
+                                    borderTopLeftRadius: data.secured === 0 && data.prospect === 0 ? "4px" : "0",
+                                    borderTopRightRadius: data.secured === 0 && data.prospect === 0 ? "4px" : "0",
+                                    borderBottomLeftRadius: "4px",
+                                    borderBottomRightRadius: "4px",
+                                  }}
+                                  title={`Bid: ${formatCurrency(data.bid)}`}
+                                />
+                              )}
+                            </div>
+                            <div className="text-[10px] sm:text-xs text-slate-600 text-center whitespace-nowrap">
+                              {data.month}
+                            </div>
                           </div>
-                          <div className="text-[10px] sm:text-xs text-slate-600 text-center whitespace-nowrap">
-                            {data.month}
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-4 text-xs sm:text-sm justify-center">
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 sm:w-4 sm:h-4 bg-blue-500 rounded"></div>
-                    <span className="text-slate-600">Forecast Revenue</span>
+                    <div className="w-3 h-3 sm:w-4 sm:h-4 bg-green-500 rounded"></div>
+                    <span className="text-slate-600">Secured</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 sm:w-4 sm:h-4 bg-slate-300 rounded"></div>
+                    <div className="w-3 h-3 sm:w-4 sm:h-4 bg-blue-500 rounded"></div>
+                    <span className="text-slate-600">Prospect</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 sm:w-4 sm:h-4 bg-yellow-500 rounded"></div>
+                    <span className="text-slate-600">Bid</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-dashed border-slate-500 rounded"></div>
                     <span className="text-slate-600">Budget</span>
                   </div>
                 </div>
