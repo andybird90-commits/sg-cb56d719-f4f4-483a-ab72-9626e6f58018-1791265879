@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, Plus, Edit, Trash2, Calendar as CalendarIcon } from "lucide-react";
 import Link from "next/link";
+import { useToast } from "@/hooks/use-toast";
 
 interface Project {
   id: string;
@@ -92,6 +93,7 @@ function ProjectDetailContent() {
   const { profile } = useAuth();
   const router = useRouter();
   const { id } = router.query;
+  const { toast } = useToast();
   
   const [project, setProject] = useState<Project | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -99,6 +101,11 @@ function ProjectDetailContent() {
   const [costs, setCosts] = useState<SubcontractorCost[]>([]);
   const [phasingData, setPhasingData] = useState<PhasingRow[]>([]);
   const [monthsGrid, setMonthsGrid] = useState<MonthPhasing[]>([]);
+  
+  // Local state for phasing edits (not saved until user clicks Save)
+  const [localMonthsGrid, setLocalMonthsGrid] = useState<MonthPhasing[]>([]);
+  const [phasingHasChanges, setPhasingHasChanges] = useState(false);
+  const [savingPhasing, setSavingPhasing] = useState(false);
   
   const [projectLoading, setProjectLoading] = useState(true);
   const [projectError, setProjectError] = useState<string | null>(null);
@@ -263,6 +270,8 @@ function ProjectDetailContent() {
     }
     
     setMonthsGrid(months);
+    setLocalMonthsGrid(months); // Initialize local state with saved data
+    setPhasingHasChanges(false); // Reset changes flag
   };
 
   const handlePhasingUpdate = async (
@@ -271,89 +280,116 @@ function ProjectDetailContent() {
     field: "revenue" | "actual" | "invoiceStatus" | "invoiceRef" | "invoiceDate",
     value: number | string
   ) => {
+    // Update local state only (no save yet)
+    setLocalMonthsGrid(prev => {
+      const updated = prev.map(m => {
+        if (m.year === year && m.month === month) {
+          const updatedMonth = { ...m };
+          if (field === "revenue") {
+            updatedMonth.revenue = typeof value === "number" ? value : 0;
+          } else if (field === "actual") {
+            updatedMonth.actualRevenue = typeof value === "number" ? value : 0;
+          } else if (field === "invoiceStatus") {
+            updatedMonth.invoiceStatus = value as string;
+          } else if (field === "invoiceRef") {
+            updatedMonth.invoiceRef = value as string;
+          } else if (field === "invoiceDate") {
+            updatedMonth.invoiceDate = value as string;
+          }
+          return updatedMonth;
+        }
+        return m;
+      });
+      setPhasingHasChanges(true); // Mark as having unsaved changes
+      return updated;
+    });
+  };
+
+  const handleSavePhasing = async () => {
     if (!id || typeof id !== "string") return;
     
-    // Get current row data
-    const currentRow = monthsGrid.find(m => m.year === year && m.month === month);
-    if (!currentRow) return;
+    setSavingPhasing(true);
     
-    // Build update object
-    const updateData: any = {
-      project_id: id,
-      year,
-      month,
-    };
-    
-    // Update the specific field
-    if (field === "revenue") {
-      updateData.revenue_amount = value;
-      updateData.actual_revenue = currentRow.actualRevenue || null;
-      updateData.invoice_status = currentRow.invoiceStatus || "none";
-      updateData.invoice_ref = currentRow.invoiceRef || null;
-      updateData.invoice_date = currentRow.invoiceDate || null;
-    } else if (field === "actual") {
-      updateData.revenue_amount = currentRow.revenue || 0;
-      updateData.actual_revenue = value;
-      updateData.invoice_status = currentRow.invoiceStatus || "none";
-      updateData.invoice_ref = currentRow.invoiceRef || null;
-      updateData.invoice_date = currentRow.invoiceDate || null;
-    } else if (field === "invoiceStatus") {
-      updateData.revenue_amount = currentRow.revenue || 0;
-      updateData.actual_revenue = currentRow.actualRevenue || null;
-      updateData.invoice_status = value;
-      updateData.invoice_ref = currentRow.invoiceRef || null;
-      updateData.invoice_date = currentRow.invoiceDate || null;
-    } else if (field === "invoiceRef") {
-      updateData.revenue_amount = currentRow.revenue || 0;
-      updateData.actual_revenue = currentRow.actualRevenue || null;
-      updateData.invoice_status = currentRow.invoiceStatus || "none";
-      updateData.invoice_ref = value || null;
-      updateData.invoice_date = currentRow.invoiceDate || null;
-    } else if (field === "invoiceDate") {
-      updateData.revenue_amount = currentRow.revenue || 0;
-      updateData.actual_revenue = currentRow.actualRevenue || null;
-      updateData.invoice_status = currentRow.invoiceStatus || "none";
-      updateData.invoice_ref = currentRow.invoiceRef || null;
-      updateData.invoice_date = value || null;
-    }
-    
-    // Check if we should delete the row (all values empty/default)
-    const shouldDelete = 
-      (!updateData.revenue_amount || updateData.revenue_amount === 0) &&
-      (!updateData.actual_revenue || updateData.actual_revenue === 0) &&
-      updateData.invoice_status === "none" &&
-      !updateData.invoice_ref &&
-      !updateData.invoice_date;
-    
-    if (shouldDelete) {
-      // Delete the row
-      const { error } = await supabase
-        .from("project_monthly_phasing")
-        .delete()
-        .eq("project_id", id)
-        .eq("year", year)
-        .eq("month", month);
+    try {
+      // Prepare all upserts and deletes
+      const upserts = [];
+      const deletes = [];
       
-      if (error) {
-        alert("Error deleting phasing: " + error.message);
-        return;
+      for (const month of localMonthsGrid) {
+        const shouldDelete = 
+          (!month.revenue || month.revenue === 0) &&
+          (!month.actualRevenue || month.actualRevenue === 0) &&
+          month.invoiceStatus === "none" &&
+          !month.invoiceRef &&
+          !month.invoiceDate;
+        
+        if (shouldDelete && month.hasData) {
+          // Delete existing row
+          deletes.push({ year: month.year, month: month.month });
+        } else if (!shouldDelete) {
+          // Upsert row
+          upserts.push({
+            project_id: id,
+            year: month.year,
+            month: month.month,
+            revenue_amount: month.revenue || 0,
+            actual_revenue: month.actualRevenue || null,
+            invoice_status: month.invoiceStatus || "none",
+            invoice_ref: month.invoiceRef || null,
+            invoice_date: month.invoiceDate || null,
+          });
+        }
       }
-    } else {
-      // Upsert the row
-      const { error } = await supabase
-        .from("project_monthly_phasing")
-        .upsert(updateData, {
-          onConflict: "project_id,year,month",
-        });
       
-      if (error) {
-        alert("Error updating phasing: " + error.message);
-        return;
+      // Execute deletes
+      if (deletes.length > 0) {
+        for (const del of deletes) {
+          const { error } = await supabase
+            .from("project_monthly_phasing")
+            .delete()
+            .eq("project_id", id)
+            .eq("year", del.year)
+            .eq("month", del.month);
+          
+          if (error) throw error;
+        }
       }
+      
+      // Execute upserts
+      if (upserts.length > 0) {
+        const { error } = await supabase
+          .from("project_monthly_phasing")
+          .upsert(upserts, {
+            onConflict: "project_id,year,month",
+          });
+        
+        if (error) throw error;
+      }
+      
+      // Refresh data but stay on the same page
+      await fetchProjectData(id);
+      
+      toast({
+        title: "Phasing saved",
+        description: "Revenue phasing has been updated successfully.",
+      });
+      
+      setPhasingHasChanges(false);
+    } catch (error) {
+      console.error("Error saving phasing:", error);
+      toast({
+        title: "Error saving phasing",
+        description: "Failed to save phasing data. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingPhasing(false);
     }
-    
-    // Refresh data
-    await fetchProjectData(id);
+  };
+
+  const handleDiscardPhasingChanges = () => {
+    setLocalMonthsGrid([...monthsGrid]); // Reset to saved state
+    setPhasingHasChanges(false);
   };
 
   const handleAutoFill = async () => {
@@ -1382,6 +1418,24 @@ function ProjectDetailContent() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
+                      {/* Save/Discard buttons - show when there are unsaved changes */}
+                      {canEdit && phasingHasChanges && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                            <span className="text-sm font-medium text-blue-900">You have unsaved changes</span>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={handleDiscardPhasingChanges}>
+                              Discard
+                            </Button>
+                            <Button size="sm" onClick={handleSavePhasing} disabled={savingPhasing}>
+                              {savingPhasing ? "Saving..." : "Save Phasing"}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                      
                       <div className="text-sm text-slate-600">
                         {phasingData.length === 0 ? (
                           <div className="bg-blue-50 border border-blue-200 rounded p-4 mb-4">
@@ -1415,7 +1469,7 @@ function ProjectDetailContent() {
                             </tr>
                           </thead>
                           <tbody>
-                            {monthsGrid.map((m, idx) => (
+                            {localMonthsGrid.map((m, idx) => (
                               <tr key={idx} className="border-b hover:bg-slate-50">
                                 <td className="p-2 text-slate-900">
                                   {getMonthName(m.month)} {m.year}
@@ -1515,19 +1569,19 @@ function ProjectDetailContent() {
                         </table>
                       </div>
 
-                      {/* Summary */}
+                      {/* Summary - use localMonthsGrid for real-time calculation */}
                       <div className="border-t pt-4 mt-4">
                         <div className="grid grid-cols-4 gap-4 text-sm">
                           <div>
                             <div className="text-slate-500 mb-1">Total forecast revenue</div>
                             <div className="text-lg font-semibold text-slate-900">
-                              {formatCurrency(getTotalPhasedRevenue())}
+                              {formatCurrency(localMonthsGrid.reduce((sum, m) => sum + (m.revenue || 0), 0))}
                             </div>
                           </div>
                           <div>
                             <div className="text-slate-500 mb-1">Total actual revenue</div>
                             <div className="text-lg font-semibold text-green-600">
-                              {formatCurrency(getTotalActualRevenue())}
+                              {formatCurrency(localMonthsGrid.reduce((sum, m) => sum + (m.actualRevenue || 0), 0))}
                             </div>
                           </div>
                           <div>
@@ -1539,15 +1593,15 @@ function ProjectDetailContent() {
                           <div>
                             <div className="text-slate-500 mb-1">Forecast difference</div>
                             <div className={`text-lg font-semibold ${
-                              Math.abs(getTotalPhasedRevenue() - getTotalProjectFee()) > 0.01
+                              Math.abs(localMonthsGrid.reduce((sum, m) => sum + (m.revenue || 0), 0) - getTotalProjectFee()) > 0.01
                                 ? "text-orange-600"
                                 : "text-green-600"
                             }`}>
-                              {formatCurrency(getTotalPhasedRevenue() - getTotalProjectFee())}
+                              {formatCurrency(localMonthsGrid.reduce((sum, m) => sum + (m.revenue || 0), 0) - getTotalProjectFee())}
                             </div>
                           </div>
                         </div>
-                        {Math.abs(getTotalPhasedRevenue() - getTotalProjectFee()) > 0.01 && (
+                        {Math.abs(localMonthsGrid.reduce((sum, m) => sum + (m.revenue || 0), 0) - getTotalProjectFee()) > 0.01 && (
                           <div className="mt-3 text-xs text-orange-600">
                             ⚠️ Forecast phased revenue does not match project fee. Adjust phasing or use "Auto-fill evenly".
                           </div>
