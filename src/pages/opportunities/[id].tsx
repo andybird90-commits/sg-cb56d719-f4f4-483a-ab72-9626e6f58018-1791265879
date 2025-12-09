@@ -119,7 +119,7 @@ function OpportunityDetailContent() {
             full_name,
             email
           ),
-          projects (
+          projects!opportunities_linked_project_id_fkey (
             id,
             code,
             name
