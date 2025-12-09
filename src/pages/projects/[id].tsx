@@ -134,7 +134,9 @@ function ProjectDetailContent() {
     variation_id: "",
   });
 
-  const canEdit = profile?.role === "admin" || profile?.role === "director";
+  // Everyone can edit, only directors/admins can delete
+  const canEdit = !!profile;
+  const canDelete = profile?.role === "admin" || profile?.role === "director";
 
   useEffect(() => {
     if (id && typeof id === "string") {
@@ -999,13 +1001,15 @@ function ProjectDetailContent() {
                                   >
                                     <Edit className="w-4 h-4" />
                                   </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleDeleteActivity(activity.id)}
-                                  >
-                                    <Trash2 className="w-4 h-4 text-red-600" />
-                                  </Button>
+                                  {canDelete && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDeleteActivity(activity.id)}
+                                    >
+                                      <Trash2 className="w-4 h-4 text-red-600" />
+                                    </Button>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -1140,13 +1144,15 @@ function ProjectDetailContent() {
                                   >
                                     <Edit className="w-4 h-4" />
                                   </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleDeleteVariation(variation.id)}
-                                  >
-                                    <Trash2 className="w-4 h-4 text-red-600" />
-                                  </Button>
+                                  {canDelete && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDeleteVariation(variation.id)}
+                                    >
+                                      <Trash2 className="w-4 h-4 text-red-600" />
+                                    </Button>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -1302,13 +1308,15 @@ function ProjectDetailContent() {
                                   >
                                     <Edit className="w-4 h-4" />
                                   </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleDeleteCost(cost.id)}
-                                  >
-                                    <Trash2 className="w-4 h-4 text-red-600" />
-                                  </Button>
+                                  {canDelete && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDeleteCost(cost.id)}
+                                    >
+                                      <Trash2 className="w-4 h-4 text-red-600" />
+                                    </Button>
+                                  )}
                                 </div>
                               )}
                             </div>

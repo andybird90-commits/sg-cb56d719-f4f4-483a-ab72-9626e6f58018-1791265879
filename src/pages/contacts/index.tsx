@@ -12,7 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Mail, Phone, Building2, User, Briefcase, AlertTriangle, FileText } from "lucide-react";
+import { Plus, Search, Mail, Phone, Building2, User, Briefcase, AlertTriangle, FileText, Edit, Trash2 } from "lucide-react";
 
 interface Contact {
   id: string;
@@ -42,6 +42,7 @@ function ContactsContent() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [formOpen, setFormOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -51,7 +52,8 @@ function ContactsContent() {
     company_id: "",
   });
 
-  const canEdit = profile?.role === "admin" || profile?.role === "director";
+  const canEdit = !!profile; // Everyone can edit
+  const canDelete = profile?.role === "admin" || profile?.role === "director"; // Only admins/directors can delete
 
   useEffect(() => {
     fetchData();
@@ -119,24 +121,79 @@ function ContactsContent() {
     e.preventDefault();
 
     try {
-      const { error: submitError } = await supabase.from("contacts").insert({
-        name: formData.name,
-        email: formData.email || null,
-        phone: formData.phone || null,
-        job_title: formData.job_title || null,
-        notes: formData.notes || null,
-        company_id: formData.company_id,
-      });
+      if (editingId) {
+        // Update existing contact
+        const { error: updateError } = await supabase
+          .from("contacts")
+          .update({
+            name: formData.name,
+            email: formData.email || null,
+            phone: formData.phone || null,
+            job_title: formData.job_title || null,
+            notes: formData.notes || null,
+            company_id: formData.company_id,
+          })
+          .eq("id", editingId);
 
-      if (submitError) throw submitError;
+        if (updateError) throw updateError;
+      } else {
+        // Create new contact
+        const { error: insertError } = await supabase.from("contacts").insert({
+          name: formData.name,
+          email: formData.email || null,
+          phone: formData.phone || null,
+          job_title: formData.job_title || null,
+          notes: formData.notes || null,
+          company_id: formData.company_id,
+        });
+
+        if (insertError) throw insertError;
+      }
 
       setFormOpen(false);
+      setEditingId(null);
       setFormData({ name: "", email: "", phone: "", job_title: "", notes: "", company_id: "" });
       fetchData();
     } catch (err) {
-      console.error("Failed to create contact", err);
-      alert("Failed to create contact");
+      console.error("Failed to save contact", err);
+      alert("Failed to save contact");
     }
+  };
+
+  const handleEdit = (contact: Contact) => {
+    setEditingId(contact.id);
+    setFormData({
+      name: contact.name,
+      email: contact.email || "",
+      phone: contact.phone || "",
+      job_title: contact.job_title || "",
+      notes: contact.notes || "",
+      company_id: contact.company_id,
+    });
+    setFormOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this contact?")) return;
+
+    try {
+      const { error: deleteError } = await supabase
+        .from("contacts")
+        .delete()
+        .eq("id", id);
+
+      if (deleteError) throw deleteError;
+      fetchData();
+    } catch (err) {
+      console.error("Failed to delete contact", err);
+      alert("Failed to delete contact");
+    }
+  };
+
+  const openNewContactForm = () => {
+    setEditingId(null);
+    setFormData({ name: "", email: "", phone: "", job_title: "", notes: "", company_id: "" });
+    setFormOpen(true);
   };
 
   return (
@@ -151,14 +208,14 @@ function ContactsContent() {
           {canEdit && (
             <Dialog open={formOpen} onOpenChange={setFormOpen}>
               <DialogTrigger asChild>
-                <Button className="w-full sm:w-auto gap-2">
+                <Button className="w-full sm:w-auto gap-2" onClick={openNewContactForm}>
                   <Plus className="w-4 h-4" />
                   <span>New Contact</span>
                 </Button>
               </DialogTrigger>
               <DialogContent className="w-[95vw] max-w-md max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>Add New Contact</DialogTitle>
+                  <DialogTitle>{editingId ? "Edit Contact" : "Add New Contact"}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-2">
@@ -235,7 +292,9 @@ function ContactsContent() {
                   </div>
 
                   <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                    <Button type="submit" className="w-full sm:w-auto">Add Contact</Button>
+                    <Button type="submit" className="w-full sm:w-auto">
+                      {editingId ? "Save Changes" : "Add Contact"}
+                    </Button>
                     <Button type="button" variant="outline" onClick={() => setFormOpen(false)} className="w-full sm:w-auto">
                       Cancel
                     </Button>
@@ -288,11 +347,11 @@ function ContactsContent() {
                 <CardContent className="p-4 sm:p-6">
                   {/* Mobile & Desktop Layout */}
                   <div className="space-y-3">
-                    {/* Header: Name and Job Title */}
-                    <div>
-                      <div className="flex items-start gap-2">
+                    {/* Header: Name and Actions */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-2 min-w-0">
                         <User className="w-5 h-5 text-slate-400 mt-0.5 flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
+                        <div className="min-w-0">
                           <h3 className="text-base sm:text-lg font-semibold text-slate-900 truncate">
                             {contact.name}
                           </h3>
@@ -303,6 +362,31 @@ function ContactsContent() {
                             </div>
                           )}
                         </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {canEdit && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-slate-500 hover:text-blue-600"
+                            onClick={() => handleEdit(contact)}
+                            title="Edit contact"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {canDelete && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-slate-500 hover:text-red-600"
+                            onClick={() => handleDelete(contact.id)}
+                            title="Delete contact"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
                     </div>
 

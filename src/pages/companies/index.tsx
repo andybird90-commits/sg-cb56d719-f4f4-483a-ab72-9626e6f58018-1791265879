@@ -30,7 +30,8 @@ function CompaniesContent() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const canEdit = profile?.role === "admin" || profile?.role === "director";
+  const canEdit = !!profile; // Everyone can edit
+  const canDelete = profile?.role === "admin" || profile?.role === "director"; // Only admins/directors can delete
 
   useEffect(() => {
     fetchCompanies();

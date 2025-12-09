@@ -71,7 +71,8 @@ function MyTimesheetsContent() {
     notes: "",
   });
 
-  const canEdit = profile?.role === "admin" || profile?.role === "director";
+  // Everyone can create and edit timesheets, only directors/admins can delete
+  const canDelete = profile?.role === "admin" || profile?.role === "director";
 
   function getWeekStart(date: Date) {
     const d = new Date(date);
@@ -519,9 +520,11 @@ function MyTimesheetsContent() {
                                 <Button variant="ghost" size="sm" onClick={() => handleEdit(ts)}>
                                   <Edit className="w-4 h-4" />
                                 </Button>
-                                <Button variant="ghost" size="sm" onClick={() => handleDelete(ts.id)}>
-                                  <Trash2 className="w-4 h-4 text-red-600" />
-                                </Button>
+                                {canDelete && (
+                                  <Button variant="ghost" size="sm" onClick={() => handleDelete(ts.id)}>
+                                    <Trash2 className="w-4 h-4 text-red-600" />
+                                  </Button>
+                                )}
                               </div>
                             </div>
                           ))}

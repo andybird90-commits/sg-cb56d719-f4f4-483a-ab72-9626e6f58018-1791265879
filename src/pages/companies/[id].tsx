@@ -8,8 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Mail, Phone, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Mail, Phone, AlertTriangle, Edit, Trash2 } from "lucide-react";
 import Link from "next/link";
+import type React from "react";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 interface Company {
   id: string;
@@ -42,6 +47,20 @@ function CompanyDetailContent() {
   const { id } = router.query;
   
   const [company, setCompany] = useState<Company | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState<{
+    name: string;
+    short_name: string;
+    sector: string;
+    status: "active" | "prospect" | "inactive" | "";
+    notes: string;
+  }>({
+    name: "",
+    short_name: "",
+    sector: "",
+    status: "",
+    notes: "",
+  });
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   
@@ -53,6 +72,9 @@ function CompanyDetailContent() {
   
   const [opportunitiesLoading, setOpportunitiesLoading] = useState(true);
   const [opportunitiesError, setOpportunitiesError] = useState<string | null>(null);
+
+  const canEdit = !!profile; // Everyone can edit
+  const canDelete = profile?.role === "admin" || profile?.role === "director"; // Only admins/directors can delete
 
   useEffect(() => {
     if (id && typeof id === "string") {
@@ -77,11 +99,62 @@ function CompanyDetailContent() {
       if (!data) throw new Error("Company not found");
       
       setCompany(data);
+      setEditData({
+        name: data.name,
+        short_name: data.short_name || "",
+        sector: data.sector || "",
+        status: data.status as "active" | "prospect" | "inactive",
+        notes: data.notes || "",
+      });
     } catch (err) {
       console.error("Failed to load company data", err);
       setCompanyError("Failed to load company details");
     } finally {
       setCompanyLoading(false);
+    }
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id || typeof id !== "string") return;
+
+    try {
+      const { error } = await supabase
+        .from("companies")
+        .update({
+          name: editData.name,
+          short_name: editData.short_name || null,
+          sector: editData.sector || null,
+          status: editData.status,
+          notes: editData.notes || null,
+        })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      await fetchCompanyData(id);
+      setIsEditing(false);
+    } catch (err) {
+      console.error("Failed to update company", err);
+      alert("Failed to update company");
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!id || typeof id !== "string") return;
+    if (!confirm("Are you sure you want to delete this company? This will also delete all associated opportunities and contacts.")) return;
+
+    try {
+      const { error } = await supabase
+        .from("companies")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+      router.push("/companies");
+    } catch (err) {
+      console.error("Failed to delete company", err);
+      alert("Failed to delete company");
     }
   };
 
@@ -183,30 +256,112 @@ function CompanyDetailContent() {
                     {company.status}
                   </Badge>
                 </div>
+                <div className="flex items-center gap-2">
+                  {canEdit && !isEditing && (
+                    <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="gap-2">
+                      <Edit className="w-4 h-4" />
+                      Edit
+                    </Button>
+                  )}
+                  {canDelete && !isEditing && (
+                    <Button variant="outline" size="sm" onClick={handleDelete} className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50">
+                      <Trash2 className="w-4 h-4" />
+                      Delete
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {company.short_name && (
-                      <div>
-                        <div className="text-sm font-medium text-slate-500">Short Name</div>
-                        <div className="text-slate-900">{company.short_name}</div>
+                {isEditing ? (
+                  <form onSubmit={handleUpdate} className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="name">Company Name *</Label>
+                        <Input
+                          id="name"
+                          value={editData.name}
+                          onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                          required
+                        />
                       </div>
-                    )}
-                    {company.sector && (
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="status">Status</Label>
+                        <Select
+                          value={editData.status}
+                          onValueChange={(value: "active" | "prospect" | "inactive") => setEditData({ ...editData, status: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="active">Active</SelectItem>
+                            <SelectItem value="prospect">Prospect</SelectItem>
+                            <SelectItem value="inactive">Inactive</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="short_name">Short Name</Label>
+                        <Input
+                          id="short_name"
+                          value={editData.short_name}
+                          onChange={(e) => setEditData({ ...editData, short_name: e.target.value })}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="sector">Sector</Label>
+                        <Input
+                          id="sector"
+                          value={editData.sector}
+                          onChange={(e) => setEditData({ ...editData, sector: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="notes">Notes</Label>
+                      <Textarea
+                        id="notes"
+                        value={editData.notes}
+                        onChange={(e) => setEditData({ ...editData, notes: e.target.value })}
+                        rows={4}
+                      />
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <Button type="submit">Save Changes</Button>
+                      <Button type="button" variant="outline" onClick={() => setIsEditing(false)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {company.short_name && (
+                        <div>
+                          <div className="text-sm font-medium text-slate-500">Short Name</div>
+                          <div className="text-slate-900">{company.short_name}</div>
+                        </div>
+                      )}
+                      {company.sector && (
+                        <div>
+                          <div className="text-sm font-medium text-slate-500">Sector</div>
+                          <div className="text-slate-900">{company.sector}</div>
+                        </div>
+                      )}
+                    </div>
+                    {company.notes && (
                       <div>
-                        <div className="text-sm font-medium text-slate-500">Sector</div>
-                        <div className="text-slate-900">{company.sector}</div>
+                        <div className="text-sm font-medium text-slate-500 mb-1">Notes</div>
+                        <div className="text-slate-900 whitespace-pre-wrap">{company.notes}</div>
                       </div>
                     )}
                   </div>
-                  {company.notes && (
-                    <div>
-                      <div className="text-sm font-medium text-slate-500 mb-1">Notes</div>
-                      <div className="text-slate-900 whitespace-pre-wrap">{company.notes}</div>
-                    </div>
-                  )}
-                </div>
+                )}
               </CardContent>
             </>
           )}

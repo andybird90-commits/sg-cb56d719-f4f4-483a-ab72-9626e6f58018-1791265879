@@ -76,7 +76,8 @@ function FinancialsContent() {
     invoice_date: new Date().toISOString().split("T")[0],
   });
 
-  const canEdit = profile?.role === "admin" || profile?.role === "director";
+  // Everyone can mark invoices, only directors/admins can modify financial data
+  const canModifyFinancials = profile?.role === "admin" || profile?.role === "director";
 
   useEffect(() => {
     fetchFinancials();

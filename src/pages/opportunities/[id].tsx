@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowLeft, Edit, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Edit, AlertTriangle, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 interface Opportunity {
@@ -56,7 +56,9 @@ function OpportunityDetailContent() {
     probability_percent: "",
   });
 
-  const canEdit = profile?.role === "admin" || profile?.role === "director";
+  // Everyone can edit, only directors/admins can delete
+  const canEdit = !!profile;
+  const canDelete = profile?.role === "admin" || profile?.role === "director";
 
   useEffect(() => {
     if (id && typeof id === "string") {
@@ -137,6 +139,24 @@ function OpportunityDetailContent() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!id || typeof id !== "string") return;
+    if (!confirm("Are you sure you want to delete this opportunity?")) return;
+
+    try {
+      const { error } = await supabase
+        .from("opportunities")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+      router.push("/opportunities");
+    } catch (err) {
+      console.error("Failed to delete opportunity", err);
+      alert("Failed to delete opportunity");
+    }
+  };
+
   const formatCurrency = (value: number | null) => {
     if (!value) return "—";
     return new Intl.NumberFormat("en-GB", {
@@ -208,12 +228,20 @@ function OpportunityDetailContent() {
                 </Badge>
                 <Badge variant="outline">{opportunity.status}</Badge>
               </div>
-              {canEdit && !isEditing && (
-                <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="gap-2 w-full sm:w-auto">
-                  <Edit className="w-4 h-4" />
-                  Edit
-                </Button>
-              )}
+              <div className="flex items-center gap-2">
+                {canEdit && !isEditing && (
+                  <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="gap-2 w-full sm:w-auto">
+                    <Edit className="w-4 h-4" />
+                    Edit
+                  </Button>
+                )}
+                {canDelete && !isEditing && (
+                  <Button variant="outline" size="sm" onClick={handleDelete} className="gap-2 w-full sm:w-auto text-red-600 hover:text-red-700 hover:bg-red-50">
+                    <Trash2 className="w-4 h-4" />
+                    Delete
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {isEditing ? (

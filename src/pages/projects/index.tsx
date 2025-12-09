@@ -28,7 +28,9 @@ function ProjectsContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const canEdit = profile?.role === "admin" || profile?.role === "director";
+  // Everyone can create/edit, only directors/admins can delete
+  const canEdit = !!profile;
+  const canDelete = profile?.role === "admin" || profile?.role === "director";
 
   useEffect(() => {
     fetchProjects();

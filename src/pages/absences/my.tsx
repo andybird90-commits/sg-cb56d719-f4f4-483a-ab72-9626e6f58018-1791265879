@@ -48,7 +48,7 @@ function MyAbsencesContent() {
     notes: "",
   });
 
-  const isAdmin = profile?.role === "admin" || profile?.role === "director";
+  const canDelete = profile?.role === "admin" || profile?.role === "director";
 
   useEffect(() => {
     if (user && profile) {
@@ -193,8 +193,8 @@ function MyAbsencesContent() {
   };
 
   const handleDelete = async (id: string, approved_by: string | null) => {
-    if (approved_by) {
-      alert("Cannot delete approved absences");
+    if (!canDelete) {
+      alert("Only directors and admins can delete absences");
       return;
     }
 
@@ -255,7 +255,7 @@ function MyAbsencesContent() {
             <p className="text-sm sm:text-base text-slate-600 mt-1">Request and manage time off</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-3">
-            {isAdmin && (
+            {(profile?.role === "admin" || profile?.role === "director") && (
               <Link href="/absences/heatmap">
                 <Button variant="outline" className="w-full sm:w-auto gap-2">
                   <Calendar className="w-4 h-4" />
@@ -438,9 +438,11 @@ function MyAbsencesContent() {
                           <Button variant="ghost" size="sm" onClick={() => handleEdit(absence)} className="flex-1 sm:flex-none">
                             <Edit className="w-4 h-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDelete(absence.id, absence.approved_by)} className="flex-1 sm:flex-none">
-                            <Trash2 className="w-4 h-4 text-red-600" />
-                          </Button>
+                          {canDelete && (
+                            <Button variant="ghost" size="sm" onClick={() => handleDelete(absence.id, absence.approved_by)} className="flex-1 sm:flex-none">
+                              <Trash2 className="w-4 h-4 text-red-600" />
+                            </Button>
+                          )}
                         </div>
                       )}
                     </div>
