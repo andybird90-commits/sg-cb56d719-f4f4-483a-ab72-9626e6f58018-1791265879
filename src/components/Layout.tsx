@@ -4,7 +4,7 @@ import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Building2, Users, Target, Briefcase, LogOut, LayoutDashboard, Clock, Calendar, PoundSterling, Settings, Menu, X, User } from "lucide-react";
+import { Building2, Users, Target, Briefcase, LogOut, LayoutDashboard, Clock, Calendar, PoundSterling, Settings, Menu, User } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import Image from "next/image";
 import { useState } from "react";
@@ -14,6 +14,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  // Only show loading screen while checking auth session
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -22,6 +23,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     );
   }
 
+  // If no user, render content without nav (for auth pages)
   if (!user) {
     return <div className="min-h-screen bg-slate-50">{children}</div>;
   }
@@ -94,7 +96,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 
                 <ScrollArea className="h-[calc(100vh-80px)]">
                   <div className="p-4">
-                    {/* User Profile Section */}
                     <div className="mb-4 pb-4 border-b">
                       <div className="flex items-center gap-3 mb-2">
                         <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center">
@@ -113,7 +114,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       </div>
                     </div>
 
-                    {/* Navigation Links */}
                     <div className="flex flex-col gap-1 mb-4">
                       {navItems.map((item) => (
                         <NavLink
@@ -126,7 +126,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       ))}
                     </div>
 
-                    {/* Sign Out Button */}
                     <Button 
                       variant="destructive" 
                       size="sm" 
@@ -185,15 +184,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     <div className="text-slate-500 capitalize text-xs">{profile.role}</div>
                   </div>
                 </div>
-              ) : profileError ? (
-                <div className="text-sm">
-                  <div className="font-medium text-slate-900">{user.email}</div>
-                  <div className="text-xs text-red-600">Profile error</div>
-                </div>
               ) : (
                 <div className="text-sm">
                   <div className="font-medium text-slate-900">{user.email}</div>
-                  <div className="text-slate-500 text-xs">Profile loading...</div>
                 </div>
               )}
               <Button variant="outline" size="sm" onClick={signOut} className="gap-2">
@@ -210,16 +203,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <Alert variant="destructive" className="mb-4 sm:mb-6">
             <AlertDescription>
               <strong>Profile Error:</strong> {profileError}
-              <br />
-              <span className="text-sm mt-2 block">
-                Please check that:
-                <br />
-                1. Supabase is connected (check .env.local or Softgen settings)
-                <br />
-                2. Database tables exist (run DATABASE_SETUP.md SQL migrations)
-                <br />
-                3. Your profile row exists in the profiles table
-              </span>
             </AlertDescription>
           </Alert>
         )}

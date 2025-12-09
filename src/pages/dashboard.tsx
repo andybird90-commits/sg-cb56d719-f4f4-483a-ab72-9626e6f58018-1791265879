@@ -6,7 +6,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Building2, Users, Target, Briefcase, TrendingUp, Calendar, Clock, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Building2, Users, Target, Briefcase, TrendingUp, Calendar, AlertCircle, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 
 interface DashboardStats {
@@ -57,6 +58,9 @@ interface PhasingRow {
 function DashboardContent() {
   const { profile } = useAuth();
   const router = useRouter();
+  
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [statsError, setStatsError] = useState<string | null>(null);
   const [stats, setStats] = useState<DashboardStats>({
     companiesCount: 0,
     contactsCount: 0,
@@ -64,165 +68,235 @@ function DashboardContent() {
     projectsCount: 0,
     liveProjectsCount: 0,
   });
+
+  const [tendersLoading, setTendersLoading] = useState(true);
+  const [tendersError, setTendersError] = useState<string | null>(null);
   const [upcomingTenders, setUpcomingTenders] = useState<Opportunity[]>([]);
+
+  const [projectsLoading, setProjectsLoading] = useState(true);
+  const [projectsError, setProjectsError] = useState<string | null>(null);
   const [liveProjects, setLiveProjects] = useState<Project[]>([]);
+
+  const [absencesLoading, setAbsencesLoading] = useState(true);
+  const [absencesError, setAbsencesError] = useState<string | null>(null);
   const [thisWeekAbsences, setThisWeekAbsences] = useState<Absence[]>([]);
+
+  const [pipelineLoading, setPipelineLoading] = useState(true);
+  const [pipelineError, setPipelineError] = useState<string | null>(null);
   const [pipelineData, setPipelineData] = useState<PipelineData[]>([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchDashboardData();
+    fetchStats();
+    fetchTenders();
+    fetchLiveProjects();
+    fetchAbsences();
+    fetchPipelineData();
   }, []);
 
-  const fetchDashboardData = async () => {
-    setLoading(true);
+  const fetchStats = async () => {
+    try {
+      setStatsLoading(true);
+      setStatsError(null);
 
-    const { data: companies } = await supabase.from("companies").select("id");
-    const { data: contacts } = await supabase.from("contacts").select("id");
-    const { data: opportunities } = await supabase.from("opportunities").select("id");
-    const { data: projects } = await supabase.from("projects").select("id, status");
-    
-    const liveCount = projects?.filter(p => p.status === "live").length || 0;
+      const { data: companies } = await supabase.from("companies").select("id");
+      const { data: contacts } = await supabase.from("contacts").select("id");
+      const { data: opportunities } = await supabase.from("opportunities").select("id");
+      const { data: projects } = await supabase.from("projects").select("id, status");
+      
+      const liveCount = projects?.filter(p => p.status === "live").length || 0;
 
-    setStats({
-      companiesCount: companies?.length || 0,
-      contactsCount: contacts?.length || 0,
-      opportunitiesCount: opportunities?.length || 0,
-      projectsCount: projects?.length || 0,
-      liveProjectsCount: liveCount,
-    });
+      setStats({
+        companiesCount: companies?.length || 0,
+        contactsCount: contacts?.length || 0,
+        opportunitiesCount: opportunities?.length || 0,
+        projectsCount: projects?.length || 0,
+        liveProjectsCount: liveCount,
+      });
+    } catch (error) {
+      console.error("Failed to load dashboard stats", error);
+      setStatsError("Failed to load statistics");
+    } finally {
+      setStatsLoading(false);
+    }
+  };
 
-    const thirtyDaysFromNow = new Date();
-    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+  const fetchTenders = async () => {
+    try {
+      setTendersLoading(true);
+      setTendersError(null);
 
-    const { data: tenders } = await supabase
-      .from("opportunities")
-      .select(`
-        id,
-        name,
-        stage,
-        tender_due_date,
-        companies (
-          name
-        )
-      `)
-      .not("tender_due_date", "is", null)
-      .lte("tender_due_date", thirtyDaysFromNow.toISOString().split("T")[0])
-      .order("tender_due_date")
-      .limit(5);
+      const thirtyDaysFromNow = new Date();
+      thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
 
-    const { data: liveProjs } = await supabase
-      .from("projects")
-      .select(`
-        id,
-        code,
-        name,
-        status,
-        companies!projects_client_company_id_fkey (
-          name
-        )
-      `)
-      .eq("status", "live")
-      .order("name")
-      .limit(5);
+      const { data, error } = await supabase
+        .from("opportunities")
+        .select(`
+          id,
+          name,
+          stage,
+          tender_due_date,
+          companies (
+            name
+          )
+        `)
+        .not("tender_due_date", "is", null)
+        .lte("tender_due_date", thirtyDaysFromNow.toISOString().split("T")[0])
+        .order("tender_due_date")
+        .limit(5);
 
-    const startOfWeek = new Date();
-    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay() + 1);
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(endOfWeek.getDate() + 6);
+      if (error) throw error;
+      setUpcomingTenders(data || []);
+    } catch (error) {
+      console.error("Failed to load upcoming tenders", error);
+      setTendersError("Failed to load tenders");
+    } finally {
+      setTendersLoading(false);
+    }
+  };
 
-    const { data: absences } = await supabase
-      .from("absences")
-      .select(`
-        id,
-        type,
-        start_date,
-        end_date,
-        profiles!absences_user_id_fkey (
-          full_name
-        )
-      `)
-      .not("approved_by", "is", null)
-      .lte("start_date", endOfWeek.toISOString().split("T")[0])
-      .gte("end_date", startOfWeek.toISOString().split("T")[0])
-      .order("start_date")
-      .limit(10);
+  const fetchLiveProjects = async () => {
+    try {
+      setProjectsLoading(true);
+      setProjectsError(null);
 
-    setUpcomingTenders(tenders || []);
-    setLiveProjects(liveProjs || []);
-    setThisWeekAbsences(absences || []);
+      const { data, error } = await supabase
+        .from("projects")
+        .select(`
+          id,
+          code,
+          name,
+          status,
+          companies!projects_client_company_id_fkey (
+            name
+          )
+        `)
+        .eq("status", "live")
+        .order("name")
+        .limit(5);
 
-    await fetchPipelineData();
-    
-    setLoading(false);
+      if (error) throw error;
+      setLiveProjects(data || []);
+    } catch (error) {
+      console.error("Failed to load live projects", error);
+      setProjectsError("Failed to load projects");
+    } finally {
+      setProjectsLoading(false);
+    }
+  };
+
+  const fetchAbsences = async () => {
+    try {
+      setAbsencesLoading(true);
+      setAbsencesError(null);
+
+      const startOfWeek = new Date();
+      startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay() + 1);
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(endOfWeek.getDate() + 6);
+
+      const { data, error } = await supabase
+        .from("absences")
+        .select(`
+          id,
+          type,
+          start_date,
+          end_date,
+          profiles!absences_user_id_fkey (
+            full_name
+          )
+        `)
+        .not("approved_by", "is", null)
+        .lte("start_date", endOfWeek.toISOString().split("T")[0])
+        .gte("end_date", startOfWeek.toISOString().split("T")[0])
+        .order("start_date")
+        .limit(10);
+
+      if (error) throw error;
+      setThisWeekAbsences(data || []);
+    } catch (error) {
+      console.error("Failed to load absences", error);
+      setAbsencesError("Failed to load absences");
+    } finally {
+      setAbsencesLoading(false);
+    }
   };
 
   const fetchPipelineData = async () => {
-    const today = new Date();
-    const months: PipelineData[] = [];
+    try {
+      setPipelineLoading(true);
+      setPipelineError(null);
 
-    for (let i = 0; i < 12; i++) {
-      const date = new Date(today.getFullYear(), today.getMonth() + i, 1);
-      const year = date.getFullYear();
-      const month = date.getMonth() + 1;
-
-      months.push({
-        month: date.toLocaleDateString("en-GB", { month: "short", year: "2-digit" }),
-        forecast: 0,
-        budget: 0,
-      });
-
-      const { data: budget } = await supabase
-        .from("monthly_budgets")
-        .select("budget_revenue")
-        .eq("year", year)
-        .eq("month", month)
-        .maybeSingle();
-
-      if (budget) {
-        months[i].budget = budget.budget_revenue;
-      }
-    }
-
-    const { data: allProjects } = await supabase
-      .from("projects")
-      .select("id, start_date, end_date, agreed_fee_value, status")
-      .in("status", ["live", "pipeline"]);
-
-    const { data: allPhasing } = await supabase
-      .from("project_monthly_phasing")
-      .select("project_id, year, month, revenue_amount");
-
-    const phasingMap = new Map<string, PhasingRow[]>();
-    (allPhasing || []).forEach((p) => {
-      if (!phasingMap.has(p.project_id)) {
-        phasingMap.set(p.project_id, []);
-      }
-      phasingMap.get(p.project_id)!.push(p as PhasingRow);
-    });
-
-    (allProjects || []).forEach((project) => {
-      const projectPhasing = phasingMap.get(project.id) || [];
+      const today = new Date();
+      const months: PipelineData[] = [];
 
       for (let i = 0; i < 12; i++) {
         const date = new Date(today.getFullYear(), today.getMonth() + i, 1);
         const year = date.getFullYear();
         const month = date.getMonth() + 1;
 
-        const manualPhasing = projectPhasing.find(
-          (p) => p.year === year && p.month === month
-        );
+        months.push({
+          month: date.toLocaleDateString("en-GB", { month: "short", year: "2-digit" }),
+          forecast: 0,
+          budget: 0,
+        });
 
-        if (manualPhasing && manualPhasing.revenue_amount > 0) {
-          months[i].forecast += manualPhasing.revenue_amount;
-        } else {
-          const autoRevenue = calculateAutoMonthlyRevenue(project, year, month);
-          months[i].forecast += autoRevenue;
+        const { data: budget } = await supabase
+          .from("monthly_budgets")
+          .select("budget_revenue")
+          .eq("year", year)
+          .eq("month", month)
+          .maybeSingle();
+
+        if (budget) {
+          months[i].budget = budget.budget_revenue;
         }
       }
-    });
 
-    setPipelineData(months);
+      const { data: allProjects } = await supabase
+        .from("projects")
+        .select("id, start_date, end_date, agreed_fee_value, status")
+        .in("status", ["live", "pipeline"]);
+
+      const { data: allPhasing } = await supabase
+        .from("project_monthly_phasing")
+        .select("project_id, year, month, revenue_amount");
+
+      const phasingMap = new Map<string, PhasingRow[]>();
+      (allPhasing || []).forEach((p) => {
+        if (!phasingMap.has(p.project_id)) {
+          phasingMap.set(p.project_id, []);
+        }
+        phasingMap.get(p.project_id)!.push(p as PhasingRow);
+      });
+
+      (allProjects || []).forEach((project) => {
+        const projectPhasing = phasingMap.get(project.id) || [];
+
+        for (let i = 0; i < 12; i++) {
+          const date = new Date(today.getFullYear(), today.getMonth() + i, 1);
+          const year = date.getFullYear();
+          const month = date.getMonth() + 1;
+
+          const manualPhasing = projectPhasing.find(
+            (p) => p.year === year && p.month === month
+          );
+
+          if (manualPhasing && manualPhasing.revenue_amount > 0) {
+            months[i].forecast += manualPhasing.revenue_amount;
+          } else {
+            const autoRevenue = calculateAutoMonthlyRevenue(project, year, month);
+            months[i].forecast += autoRevenue;
+          }
+        }
+      });
+
+      setPipelineData(months);
+    } catch (error) {
+      console.error("Failed to load pipeline data", error);
+      setPipelineError("Failed to load pipeline");
+    } finally {
+      setPipelineLoading(false);
+    }
   };
 
   const calculateAutoMonthlyRevenue = (
@@ -300,15 +374,12 @@ function DashboardContent() {
     1
   );
 
-  if (loading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="text-slate-600">Loading...</div>
-        </div>
-      </Layout>
-    );
-  }
+  const ErrorState = ({ message }: { message: string }) => (
+    <Alert variant="destructive" className="my-4">
+      <AlertTriangle className="h-4 w-4" />
+      <AlertDescription>{message}</AlertDescription>
+    </Alert>
+  );
 
   return (
     <Layout>
@@ -325,66 +396,70 @@ function DashboardContent() {
           )}
         </div>
 
-        {/* Quick Stats Grid - Mobile: 2 cols, Tablet+: 4 cols */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <Link href="/companies">
-            <Card className="hover:shadow-md transition-shadow cursor-pointer">
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
-                  <div className="text-xl sm:text-2xl font-bold text-slate-900">
-                    {stats.companiesCount}
+        {/* Quick Stats Grid */}
+        {statsError ? (
+          <ErrorState message={statsError} />
+        ) : (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <Link href="/companies">
+              <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                <CardContent className="p-4 sm:p-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
+                    <div className="text-xl sm:text-2xl font-bold text-slate-900">
+                      {statsLoading ? "..." : stats.companiesCount}
+                    </div>
                   </div>
-                </div>
-                <div className="text-xs sm:text-sm text-slate-600">Companies</div>
-              </CardContent>
-            </Card>
-          </Link>
+                  <div className="text-xs sm:text-sm text-slate-600">Companies</div>
+                </CardContent>
+              </Card>
+            </Link>
 
-          <Link href="/contacts">
-            <Card className="hover:shadow-md transition-shadow cursor-pointer">
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <Users className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
-                  <div className="text-xl sm:text-2xl font-bold text-slate-900">
-                    {stats.contactsCount}
+            <Link href="/contacts">
+              <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                <CardContent className="p-4 sm:p-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <Users className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
+                    <div className="text-xl sm:text-2xl font-bold text-slate-900">
+                      {statsLoading ? "..." : stats.contactsCount}
+                    </div>
                   </div>
-                </div>
-                <div className="text-xs sm:text-sm text-slate-600">Contacts</div>
-              </CardContent>
-            </Card>
-          </Link>
+                  <div className="text-xs sm:text-sm text-slate-600">Contacts</div>
+                </CardContent>
+              </Card>
+            </Link>
 
-          <Link href="/opportunities">
-            <Card className="hover:shadow-md transition-shadow cursor-pointer">
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <Target className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" />
-                  <div className="text-xl sm:text-2xl font-bold text-slate-900">
-                    {stats.opportunitiesCount}
+            <Link href="/opportunities">
+              <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                <CardContent className="p-4 sm:p-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <Target className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" />
+                    <div className="text-xl sm:text-2xl font-bold text-slate-900">
+                      {statsLoading ? "..." : stats.opportunitiesCount}
+                    </div>
                   </div>
-                </div>
-                <div className="text-xs sm:text-sm text-slate-600">Opportunities</div>
-              </CardContent>
-            </Card>
-          </Link>
+                  <div className="text-xs sm:text-sm text-slate-600">Opportunities</div>
+                </CardContent>
+              </Card>
+            </Link>
 
-          <Link href="/projects">
-            <Card className="hover:shadow-md transition-shadow cursor-pointer">
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex items-center justify-between mb-2">
-                  <Briefcase className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
-                  <div className="text-xl sm:text-2xl font-bold text-slate-900">
-                    {stats.liveProjectsCount}
+            <Link href="/projects">
+              <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                <CardContent className="p-4 sm:p-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <Briefcase className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
+                    <div className="text-xl sm:text-2xl font-bold text-slate-900">
+                      {statsLoading ? "..." : stats.liveProjectsCount}
+                    </div>
                   </div>
-                </div>
-                <div className="text-xs sm:text-sm text-slate-600">Live Projects</div>
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
+                  <div className="text-xs sm:text-sm text-slate-600">Live Projects</div>
+                </CardContent>
+              </Card>
+            </Link>
+          </div>
+        )}
 
-        {/* Pipeline Chart - Full width, responsive */}
+        {/* Pipeline Chart */}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -393,52 +468,62 @@ function DashboardContent() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto -mx-2 px-2">
-              <div className="min-w-[600px] h-64 sm:h-80">
-                <div className="flex h-full gap-1 items-end">
-                  {pipelineData.map((data, idx) => (
-                    <div key={idx} className="flex-1 flex flex-col justify-end items-center gap-1">
-                      <div className="w-full flex flex-col gap-0.5">
-                        <div
-                          className="w-full bg-blue-500 rounded-t hover:bg-blue-600 transition-colors"
-                          style={{
-                            height: `${(data.forecast / maxValue) * 200}px`,
-                            minHeight: data.forecast > 0 ? "4px" : "0px",
-                          }}
-                          title={`Forecast: ${formatCurrency(data.forecast)}`}
-                        />
-                        <div
-                          className="w-full bg-slate-300 rounded-b hover:bg-slate-400 transition-colors"
-                          style={{
-                            height: `${(data.budget / maxValue) * 200}px`,
-                            minHeight: data.budget > 0 ? "4px" : "0px",
-                          }}
-                          title={`Budget: ${formatCurrency(data.budget)}`}
-                        />
-                      </div>
-                      <div className="text-[10px] sm:text-xs text-slate-600 text-center whitespace-nowrap">
-                        {data.month}
-                      </div>
+            {pipelineError ? (
+              <ErrorState message={pipelineError} />
+            ) : pipelineLoading ? (
+              <div className="flex items-center justify-center h-64 sm:h-80 text-slate-600">
+                Loading pipeline data...
+              </div>
+            ) : (
+              <>
+                <div className="overflow-x-auto -mx-2 px-2">
+                  <div className="min-w-[600px] h-64 sm:h-80">
+                    <div className="flex h-full gap-1 items-end">
+                      {pipelineData.map((data, idx) => (
+                        <div key={idx} className="flex-1 flex flex-col justify-end items-center gap-1">
+                          <div className="w-full flex flex-col gap-0.5">
+                            <div
+                              className="w-full bg-blue-500 rounded-t hover:bg-blue-600 transition-colors"
+                              style={{
+                                height: `${(data.forecast / maxValue) * 200}px`,
+                                minHeight: data.forecast > 0 ? "4px" : "0px",
+                              }}
+                              title={`Forecast: ${formatCurrency(data.forecast)}`}
+                            />
+                            <div
+                              className="w-full bg-slate-300 rounded-b hover:bg-slate-400 transition-colors"
+                              style={{
+                                height: `${(data.budget / maxValue) * 200}px`,
+                                minHeight: data.budget > 0 ? "4px" : "0px",
+                              }}
+                              title={`Budget: ${formatCurrency(data.budget)}`}
+                            />
+                          </div>
+                          <div className="text-[10px] sm:text-xs text-slate-600 text-center whitespace-nowrap">
+                            {data.month}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            <div className="mt-4 flex flex-wrap gap-4 text-xs sm:text-sm justify-center">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 sm:w-4 sm:h-4 bg-blue-500 rounded"></div>
-                <span className="text-slate-600">Forecast Revenue</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 sm:w-4 sm:h-4 bg-slate-300 rounded"></div>
-                <span className="text-slate-600">Budget</span>
-              </div>
-            </div>
+                <div className="mt-4 flex flex-wrap gap-4 text-xs sm:text-sm justify-center">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 sm:w-4 sm:h-4 bg-blue-500 rounded"></div>
+                    <span className="text-slate-600">Forecast Revenue</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 sm:w-4 sm:h-4 bg-slate-300 rounded"></div>
+                    <span className="text-slate-600">Budget</span>
+                  </div>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
-        {/* Three Column Section - Stacks on mobile */}
+        {/* Three Column Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Upcoming Tenders */}
           <Card>
@@ -450,7 +535,13 @@ function DashboardContent() {
               <p className="text-xs sm:text-sm text-slate-600">Next 30 days</p>
             </CardHeader>
             <CardContent>
-              {upcomingTenders.length === 0 ? (
+              {tendersError ? (
+                <ErrorState message={tendersError} />
+              ) : tendersLoading ? (
+                <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
+                  Loading tenders...
+                </div>
+              ) : upcomingTenders.length === 0 ? (
                 <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
                   No tenders due in the next 30 days
                 </div>
@@ -493,7 +584,13 @@ function DashboardContent() {
               <p className="text-xs sm:text-sm text-slate-600">Currently active</p>
             </CardHeader>
             <CardContent>
-              {liveProjects.length === 0 ? (
+              {projectsError ? (
+                <ErrorState message={projectsError} />
+              ) : projectsLoading ? (
+                <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
+                  Loading projects...
+                </div>
+              ) : liveProjects.length === 0 ? (
                 <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
                   No live projects
                 </div>
@@ -533,7 +630,13 @@ function DashboardContent() {
               <p className="text-xs sm:text-sm text-slate-600">Team availability</p>
             </CardHeader>
             <CardContent>
-              {thisWeekAbsences.length === 0 ? (
+              {absencesError ? (
+                <ErrorState message={absencesError} />
+              ) : absencesLoading ? (
+                <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
+                  Loading absences...
+                </div>
+              ) : thisWeekAbsences.length === 0 ? (
                 <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
                   No absences this week
                 </div>
