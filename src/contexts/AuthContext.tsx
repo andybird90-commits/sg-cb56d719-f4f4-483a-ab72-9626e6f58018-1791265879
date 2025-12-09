@@ -9,7 +9,6 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   profileError: string | null;
-  authError: string | null;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -19,7 +18,6 @@ const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
   refreshProfile: async () => {},
   profileError: null,
-  authError: null,
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -27,7 +25,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileError, setProfileError] = useState<string | null>(null);
-  const [authError, setAuthError] = useState<string | null>(null);
 
   const fetchProfile = async (userId: string) => {
     try {
@@ -40,14 +37,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .maybeSingle();
       
       if (error) {
-        console.error("❌ Error fetching profile:", error);
+        console.error("❌ Failed to load user profile:", error);
         setProfileError(`Database error: ${error.message}`);
         return;
       }
       
       if (!data) {
-        console.warn("⚠️ No profile found for user:", userId);
-        setProfileError("Profile not found in database. Please contact support.");
+        console.error("⚠️ Failed to load user profile: Profile not found for user:", userId);
+        setProfileError("Profile not found in database. Some features may be limited.");
         return;
       }
       
@@ -55,8 +52,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(data);
       setProfileError(null);
     } catch (error) {
-      console.error("❌ Unexpected error fetching profile:", error);
-      setProfileError("Failed to load profile. Please refresh the page.");
+      console.error("❌ Failed to load user profile:", error);
+      setProfileError("Failed to load profile. Some features may be limited.");
     }
   };
 
@@ -67,48 +64,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    // Set timeout to prevent infinite loading
-    const loadingTimeout = setTimeout(() => {
-      if (loading) {
-        console.warn("⚠️ Auth loading timeout - forcing completion");
-        setLoading(false);
-        setAuthError("Authentication check timed out. Please refresh the page.");
-      }
-    }, 10000); // 10 second timeout
-
     // Initial session check
     supabase.auth.getSession().then(({ data: { session }, error }) => {
-      clearTimeout(loadingTimeout);
-      
       if (error) {
         console.error("❌ Session fetch error:", error);
-        setAuthError(`Authentication error: ${error.message}`);
         setLoading(false);
         return;
       }
       
       console.log("🔐 Initial session check:", session ? "User logged in" : "No session");
+      
+      // Immediately set user and mark loading as complete
       setUser(session?.user ?? null);
+      setLoading(false);
+      
+      // Load profile in background (non-blocking)
       if (session?.user) {
         fetchProfile(session.user.id);
       }
-      setLoading(false);
     }).catch((error) => {
-      clearTimeout(loadingTimeout);
       console.error("❌ Auth initialization error:", error);
-      setAuthError("Failed to initialize authentication. Please check your connection.");
       setLoading(false);
     });
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        console.log("🔄 Auth state changed:", _event);
+      async (event, session) => {
+        console.log("🔄 Auth state changed:", event);
+        
+        // Immediately update user state (non-blocking)
         setUser(session?.user ?? null);
-        setAuthError(null);
-        if (session?.user) {
-          await fetchProfile(session.user.id);
-        } else {
+        
+        // Handle SIGNED_IN event
+        if (event === "SIGNED_IN" && session?.user) {
+          console.log("✅ User signed in, loading profile in background");
+          // Load profile in background (non-blocking)
+          fetchProfile(session.user.id);
+        } else if (!session?.user) {
+          // Clear profile when user signs out
           setProfile(null);
           setProfileError(null);
         }
@@ -116,7 +109,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
 
     return () => {
-      clearTimeout(loadingTimeout);
       subscription.unsubscribe();
     };
   }, []);
@@ -126,11 +118,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setProfile(null);
     setProfileError(null);
-    setAuthError(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signOut, refreshProfile, profileError, authError }}>
+    <AuthContext.Provider value={{ user, profile, loading, signOut, refreshProfile, profileError }}>
       {children}
     </AuthContext.Provider>
   );

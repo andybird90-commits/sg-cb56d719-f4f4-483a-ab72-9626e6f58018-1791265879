@@ -34,25 +34,34 @@ export default function SignInPage() {
     setLoading(true);
     setError("");
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: formData.email,
-      password: formData.password,
-    });
+    try {
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
+      });
 
-    if (signInError) {
-      setError(signInError.message);
+      if (signInError) {
+        setError(signInError.message);
+        setLoading(false);
+        return;
+      }
+
+      // Handle "Remember Me" - save or clear email
+      if (rememberMe) {
+        localStorage.setItem("rememberedEmail", formData.email);
+      } else {
+        localStorage.removeItem("rememberedEmail");
+      }
+
+      // Immediately navigate to dashboard on successful sign-in
+      // Profile loading will happen in background via AuthContext
+      console.log("✅ Sign in successful, navigating to dashboard");
+      router.push("/dashboard");
+    } catch (error) {
+      console.error("❌ Sign in error:", error);
+      setError("An unexpected error occurred. Please try again.");
       setLoading(false);
-      return;
     }
-
-    // Handle "Remember Me" - save or clear email
-    if (rememberMe) {
-      localStorage.setItem("rememberedEmail", formData.email);
-    } else {
-      localStorage.removeItem("rememberedEmail");
-    }
-
-    router.push("/dashboard");
   };
 
   return (
