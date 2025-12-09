@@ -489,11 +489,11 @@ function DashboardContent() {
                         {pipelineData.map((data, idx) => {
                           const total = data.bid + data.prospect + data.secured;
                           const budgetGap = data.budget > 0 ? data.budget - total : 0;
-                          const totalHeight = (total / maxValue) * 200;
-                          const budgetGapHeight = (budgetGap / maxValue) * 200;
-                          const bidHeight = (data.bid / maxValue) * 200;
-                          const prospectHeight = (data.prospect / maxValue) * 200;
-                          const securedHeight = (data.secured / maxValue) * 200;
+                          const chartHeight = 256; // Fixed chart height in pixels (h-64 = 256px)
+                          const bidHeight = (data.bid / maxValue) * chartHeight;
+                          const prospectHeight = (data.prospect / maxValue) * chartHeight;
+                          const securedHeight = (data.secured / maxValue) * chartHeight;
+                          const budgetGapHeight = (budgetGap / maxValue) * chartHeight;
 
                           return (
                             <div key={idx} className="flex-1 flex flex-col justify-end items-center gap-1">
