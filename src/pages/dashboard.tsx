@@ -477,15 +477,17 @@ function DashboardContent() {
                     <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 10 }}>
                       <path
                         d={pipelineData.map((data, idx) => {
-                          const totalWidth = 100;
-                          const x = ((idx + 0.5) / pipelineData.length) * totalWidth;
-                          const y = 20 + ((1 - (data.budget / maxValue)) * 60);
-                          return `${idx === 0 ? 'M' : 'L'}${x},${y}`;
+                          const totalWidth = pipelineData.length;
+                          const x = ((idx + 0.5) / totalWidth) * 100;
+                          const y = data.budget > 0 
+                            ? 20 + ((1 - (data.budget / maxValue)) * 60)
+                            : 80; // Default to bottom if no budget
+                          return `${idx === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`;
                         }).join(' ')}
                         fill="none"
                         stroke="#ef4444"
-                        strokeWidth="3"
-                        strokeDasharray="5,5"
+                        strokeWidth="2"
+                        strokeDasharray="4 4"
                         vectorEffect="non-scaling-stroke"
                       />
                     </svg>
