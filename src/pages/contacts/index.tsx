@@ -29,7 +29,7 @@ interface Contact {
   added_by_profile?: {
     full_name: string | null;
     email: string;
-  };
+  } | null;
 }
 
 interface Company {
@@ -88,7 +88,7 @@ function ContactsContent() {
           companies (
             name
           ),
-          added_by_profile:profiles!contacts_added_by_user_id_fkey (
+          added_by_profile:profiles (
             full_name,
             email
           )

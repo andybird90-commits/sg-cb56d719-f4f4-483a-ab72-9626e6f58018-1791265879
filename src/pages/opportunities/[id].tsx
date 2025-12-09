@@ -38,7 +38,7 @@ interface Opportunity {
   added_by_profile?: {
     full_name: string | null;
     email: string;
-  };
+  } | null;
 }
 
 interface User {
@@ -109,7 +109,7 @@ function OpportunityDetailContent() {
           contacts (
             name
           ),
-          added_by_profile:profiles!opportunities_added_by_user_id_fkey (
+          added_by_profile:profiles (
             full_name,
             email
           )

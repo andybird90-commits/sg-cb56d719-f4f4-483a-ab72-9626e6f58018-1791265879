@@ -19,11 +19,11 @@ interface Company {
   sector: string | null;
   status: string;
   created_at: string;
-  added_by_user_id?: string | null;
+  added_by_user_id: string | null;
   added_by_profile?: {
     full_name: string | null;
     email: string;
-  };
+  } | null;
 }
 
 function CompaniesContent() {
@@ -55,7 +55,7 @@ function CompaniesContent() {
         .from("companies")
         .select(`
           *,
-          added_by_profile:profiles!companies_added_by_user_id_fkey (
+          added_by_profile:profiles (
             full_name,
             email
           )
