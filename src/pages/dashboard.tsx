@@ -518,7 +518,7 @@ function DashboardContent() {
                                 {/* Secured (green) - top */}
                                 {data.secured > 0 && (
                                   <div
-                                    className="w-full bg-green-500 hover:bg-green-600 transition-colors"
+                                    className="w-full bg-green-500 hover:bg-green-600 transition-colors relative flex items-center justify-center"
                                     style={{
                                       height: `${securedHeight}px`,
                                       minHeight: "2px",
@@ -526,12 +526,18 @@ function DashboardContent() {
                                       borderTopRightRadius: total === data.secured ? "4px" : "0",
                                     }}
                                     title={`Secured: ${formatCurrency(data.secured)}`}
-                                  />
+                                  >
+                                    {securedHeight > 20 && (
+                                      <span className="text-white text-[10px] font-medium">
+                                        {data.secured >= 1000 ? `£${(data.secured / 1000).toFixed(0)}k` : `£${data.secured.toFixed(0)}`}
+                                      </span>
+                                    )}
+                                  </div>
                                 )}
                                 {/* Prospect (blue) - middle */}
                                 {data.prospect > 0 && (
                                   <div
-                                    className="w-full bg-blue-500 hover:bg-blue-600 transition-colors"
+                                    className="w-full bg-blue-500 hover:bg-blue-600 transition-colors relative flex items-center justify-center"
                                     style={{
                                       height: `${prospectHeight}px`,
                                       minHeight: "2px",
@@ -539,12 +545,18 @@ function DashboardContent() {
                                       borderTopRightRadius: data.secured === 0 ? "4px" : "0",
                                     }}
                                     title={`Prospect: ${formatCurrency(data.prospect)}`}
-                                  />
+                                  >
+                                    {prospectHeight > 20 && (
+                                      <span className="text-white text-[10px] font-medium">
+                                        {data.prospect >= 1000 ? `£${(data.prospect / 1000).toFixed(0)}k` : `£${data.prospect.toFixed(0)}`}
+                                      </span>
+                                    )}
+                                  </div>
                                 )}
                                 {/* Bid (yellow) - bottom */}
                                 {data.bid > 0 && (
                                   <div
-                                    className="w-full bg-yellow-500 hover:bg-yellow-600 transition-colors"
+                                    className="w-full bg-yellow-500 hover:bg-yellow-600 transition-colors relative flex items-center justify-center"
                                     style={{
                                       height: `${bidHeight}px`,
                                       minHeight: "2px",
@@ -554,7 +566,13 @@ function DashboardContent() {
                                       borderBottomRightRadius: "4px",
                                     }}
                                     title={`Bid: ${formatCurrency(data.bid)}`}
-                                  />
+                                  >
+                                    {bidHeight > 20 && (
+                                      <span className="text-white text-[10px] font-medium">
+                                        {data.bid >= 1000 ? `£${(data.bid / 1000).toFixed(0)}k` : `£${data.bid.toFixed(0)}`}
+                                      </span>
+                                    )}
+                                  </div>
                                 )}
                               </div>
                               <div className="text-[10px] sm:text-xs text-slate-600 text-center whitespace-nowrap">
