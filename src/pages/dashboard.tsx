@@ -510,19 +510,10 @@ function DashboardContent() {
               <>
                 <div className="overflow-x-auto -mx-2 px-2">
                   <div className="min-w-[600px] h-64 sm:h-80 relative">
-                    {/* Stacked bar chart with Y-axis */}
+                    {/* Stacked bar chart without Y-axis */}
                     <div className="flex h-full">
-                      {/* Y-axis labels */}
-                      <div className="w-16 flex flex-col justify-between pr-2 text-xs text-slate-500 text-right">
-                        <div>{formatCurrency(maxValue)}</div>
-                        <div>{formatCurrency(maxValue * 0.75)}</div>
-                        <div>{formatCurrency(maxValue * 0.5)}</div>
-                        <div>{formatCurrency(maxValue * 0.25)}</div>
-                        <div>£0</div>
-                      </div>
-
                       {/* Chart area */}
-                      <div className="flex-1 flex gap-1 items-end border-l border-slate-200 pl-2">
+                      <div className="flex-1 flex gap-1 items-end pl-2">
                         {pipelineData.map((data, idx) => {
                           const total = data.bid + data.prospect + data.secured;
                           const budgetGap = data.budget > 0 ? data.budget - total : 0;
