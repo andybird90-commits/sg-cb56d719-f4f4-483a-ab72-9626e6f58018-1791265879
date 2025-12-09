@@ -56,11 +56,12 @@ export function ContactCalendar({ contactId, contactName, isDetailView = false }
   const fetchEvents = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("contact_events")
+      // Cast to any to bypass type checking for the new table
+      const { data, error } = await (supabase
+        .from("contact_events" as any)
         .select("*")
         .eq("contact_id", contactId)
-        .order("event_date", { ascending: true });
+        .order("event_date", { ascending: true })) as any;
 
       if (error) throw error;
       setEvents((data as ContactEvent[]) || []);
@@ -76,8 +77,8 @@ export function ContactCalendar({ contactId, contactName, isDetailView = false }
 
     try {
       if (editingEvent) {
-        const { error } = await supabase
-          .from("contact_events")
+        const { error } = await (supabase
+          .from("contact_events" as any)
           .update({
             title: formData.title,
             event_type: formData.event_type as "visit" | "function",
@@ -87,11 +88,11 @@ export function ContactCalendar({ contactId, contactName, isDetailView = false }
             location: formData.location || null,
             notes: formData.notes || null,
           })
-          .eq("id", editingEvent.id);
+          .eq("id", editingEvent.id)) as any;
 
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("contact_events").insert({
+        const { error } = await (supabase.from("contact_events" as any).insert({
           contact_id: contactId,
           title: formData.title,
           event_type: formData.event_type as "visit" | "function",
@@ -100,7 +101,7 @@ export function ContactCalendar({ contactId, contactName, isDetailView = false }
           end_time: formData.end_time || null,
           location: formData.location || null,
           notes: formData.notes || null,
-        });
+        })) as any;
 
         if (error) throw error;
       }
@@ -141,10 +142,10 @@ export function ContactCalendar({ contactId, contactName, isDetailView = false }
     if (!confirm("Delete this event?")) return;
 
     try {
-      const { error } = await supabase
-        .from("contact_events")
+      const { error } = await (supabase
+        .from("contact_events" as any)
         .delete()
-        .eq("id", eventId);
+        .eq("id", eventId)) as any;
 
       if (error) throw error;
       await fetchEvents();

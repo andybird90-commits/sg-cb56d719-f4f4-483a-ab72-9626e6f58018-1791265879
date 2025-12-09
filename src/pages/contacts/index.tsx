@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Search, Mail, Phone, Building2, User, Briefcase, AlertTriangle, FileText, Edit, Trash2 } from "lucide-react";
+import { ContactCalendar } from "@/components/ContactCalendar";
 
 interface Contact {
   id: string;
@@ -399,7 +400,10 @@ function ContactsContent() {
                       <div className="flex items-start gap-2 min-w-0">
                         <User className="w-5 h-5 text-slate-400 mt-0.5 flex-shrink-0" />
                         <div className="min-w-0">
-                          <h3 className="text-base sm:text-lg font-semibold text-slate-900 truncate">
+                          <h3 
+                            className="text-base sm:text-lg font-semibold text-slate-900 truncate cursor-pointer hover:text-blue-600"
+                            onClick={() => router.push(`/contacts/${contact.id}`)}
+                          >
                             {contact.name}
                           </h3>
                           {contact.job_title && (
@@ -435,6 +439,15 @@ function ContactsContent() {
                           </Button>
                         )}
                       </div>
+                    </div>
+
+                    {/* Calendar Preview */}
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <ContactCalendar 
+                        contactId={contact.id} 
+                        contactName={contact.name} 
+                        isDetailView={false} 
+                      />
                     </div>
 
                     {/* Company */}
