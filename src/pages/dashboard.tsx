@@ -258,17 +258,38 @@ function DashboardContent() {
       (allOpportunities || []).forEach((opp) => {
         if (!opp.expected_start_date || !opp.expected_fee_value) return;
 
-        const awardDate = new Date(opp.expected_start_date);
-        const monthIndex = (awardDate.getFullYear() - today.getFullYear()) * 12 + 
-                          (awardDate.getMonth() - today.getMonth());
+        const startDate = new Date(opp.expected_start_date);
+        const endDate = opp.expected_end_date ? new Date(opp.expected_end_date) : startDate;
+        
+        // Calculate duration in months (inclusive)
+        const durationMonths = Math.max(1, 
+          (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
+          (endDate.getMonth() - startDate.getMonth()) + 1
+        );
+        
+        // Calculate monthly value spread across duration
+        const monthlyValue = opp.expected_fee_value / durationMonths;
 
-        if (monthIndex >= 0 && monthIndex < 12) {
-          if (opp.stage === "bid") {
-            months[monthIndex].bid += opp.expected_fee_value;
-          } else if (opp.stage === "high_potential") {
-            months[monthIndex].prospect += opp.expected_fee_value;
-          } else if (opp.stage === "secured") {
-            months[monthIndex].secured += opp.expected_fee_value;
+        // Spread the value across all months in the project duration
+        for (let monthOffset = 0; monthOffset < durationMonths; monthOffset++) {
+          const currentMonth = new Date(
+            startDate.getFullYear(), 
+            startDate.getMonth() + monthOffset, 
+            1
+          );
+          
+          const monthIndex = (currentMonth.getFullYear() - today.getFullYear()) * 12 + 
+                            (currentMonth.getMonth() - today.getMonth());
+
+          // Only include if within our 12-month window
+          if (monthIndex >= 0 && monthIndex < 12) {
+            if (opp.stage === "bid") {
+              months[monthIndex].bid += monthlyValue;
+            } else if (opp.stage === "high_potential") {
+              months[monthIndex].prospect += monthlyValue;
+            } else if (opp.stage === "secured") {
+              months[monthIndex].secured += monthlyValue;
+            }
           }
         }
       });
