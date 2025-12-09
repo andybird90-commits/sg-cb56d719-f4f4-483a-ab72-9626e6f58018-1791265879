@@ -146,6 +146,8 @@ function DashboardContent() {
       setTendersLoading(true);
       setTendersError(null);
 
+      const now = new Date();
+      now.setHours(0, 0, 0, 0); // Set to start of today
       const thirtyDaysFromNow = new Date();
       thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
 
@@ -161,6 +163,7 @@ function DashboardContent() {
           )
         `)
         .not("tender_due_date", "is", null)
+        .gte("tender_due_date", now.toISOString().split("T")[0]) // Only future dates
         .lte("tender_due_date", thirtyDaysFromNow.toISOString().split("T")[0])
         .order("tender_due_date")
         .limit(5);
