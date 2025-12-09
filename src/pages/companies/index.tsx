@@ -63,7 +63,7 @@ function CompaniesContent() {
         .order("name");
 
       if (fetchError) throw fetchError;
-      setCompanies(data || []);
+      setCompanies((data as unknown as Company[]) || []);
     } catch (err) {
       console.error("Failed to load companies data", err);
       setError("Failed to load companies");

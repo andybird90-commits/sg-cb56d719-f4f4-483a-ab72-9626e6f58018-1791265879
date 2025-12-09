@@ -62,7 +62,7 @@ function OpportunitiesContent() {
         .order("created_at", { ascending: false });
 
       if (fetchError) throw fetchError;
-      setOpportunities(data || []);
+      setOpportunities((data as unknown as Opportunity[]) || []);
     } catch (err) {
       console.error("Failed to load opportunities data", err);
       setError("Failed to load opportunities");

@@ -133,7 +133,7 @@ function CompanyDetailContent() {
       if (error) throw error;
       if (!data) throw new Error("Company not found");
       
-      setCompany(data);
+      setCompany(data as unknown as Company);
       setEditData({
         name: data.name,
         short_name: data.short_name || "",

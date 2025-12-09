@@ -111,7 +111,7 @@ function ContactsContent() {
 
       if (usersError) throw usersError;
 
-      setContacts(contactsData || []);
+      setContacts((contactsData as unknown as Contact[]) || []);
       setCompanies(companiesData || []);
       setUsers(usersData || []);
     } catch (err) {

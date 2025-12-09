@@ -120,7 +120,7 @@ function OpportunityDetailContent() {
       if (fetchError) throw fetchError;
       if (!data) throw new Error("Opportunity not found");
 
-      setOpportunity(data);
+      setOpportunity(data as unknown as Opportunity);
       setEditData({
         name: data.name,
         description: data.description || "",
