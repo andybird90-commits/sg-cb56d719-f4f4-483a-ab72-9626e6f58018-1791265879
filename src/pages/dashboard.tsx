@@ -45,6 +45,23 @@ interface Absence {
   profiles?: { full_name: string };
 }
 
+interface ContactEvent {
+  id: string;
+  contact_id: string;
+  title: string;
+  event_type: "visit" | "function";
+  event_date: string;
+  start_time: string | null;
+  end_time: string | null;
+  location: string | null;
+  contacts?: {
+    name: string;
+    companies?: {
+      name: string;
+    };
+  };
+}
+
 interface PipelineData {
   month: string;
   bid: number;
@@ -79,6 +96,10 @@ function DashboardContent() {
   const [absencesError, setAbsencesError] = useState<string | null>(null);
   const [thisWeekAbsences, setThisWeekAbsences] = useState<Absence[]>([]);
 
+  const [visitsLoading, setVisitsLoading] = useState(true);
+  const [visitsError, setVisitsError] = useState<string | null>(null);
+  const [upcomingVisits, setUpcomingVisits] = useState<ContactEvent[]>([]);
+
   const [pipelineLoading, setPipelineLoading] = useState(true);
   const [pipelineError, setPipelineError] = useState<string | null>(null);
   const [pipelineData, setPipelineData] = useState<PipelineData[]>([]);
@@ -88,6 +109,7 @@ function DashboardContent() {
     fetchTenders();
     fetchLiveProjects();
     fetchAbsences();
+    fetchUpcomingVisits();
     fetchPipelineData();
   }, []);
 
@@ -216,6 +238,44 @@ function DashboardContent() {
       setAbsencesError("Failed to load absences");
     } finally {
       setAbsencesLoading(false);
+    }
+  };
+
+  const fetchUpcomingVisits = async () => {
+    try {
+      setVisitsLoading(true);
+      setVisitsError(null);
+
+      // Get start and end of current month
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+      // Cast to any to bypass type checking for the new table
+      const { data, error } = await (supabase
+        .from("contact_events" as any)
+        .select(`
+          *,
+          contacts!contact_events_contact_id_fkey (
+            name,
+            companies!contacts_company_id_fkey (
+              name
+            )
+          )
+        `)
+        .gte("event_date", startOfMonth.toISOString().split("T")[0])
+        .lte("event_date", endOfMonth.toISOString().split("T")[0])
+        .order("event_date")
+        .order("start_time")
+        .limit(10)) as any;
+
+      if (error) throw error;
+      setUpcomingVisits((data as ContactEvent[]) || []);
+    } catch (error) {
+      console.error("Failed to load upcoming visits", error);
+      setVisitsError("Failed to load visits");
+    } finally {
+      setVisitsLoading(false);
     }
   };
 
@@ -454,6 +514,10 @@ function DashboardContent() {
       default:
         return "bg-orange-100 text-orange-800";
     }
+  };
+
+  const getEventTypeColor = (type: "visit" | "function") => {
+    return type === "visit" ? "bg-blue-100 text-blue-800" : "bg-purple-100 text-purple-800";
   };
 
   const maxValue = 200000;
@@ -842,6 +906,78 @@ function DashboardContent() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Client Visits & Functions - Full Width */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-purple-600" />
+              <CardTitle className="text-base sm:text-lg">Client Visits & Functions</CardTitle>
+            </div>
+            <p className="text-xs sm:text-sm text-slate-600">This month's scheduled visits and events</p>
+          </CardHeader>
+          <CardContent>
+            {visitsError ? (
+              <ErrorState message={visitsError} />
+            ) : visitsLoading ? (
+              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
+                Loading visits...
+              </div>
+            ) : upcomingVisits.length === 0 ? (
+              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
+                No visits or functions scheduled this month
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {upcomingVisits.map((visit) => (
+                  <div
+                    key={visit.id}
+                    className="p-3 sm:p-4 border rounded-lg cursor-pointer hover:bg-slate-50 transition-colors"
+                    onClick={() => router.push(`/contacts/${visit.contact_id}`)}
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+                      {/* Date & Time Column */}
+                      <div className="flex-shrink-0 sm:w-32">
+                        <div className="text-sm font-semibold text-slate-900">
+                          {formatDate(visit.event_date)}
+                        </div>
+                        {visit.start_time && (
+                          <div className="text-xs text-slate-500">
+                            {visit.start_time.substring(0, 5)}
+                            {visit.end_time && ` - ${visit.end_time.substring(0, 5)}`}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Event Details Column */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start gap-2 mb-2">
+                          <Badge className={`${getEventTypeColor(visit.event_type)} flex-shrink-0 text-xs`}>
+                            {visit.event_type}
+                          </Badge>
+                          <div className="font-medium text-sm text-slate-900 truncate">
+                            {visit.title}
+                          </div>
+                        </div>
+                        <div className="text-sm text-slate-600">
+                          <span className="font-medium">{visit.contacts?.name}</span>
+                          {visit.contacts?.companies?.name && (
+                            <span className="text-slate-500"> • {visit.contacts.companies.name}</span>
+                          )}
+                        </div>
+                        {visit.location && (
+                          <div className="text-xs text-slate-500 mt-1">
+                            📍 {visit.location}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </Layout>
   );
