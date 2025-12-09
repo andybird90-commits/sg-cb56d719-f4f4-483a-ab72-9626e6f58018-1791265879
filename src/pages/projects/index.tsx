@@ -59,7 +59,42 @@ function ProjectsContent() {
         .order("created_at", { ascending: false });
 
       if (fetchError) throw fetchError;
-      setProjects(data || []);
+      
+      // Sort by project code descending (larger numbers first, with alpha suffixes)
+      const sortedData = (data || []).sort((a, b) => {
+        // Extract numeric and alpha parts from project codes
+        const parseCode = (code: string) => {
+          const match = code.match(/^(.+?)([a-z]*)$/i);
+          if (!match) return { base: code, suffix: '' };
+          return { base: match[1], suffix: match[2].toLowerCase() };
+        };
+        
+        const aCode = parseCode(a.code);
+        const bCode = parseCode(b.code);
+        
+        // Compare base codes (numeric comparison if both are numbers)
+        const aNum = parseFloat(aCode.base.replace(/[^0-9.-]/g, ''));
+        const bNum = parseFloat(bCode.base.replace(/[^0-9.-]/g, ''));
+        
+        if (!isNaN(aNum) && !isNaN(bNum)) {
+          if (aNum !== bNum) {
+            return bNum - aNum; // Descending order
+          }
+        } else {
+          const baseCompare = bCode.base.localeCompare(aCode.base);
+          if (baseCompare !== 0) {
+            return baseCompare;
+          }
+        }
+        
+        // If base codes are equal, compare suffixes (a > no suffix, b > a, etc.)
+        if (aCode.suffix === bCode.suffix) return 0;
+        if (aCode.suffix === '') return 1; // No suffix comes after suffixes
+        if (bCode.suffix === '') return -1; // Suffix comes before no suffix
+        return bCode.suffix.localeCompare(aCode.suffix); // Reverse for descending
+      });
+      
+      setProjects(sortedData);
     } catch (err) {
       console.error("Failed to load projects data", err);
       setError("Failed to load projects");
