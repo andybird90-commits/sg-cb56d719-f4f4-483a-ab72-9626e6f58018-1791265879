@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Plus, ChevronRight, Briefcase, AlertTriangle } from "lucide-react";
+import { Plus, ChevronRight, Briefcase, AlertTriangle, Search } from "lucide-react";
 import Link from "next/link";
 
 interface Project {
@@ -25,8 +25,10 @@ function ProjectsContent() {
   const { profile } = useAuth();
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Everyone can create/edit, only directors/admins can delete
   const canEdit = !!profile;
@@ -35,6 +37,10 @@ function ProjectsContent() {
   useEffect(() => {
     fetchProjects();
   }, []);
+
+  useEffect(() => {
+    filterProjects();
+  }, [projects, searchTerm]);
 
   const fetchProjects = async () => {
     try {
@@ -59,6 +65,24 @@ function ProjectsContent() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const filterProjects = () => {
+    if (!searchTerm) {
+      setFilteredProjects(projects);
+      return;
+    }
+
+    const filtered = projects.filter((project) => {
+      const searchLower = searchTerm.toLowerCase();
+      return (
+        project.code.toLowerCase().includes(searchLower) ||
+        project.name.toLowerCase().includes(searchLower) ||
+        project.companies?.name.toLowerCase().includes(searchLower)
+      );
+    });
+
+    setFilteredProjects(filtered);
   };
 
   const getStatusColor = (status: string) => {
@@ -97,6 +121,17 @@ function ProjectsContent() {
           )}
         </div>
 
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+          <Input
+            placeholder="Search by job number, client, or project name..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+
         {/* Error State */}
         {error && (
           <Alert variant="destructive">
@@ -117,15 +152,17 @@ function ProjectsContent() {
         {/* Projects List - Mobile: Cards, Desktop: Cards with more details */}
         {!loading && !error && (
           <div className="space-y-3">
-            {projects.length === 0 ? (
+            {filteredProjects.length === 0 ? (
               <Card>
                 <CardContent className="p-8 text-center">
                   <Briefcase className="w-12 h-12 mx-auto text-slate-300 mb-3" />
-                  <p className="text-slate-600">No projects yet</p>
+                  <p className="text-slate-600">
+                    {searchTerm ? "No projects found" : "No projects yet"}
+                  </p>
                 </CardContent>
               </Card>
             ) : (
-              projects.map((project) => (
+              filteredProjects.map((project) => (
                 <Card 
                   key={project.id} 
                   className="hover:shadow-md transition-shadow cursor-pointer"
@@ -162,9 +199,9 @@ function ProjectsContent() {
         )}
 
         {/* Results count - Mobile friendly */}
-        {!loading && !error && projects.length > 0 && (
+        {!loading && !error && filteredProjects.length > 0 && (
           <div className="text-center text-sm text-slate-600">
-            Showing {projects.length} {projects.length === 1 ? 'project' : 'projects'}
+            Showing {filteredProjects.length} {filteredProjects.length === 1 ? 'project' : 'projects'}
           </div>
         )}
       </div>
