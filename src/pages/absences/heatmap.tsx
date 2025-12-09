@@ -6,9 +6,9 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription, AlertCircle } from "@/components/ui/alert";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface User {
   id: string;

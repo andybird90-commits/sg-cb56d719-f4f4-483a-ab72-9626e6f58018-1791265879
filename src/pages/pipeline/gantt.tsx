@@ -176,6 +176,22 @@ function PipelineGanttContent() {
     return months;
   };
 
+  // Calculate timeline range
+  const earliestStart = items.length > 0 
+    ? new Date(Math.min(...items.map(i => i.startDate.getTime()))) 
+    : new Date();
+  const latestEnd = items.length > 0 
+    ? new Date(Math.max(...items.map(i => i.endDate.getTime()))) 
+    : new Date();
+
+  // Add buffer
+  if (items.length > 0) {
+    earliestStart.setMonth(earliestStart.getMonth() - 1);
+    latestEnd.setMonth(latestEnd.getMonth() + 1);
+  }
+
+  const timelineMonths = getMonthsBetween(earliestStart, latestEnd);
+
   return (
     <Layout>
       <div className="space-y-6">
