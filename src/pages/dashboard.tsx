@@ -457,9 +457,8 @@ function DashboardContent() {
                           return `${x}%,${y}%`;
                         }).join(" ")}
                         fill="none"
-                        stroke="#64748b"
-                        strokeWidth="2"
-                        strokeDasharray="4,4"
+                        stroke="#ef4444"
+                        strokeWidth="3"
                       />
                       {pipelineData.map((data, idx) => {
                         if (data.budget === 0) return null;
@@ -470,8 +469,8 @@ function DashboardContent() {
                             key={idx}
                             cx={`${x}%`}
                             cy={`${y}%`}
-                            r="3"
-                            fill="#64748b"
+                            r="4"
+                            fill="#ef4444"
                           />
                         );
                       })}
@@ -555,7 +554,7 @@ function DashboardContent() {
                     <span className="text-slate-600">Bid</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-dashed border-slate-500 rounded"></div>
+                    <div className="w-3 h-3 sm:w-4 sm:h-4 bg-red-500 rounded"></div>
                     <span className="text-slate-600">Budget</span>
                   </div>
                 </div>
