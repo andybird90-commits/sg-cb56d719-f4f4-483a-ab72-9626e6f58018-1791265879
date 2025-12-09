@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Plus, ChevronRight, Building2, AlertTriangle } from "lucide-react";
+import { Plus, ChevronRight, Building2, AlertTriangle, Search } from "lucide-react";
 import Link from "next/link";
 
 interface Opportunity {
@@ -31,8 +31,10 @@ function OpportunitiesContent() {
   const { profile } = useAuth();
   const router = useRouter();
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [filteredOpportunities, setFilteredOpportunities] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Everyone can create/edit, only directors/admins can delete
   const canEdit = !!profile;
@@ -41,6 +43,10 @@ function OpportunitiesContent() {
   useEffect(() => {
     fetchOpportunities();
   }, []);
+
+  useEffect(() => {
+    filterOpportunities();
+  }, [opportunities, searchTerm]);
 
   const fetchOpportunities = async () => {
     try {
@@ -63,12 +69,32 @@ function OpportunitiesContent() {
 
       if (fetchError) throw fetchError;
       setOpportunities((data as unknown as Opportunity[]) || []);
+      setFilteredOpportunities((data as unknown as Opportunity[]) || []);
     } catch (err) {
       console.error("Failed to load opportunities data", err);
       setError("Failed to load opportunities");
     } finally {
       setLoading(false);
     }
+  };
+
+  const filterOpportunities = () => {
+    if (!searchTerm) {
+      setFilteredOpportunities(opportunities);
+      return;
+    }
+
+    const filtered = opportunities.filter((opp) => {
+      const searchLower = searchTerm.toLowerCase();
+      return (
+        opp.name.toLowerCase().includes(searchLower) ||
+        opp.companies?.name.toLowerCase().includes(searchLower) ||
+        opp.stage.toLowerCase().includes(searchLower) ||
+        opp.status.toLowerCase().includes(searchLower)
+      );
+    });
+
+    setFilteredOpportunities(filtered);
   };
 
   const getStageColor = (stage: string) => {
@@ -112,6 +138,17 @@ function OpportunitiesContent() {
           )}
         </div>
 
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+          <Input
+            placeholder="Search by name, company, stage, or status..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+
         {/* Error State */}
         {error && (
           <Alert variant="destructive">
@@ -130,15 +167,17 @@ function OpportunitiesContent() {
         {/* Opportunities List */}
         {!loading && !error && (
           <div className="space-y-3">
-            {opportunities.length === 0 ? (
+            {filteredOpportunities.length === 0 ? (
               <Card>
                 <CardContent className="p-8 text-center">
                   <Building2 className="w-12 h-12 mx-auto text-slate-300 mb-3" />
-                  <p className="text-slate-600">No opportunities yet</p>
+                  <p className="text-slate-600">
+                    {searchTerm ? "No opportunities found" : "No opportunities yet"}
+                  </p>
                 </CardContent>
               </Card>
             ) : (
-              opportunities.map((opp) => (
+              filteredOpportunities.map((opp) => (
                 <Card 
                   key={opp.id} 
                   className="hover:shadow-md transition-shadow cursor-pointer"
@@ -184,9 +223,9 @@ function OpportunitiesContent() {
         )}
 
         {/* Results count */}
-        {!loading && !error && opportunities.length > 0 && (
+        {!loading && !error && filteredOpportunities.length > 0 && (
           <div className="text-center text-sm text-slate-600">
-            Showing {opportunities.length} {opportunities.length === 1 ? 'opportunity' : 'opportunities'}
+            Showing {filteredOpportunities.length} {filteredOpportunities.length === 1 ? 'opportunity' : 'opportunities'}
           </div>
         )}
       </div>
