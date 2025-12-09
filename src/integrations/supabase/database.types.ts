@@ -110,6 +110,56 @@ export type Database = {
           },
         ]
       }
+      contact_events: {
+        Row: {
+          contact_id: string
+          created_at: string | null
+          created_by: string | null
+          end_time: string | null
+          event_date: string
+          event_type: string
+          id: string
+          location: string | null
+          notes: string | null
+          start_time: string | null
+          title: string
+        }
+        Insert: {
+          contact_id: string
+          created_at?: string | null
+          created_by?: string | null
+          end_time?: string | null
+          event_date: string
+          event_type: string
+          id?: string
+          location?: string | null
+          notes?: string | null
+          start_time?: string | null
+          title: string
+        }
+        Update: {
+          contact_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          end_time?: string | null
+          event_date?: string
+          event_type?: string
+          id?: string
+          location?: string | null
+          notes?: string | null
+          start_time?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_events_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contacts: {
         Row: {
           added_by_user_id: string | null
