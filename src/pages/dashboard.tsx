@@ -24,7 +24,8 @@ interface Opportunity {
   name: string;
   stage: string;
   tender_due_date: string | null;
-  estimated_value: number | null;
+  expected_fee_value: number | null;
+  expected_start_date: string | null;
   companies?: { name: string };
 }
 
@@ -241,24 +242,24 @@ function DashboardContent() {
       // Fetch all opportunities
       const { data: allOpportunities } = await supabase
         .from("opportunities")
-        .select("id, stage, estimated_value, target_award_date")
+        .select("id, stage, expected_fee_value, expected_start_date")
         .in("stage", ["bid", "high_potential", "secured"]);
 
       // Group opportunities by month and stage
       (allOpportunities || []).forEach((opp) => {
-        if (!opp.target_award_date || !opp.estimated_value) return;
+        if (!opp.expected_start_date || !opp.expected_fee_value) return;
 
-        const awardDate = new Date(opp.target_award_date);
+        const awardDate = new Date(opp.expected_start_date);
         const monthIndex = (awardDate.getFullYear() - today.getFullYear()) * 12 + 
                           (awardDate.getMonth() - today.getMonth());
 
         if (monthIndex >= 0 && monthIndex < 12) {
           if (opp.stage === "bid") {
-            months[monthIndex].bid += opp.estimated_value;
+            months[monthIndex].bid += opp.expected_fee_value;
           } else if (opp.stage === "high_potential") {
-            months[monthIndex].prospect += opp.estimated_value;
+            months[monthIndex].prospect += opp.expected_fee_value;
           } else if (opp.stage === "secured") {
-            months[monthIndex].secured += opp.estimated_value;
+            months[monthIndex].secured += opp.expected_fee_value;
           }
         }
       });
