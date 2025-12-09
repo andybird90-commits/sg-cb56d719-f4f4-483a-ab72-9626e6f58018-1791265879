@@ -52,13 +52,13 @@ function CompanyDetailContent() {
     name: string;
     short_name: string;
     sector: string;
-    status: "active" | "prospect" | "inactive" | "";
+    status: "active" | "prospect" | "inactive";
     notes: string;
   }>({
     name: "",
     short_name: "",
     sector: "",
-    status: "",
+    status: "prospect",
     notes: "",
   });
   const [contacts, setContacts] = useState<Contact[]>([]);
