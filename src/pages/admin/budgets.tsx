@@ -217,7 +217,7 @@ function AdminBudgetsContent() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="budget_revenue">Budget Revenue (£) *</Label>
+                    <Label htmlFor="budget_revenue">Budget (£) *</Label>
                     <Input
                       id="budget_revenue"
                       type="number"
@@ -283,7 +283,7 @@ function AdminBudgetsContent() {
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <div className="text-sm text-slate-500">Revenue Budget</div>
+                            <div className="text-sm text-slate-500">Budget</div>
                             <div className="text-lg font-semibold text-slate-900">
                               {formatCurrency(budget.budget_revenue)}
                             </div>

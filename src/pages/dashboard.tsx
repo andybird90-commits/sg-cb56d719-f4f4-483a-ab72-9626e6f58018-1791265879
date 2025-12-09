@@ -24,8 +24,8 @@ interface Opportunity {
   name: string;
   stage: string;
   tender_due_date: string | null;
-  expected_fee_value: number | null;
-  expected_start_date: string | null;
+  expected_fee_value?: number | null;
+  expected_start_date?: string | null;
   companies?: { name: string };
 }
 
