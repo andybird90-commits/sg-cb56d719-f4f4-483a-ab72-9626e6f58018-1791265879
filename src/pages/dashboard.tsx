@@ -473,25 +473,6 @@ function DashboardContent() {
               <>
                 <div className="overflow-x-auto -mx-2 px-2">
                   <div className="min-w-[600px] h-64 sm:h-80 relative">
-                    {/* Budget line overlay */}
-                    <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 10 }}>
-                      <path
-                        d={pipelineData.map((data, idx) => {
-                          const totalWidth = pipelineData.length;
-                          const x = ((idx + 0.5) / totalWidth) * 100;
-                          const y = data.budget > 0 
-                            ? 20 + ((1 - (data.budget / maxValue)) * 60)
-                            : 80; // Default to bottom if no budget
-                          return `${idx === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`;
-                        }).join(' ')}
-                        fill="none"
-                        stroke="#ef4444"
-                        strokeWidth="2"
-                        strokeDasharray="4 4"
-                        vectorEffect="non-scaling-stroke"
-                      />
-                    </svg>
-
                     {/* Stacked bar chart with Y-axis */}
                     <div className="flex h-full">
                       {/* Y-axis labels */}
@@ -507,7 +488,9 @@ function DashboardContent() {
                       <div className="flex-1 flex gap-1 items-end border-l border-slate-200 pl-2">
                         {pipelineData.map((data, idx) => {
                           const total = data.bid + data.prospect + data.secured;
+                          const budgetGap = data.budget > 0 ? data.budget - total : 0;
                           const totalHeight = (total / maxValue) * 200;
+                          const budgetGapHeight = (budgetGap / maxValue) * 200;
                           const bidHeight = (data.bid / maxValue) * 200;
                           const prospectHeight = (data.prospect / maxValue) * 200;
                           const securedHeight = (data.secured / maxValue) * 200;
@@ -515,15 +498,34 @@ function DashboardContent() {
                           return (
                             <div key={idx} className="flex-1 flex flex-col justify-end items-center gap-1">
                               <div className="w-full flex flex-col">
-                                {/* Secured (green) - top */}
+                                {/* Budget gap bar (red) - top */}
+                                {budgetGap > 0 && (
+                                  <div
+                                    className="w-full bg-red-500 hover:bg-red-600 transition-colors relative flex items-center justify-center"
+                                    style={{
+                                      height: `${budgetGapHeight}px`,
+                                      minHeight: "2px",
+                                      borderTopLeftRadius: "4px",
+                                      borderTopRightRadius: "4px",
+                                    }}
+                                    title={`Budget Gap: ${formatCurrency(budgetGap)}`}
+                                  >
+                                    {budgetGapHeight > 20 && (
+                                      <span className="text-white text-[10px] font-medium">
+                                        Gap: {budgetGap >= 1000 ? `£${(budgetGap / 1000).toFixed(0)}k` : `£${budgetGap.toFixed(0)}`}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                                {/* Secured (green) - top of pipeline */}
                                 {data.secured > 0 && (
                                   <div
                                     className="w-full bg-green-500 hover:bg-green-600 transition-colors relative flex items-center justify-center"
                                     style={{
                                       height: `${securedHeight}px`,
                                       minHeight: "2px",
-                                      borderTopLeftRadius: total === data.secured ? "4px" : "0",
-                                      borderTopRightRadius: total === data.secured ? "4px" : "0",
+                                      borderTopLeftRadius: budgetGap === 0 ? "4px" : "0",
+                                      borderTopRightRadius: budgetGap === 0 ? "4px" : "0",
                                     }}
                                     title={`Secured: ${formatCurrency(data.secured)}`}
                                   >
@@ -541,8 +543,8 @@ function DashboardContent() {
                                     style={{
                                       height: `${prospectHeight}px`,
                                       minHeight: "2px",
-                                      borderTopLeftRadius: data.secured === 0 ? "4px" : "0",
-                                      borderTopRightRadius: data.secured === 0 ? "4px" : "0",
+                                      borderTopLeftRadius: data.secured === 0 && budgetGap === 0 ? "4px" : "0",
+                                      borderTopRightRadius: data.secured === 0 && budgetGap === 0 ? "4px" : "0",
                                     }}
                                     title={`Prospect: ${formatCurrency(data.prospect)}`}
                                   >
@@ -560,8 +562,8 @@ function DashboardContent() {
                                     style={{
                                       height: `${bidHeight}px`,
                                       minHeight: "2px",
-                                      borderTopLeftRadius: data.secured === 0 && data.prospect === 0 ? "4px" : "0",
-                                      borderTopRightRadius: data.secured === 0 && data.prospect === 0 ? "4px" : "0",
+                                      borderTopLeftRadius: data.secured === 0 && data.prospect === 0 && budgetGap === 0 ? "4px" : "0",
+                                      borderTopRightRadius: data.secured === 0 && data.prospect === 0 && budgetGap === 0 ? "4px" : "0",
                                       borderBottomLeftRadius: "4px",
                                       borderBottomRightRadius: "4px",
                                     }}
@@ -600,8 +602,8 @@ function DashboardContent() {
                     <span className="text-slate-600">Bid</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-0.5 bg-red-500" style={{ backgroundImage: 'repeating-linear-gradient(to right, #ef4444 0px, #ef4444 4px, transparent 4px, transparent 8px)' }}></div>
-                    <span className="text-slate-600">Budget</span>
+                    <div className="w-3 h-3 sm:w-4 sm:h-4 bg-red-500 rounded"></div>
+                    <span className="text-slate-600">Budget Gap</span>
                   </div>
                 </div>
               </>
