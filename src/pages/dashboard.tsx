@@ -246,11 +246,30 @@ function DashboardContent() {
         .in("stage", ["bid", "high_potential", "secured"])
         .is("linked_project_id", null); // Only get opportunities NOT yet converted to projects
 
-      // Fetch all live projects (secured work)
+      // Fetch all live projects
       const { data: liveProjects } = await supabase
         .from("projects")
         .select("id, status, agreed_fee_value, start_date, end_date")
         .eq("status", "live");
+
+      // Fetch ALL manual phasing data for live projects
+      const liveProjectIds = (liveProjects || []).map(p => p.id);
+      const { data: phasingData } = await supabase
+        .from("project_monthly_phasing")
+        .select("*")
+        .in("project_id", liveProjectIds);
+
+      // Create a map of phasing data by project
+      const phasingByProject = new Map<string, any[]>();
+      (phasingData || []).forEach(phasing => {
+        if (!phasingByProject.has(phasing.project_id)) {
+          phasingByProject.set(phasing.project_id, []);
+        }
+        phasingByProject.get(phasing.project_id)!.push(phasing);
+      });
+
+      // Debug logging object
+      const debugLog: Record<string, any> = {};
 
       // Process opportunities (only those not converted to projects)
       (allOpportunities || []).forEach((opp) => {
@@ -292,31 +311,77 @@ function DashboardContent() {
       (liveProjects || []).forEach((project) => {
         if (!project.start_date || !project.agreed_fee_value) return;
 
-        const startDate = new Date(project.start_date);
-        const endDate = project.end_date ? new Date(project.end_date) : startDate;
-        
-        const durationMonths = Math.max(1, 
-          (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
-          (endDate.getMonth() - startDate.getMonth()) + 1
-        );
-        
-        const monthlyValue = project.agreed_fee_value / durationMonths;
+        const projectPhasing = phasingByProject.get(project.id);
+        const hasManualPhasing = projectPhasing && projectPhasing.length > 0;
 
-        for (let monthOffset = 0; monthOffset < durationMonths; monthOffset++) {
-          const currentMonth = new Date(
-            startDate.getFullYear(), 
-            startDate.getMonth() + monthOffset, 
-            1
+        if (hasManualPhasing) {
+          // Use manual phasing data
+          projectPhasing.forEach((phasing: any) => {
+            const phasingDate = new Date(phasing.year, phasing.month - 1, 1);
+            const monthIndex = (phasingDate.getFullYear() - today.getFullYear()) * 12 + 
+                              (phasingDate.getMonth() - today.getMonth());
+
+            if (monthIndex >= 0 && monthIndex < 12) {
+              const revenueAmount = phasing.revenue_amount || 0;
+              months[monthIndex].secured += revenueAmount;
+
+              // Debug logging
+              const monthKey = `${phasing.year}-${String(phasing.month).padStart(2, '0')}`;
+              if (!debugLog[monthKey]) {
+                debugLog[monthKey] = { projects: [], total: 0 };
+              }
+              debugLog[monthKey].projects.push({
+                id: project.id,
+                source: 'manual_phasing',
+                amount: revenueAmount
+              });
+              debugLog[monthKey].total += revenueAmount;
+            }
+          });
+        } else {
+          // Use auto-spread for projects without manual phasing
+          const startDate = new Date(project.start_date);
+          const endDate = project.end_date ? new Date(project.end_date) : startDate;
+          
+          const durationMonths = Math.max(1, 
+            (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
+            (endDate.getMonth() - startDate.getMonth()) + 1
           );
           
-          const monthIndex = (currentMonth.getFullYear() - today.getFullYear()) * 12 + 
-                            (currentMonth.getMonth() - today.getMonth());
+          const monthlyValue = project.agreed_fee_value / durationMonths;
 
-          if (monthIndex >= 0 && monthIndex < 12) {
-            months[monthIndex].secured += monthlyValue;
+          for (let monthOffset = 0; monthOffset < durationMonths; monthOffset++) {
+            const currentMonth = new Date(
+              startDate.getFullYear(), 
+              startDate.getMonth() + monthOffset, 
+              1
+            );
+            
+            const monthIndex = (currentMonth.getFullYear() - today.getFullYear()) * 12 + 
+                              (currentMonth.getMonth() - today.getMonth());
+
+            if (monthIndex >= 0 && monthIndex < 12) {
+              months[monthIndex].secured += monthlyValue;
+
+              // Debug logging
+              const monthKey = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`;
+              if (!debugLog[monthKey]) {
+                debugLog[monthKey] = { projects: [], total: 0 };
+              }
+              debugLog[monthKey].projects.push({
+                id: project.id,
+                source: 'auto_spread',
+                amount: monthlyValue
+              });
+              debugLog[monthKey].total += monthlyValue;
+            }
           }
         }
       });
+
+      // Console log for debugging
+      console.log('🔍 Pipeline Debug - Secured Work by Month:', debugLog);
+      console.log('📊 Final Pipeline Data:', months);
 
       // Fetch budgets for each month
       for (let i = 0; i < 12; i++) {
