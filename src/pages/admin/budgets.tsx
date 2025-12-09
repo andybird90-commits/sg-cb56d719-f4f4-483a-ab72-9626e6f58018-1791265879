@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, Edit, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface MonthlyBudget {
   id: string;
@@ -21,10 +22,11 @@ interface MonthlyBudget {
 }
 
 function AdminBudgetsContent() {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const router = useRouter();
   const [budgets, setBudgets] = useState<MonthlyBudget[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   const [formOpen, setFormOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<MonthlyBudget | null>(null);
@@ -38,23 +40,35 @@ function AdminBudgetsContent() {
   const canEdit = profile?.role === "admin" || profile?.role === "director";
 
   useEffect(() => {
-    if (profile && !canEdit) {
+    if (!user) {
+      router.push("/auth/signin");
+    } else if (profile && !canEdit) {
       router.push("/dashboard");
     } else if (canEdit) {
       fetchBudgets();
     }
-  }, [profile, canEdit, router]);
+  }, [user, profile, canEdit, router]);
 
   const fetchBudgets = async () => {
-    setLoading(true);
-    const { data } = await supabase
-      .from("monthly_budgets")
-      .select("*")
-      .order("year", { ascending: false })
-      .order("month", { ascending: false });
+    try {
+      setLoading(true);
+      setError(null);
 
-    setBudgets(data || []);
-    setLoading(false);
+      const { data, error: fetchError } = await supabase
+        .from("monthly_budgets")
+        .select("*")
+        .order("year", { ascending: false })
+        .order("month", { ascending: false });
+
+      if (fetchError) throw fetchError;
+
+      setBudgets(data || []);
+    } catch (err) {
+      console.error("Failed to load budgets data", err);
+      setError("Failed to load budgets. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -141,16 +155,6 @@ function AdminBudgetsContent() {
   const getMonthName = (month: number) => {
     return new Date(2000, month - 1, 1).toLocaleDateString("en-GB", { month: "long" });
   };
-
-  if (loading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center py-12">
-          <div className="text-slate-600">Loading...</div>
-        </div>
-      </Layout>
-    );
-  }
 
   return (
     <Layout>
@@ -256,7 +260,15 @@ function AdminBudgetsContent() {
             <CardTitle>Budget Entries</CardTitle>
           </CardHeader>
           <CardContent>
-            {budgets.length === 0 ? (
+            {loading ? (
+              <div className="text-center py-8 text-slate-600">
+                Loading budgets...
+              </div>
+            ) : error ? (
+              <Alert variant="destructive" className="my-4">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            ) : budgets.length === 0 ? (
               <div className="text-center py-8 text-slate-600">
                 No budget entries yet. Create one to get started.
               </div>

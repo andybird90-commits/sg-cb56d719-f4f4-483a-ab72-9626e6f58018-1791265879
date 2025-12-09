@@ -9,6 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Check } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 interface Absence {
   id: string;
@@ -29,7 +31,8 @@ function TeamAbsencesContent() {
   const { user, profile } = useAuth();
   const router = useRouter();
   const [absences, setAbsences] = useState<Absence[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("pending");
 
   const canView = profile?.role === "admin" || profile?.role === "director";
@@ -43,23 +46,32 @@ function TeamAbsencesContent() {
   }, [profile, canView, router]);
 
   const fetchAbsences = async () => {
-    setLoading(true);
+    try {
+      setLoading(true);
+      setError(null);
 
-    const { data } = await supabase
-      .from("absences")
-      .select(`
-        *,
-        profiles!absences_user_id_fkey (
-          full_name
-        ),
-        approver:profiles!absences_approved_by_fkey (
-          full_name
-        )
-      `)
-      .order("start_date", { ascending: false });
+      const { data, error: fetchError } = await supabase
+        .from("absences")
+        .select(`
+          *,
+          profiles!absences_user_id_fkey (
+            full_name
+          ),
+          approver:profiles!absences_approved_by_fkey (
+            full_name
+          )
+        `)
+        .order("start_date", { ascending: false });
 
-    setAbsences(data || []);
-    setLoading(false);
+      if (fetchError) throw fetchError;
+
+      setAbsences(data || []);
+    } catch (err) {
+      console.error("Failed to load team absences data", err);
+      setError("Failed to load team absences");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleApprove = async (absenceId: string) => {
@@ -120,6 +132,13 @@ function TeamAbsencesContent() {
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Team Absences</h1>
           <p className="text-sm sm:text-base text-slate-600 mt-1">Review and approve absence requests</p>
         </div>
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="w-full grid grid-cols-2">

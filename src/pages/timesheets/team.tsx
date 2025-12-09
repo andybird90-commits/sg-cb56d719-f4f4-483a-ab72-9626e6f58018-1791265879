@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface Timesheet {
   id: string;
@@ -40,6 +41,7 @@ function TeamTimesheetsContent() {
   const [timesheets, setTimesheets] = useState<Timesheet[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<string>("all");
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(getWeekStart(new Date()));
 
@@ -61,48 +63,58 @@ function TeamTimesheetsContent() {
   }, [profile, canView, router, selectedUser, currentWeekStart]);
 
   const fetchData = async () => {
-    setLoading(true);
+    try {
+      setLoading(true);
+      setError(null);
 
-    const weekEnd = new Date(currentWeekStart);
-    weekEnd.setDate(weekEnd.getDate() + 7);
+      const weekEnd = new Date(currentWeekStart);
+      weekEnd.setDate(weekEnd.getDate() + 7);
 
-    let query = supabase
-      .from("timesheets")
-      .select(`
-        *,
-        profiles (
-          full_name
-        ),
-        projects (
-          code,
-          name
-        ),
-        project_activities (
-          name
-        ),
-        variations (
-          code
-        )
-      `)
-      .gte("date", currentWeekStart.toISOString().split("T")[0])
-      .lt("date", weekEnd.toISOString().split("T")[0])
-      .order("date", { ascending: false });
+      let query = supabase
+        .from("timesheets")
+        .select(`
+          *,
+          profiles (
+            full_name
+          ),
+          projects (
+            code,
+            name
+          ),
+          project_activities (
+            name
+          ),
+          variations (
+            code
+          )
+        `)
+        .gte("date", currentWeekStart.toISOString().split("T")[0])
+        .lt("date", weekEnd.toISOString().split("T")[0])
+        .order("date", { ascending: false });
 
-    if (selectedUser !== "all") {
-      query = query.eq("user_id", selectedUser);
+      if (selectedUser !== "all") {
+        query = query.eq("user_id", selectedUser);
+      }
+
+      const { data: timesheetsData, error: timesheetsError } = await query;
+      if (timesheetsError) throw timesheetsError;
+
+      const { data: usersData, error: usersError } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .eq("is_active", true)
+        .order("full_name");
+
+      if (usersError) throw usersError;
+
+      setTimesheets(timesheetsData || []);
+      setUsers(usersData || []);
+    } catch (err) {
+      console.error("Failed to load team timesheets data", err);
+      setError("Failed to load team timesheets. Please try again.");
+    } finally {
+      setLoading(false);
     }
-
-    const { data: timesheetsData } = await query;
-
-    const { data: usersData } = await supabase
-      .from("profiles")
-      .select("id, full_name")
-      .eq("is_active", true)
-      .order("full_name");
-
-    setTimesheets(timesheetsData || []);
-    setUsers(usersData || []);
-    setLoading(false);
   };
 
   const prevWeek = () => {
@@ -124,16 +136,6 @@ function TeamTimesheetsContent() {
   const getTotalHours = () => {
     return timesheets.reduce((sum, t) => sum + t.hours, 0);
   };
-
-  if (loading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center py-12">
-          <div className="text-slate-600">Loading...</div>
-        </div>
-      </Layout>
-    );
-  }
 
   return (
     <Layout>
@@ -183,7 +185,25 @@ function TeamTimesheetsContent() {
             </div>
           </CardHeader>
           <CardContent>
-            {timesheets.length === 0 ? (
+            {loading ? (
+              <div className="text-center py-8 text-slate-600 text-sm">
+                Loading team timesheets...
+              </div>
+            ) : error ? (
+              <div className="text-center py-8">
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+                <Button 
+                  onClick={fetchData} 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-4"
+                >
+                  Try Again
+                </Button>
+              </div>
+            ) : timesheets.length === 0 ? (
               <div className="text-center py-8 text-slate-600 text-sm">
                 No time entries for this period.
               </div>

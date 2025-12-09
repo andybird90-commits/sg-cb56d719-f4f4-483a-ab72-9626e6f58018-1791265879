@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from "@/components/ui/badge";
 import { Plus, Edit, Users } from "lucide-react";
 import Link from "next/link";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface Profile {
   id: string;
@@ -26,10 +27,11 @@ interface Profile {
 }
 
 function AdminContent() {
-  const { user, profile, loading: authLoading } = useAuth();
+  const { user, profile } = useAuth();
   const router = useRouter();
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   const [formOpen, setFormOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<Profile | null>(null);
@@ -44,25 +46,35 @@ function AdminContent() {
   const canEdit = profile?.role === "admin" || profile?.role === "director";
 
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (!user) {
       router.push("/auth/signin");
-    } else if (!authLoading && profile && !canEdit) {
+    } else if (profile && !canEdit) {
       router.push("/dashboard");
     } else if (canEdit) {
       fetchUsers();
     }
-  }, [user, profile, authLoading, canEdit, router]);
+  }, [user, profile, canEdit, router]);
 
   const fetchUsers = async () => {
-    setLoading(true);
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .order("full_name");
+    try {
+      setLoading(true);
+      setError(null);
 
-    // Cast to Profile[] as generated types might not have new columns yet
-    setUsers((data as unknown as Profile[]) || []);
-    setLoading(false);
+      const { data, error: fetchError } = await supabase
+        .from("profiles")
+        .select("*")
+        .order("full_name");
+
+      if (fetchError) throw fetchError;
+
+      // Cast to Profile[] as generated types might not have new columns yet
+      setUsers((data as unknown as Profile[]) || []);
+    } catch (err) {
+      console.error("Failed to load users data", err);
+      setError("Failed to load users. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleEdit = (user: Profile) => {
@@ -124,16 +136,6 @@ function AdminContent() {
     }).format(value);
   };
 
-  if (authLoading || loading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center py-12">
-          <div className="text-slate-600">Loading...</div>
-        </div>
-      </Layout>
-    );
-  }
-
   return (
     <Layout>
       <div className="space-y-4 sm:space-y-6">
@@ -158,7 +160,15 @@ function AdminContent() {
             </div>
           </CardHeader>
           <CardContent>
-            {users.length === 0 ? (
+            {loading ? (
+              <div className="text-center py-8 text-slate-600">
+                Loading users...
+              </div>
+            ) : error ? (
+              <Alert variant="destructive" className="my-4">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            ) : users.length === 0 ? (
               <div className="text-center py-8 text-slate-600">
                 No users found.
               </div>

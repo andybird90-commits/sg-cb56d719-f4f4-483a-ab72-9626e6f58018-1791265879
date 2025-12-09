@@ -91,14 +91,16 @@ function ProjectDetailContent() {
   const { profile } = useAuth();
   const router = useRouter();
   const { id } = router.query;
+  
   const [project, setProject] = useState<Project | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [variations, setVariations] = useState<Variation[]>([]);
   const [costs, setCosts] = useState<SubcontractorCost[]>([]);
   const [phasingData, setPhasingData] = useState<PhasingRow[]>([]);
   const [monthsGrid, setMonthsGrid] = useState<MonthPhasing[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  
+  const [projectLoading, setProjectLoading] = useState(true);
+  const [projectError, setProjectError] = useState<string | null>(null);
 
   // Activity form state
   const [activityFormOpen, setActivityFormOpen] = useState(false);
@@ -141,86 +143,86 @@ function ProjectDetailContent() {
   }, [id]);
 
   const fetchProjectData = async (projectId: string) => {
-    setLoading(true);
-    
-    const { data: projectData, error: projectError } = await supabase
-      .from("projects")
-      .select(`
-        id,
-        code,
-        name,
-        status,
-        start_date,
-        end_date,
-        agreed_fee_value,
-        notes,
-        client_company_id,
-        opportunity_id,
-        companies!projects_client_company_id_fkey (
+    try {
+      setProjectLoading(true);
+      setProjectError(null);
+
+      const { data: projectData, error: projectError } = await supabase
+        .from("projects")
+        .select(`
           id,
-          name
-        ),
-        opportunities!projects_opportunity_id_fkey (
-          id,
-          name
-        )
-      `)
-      .eq("id", projectId)
-      .single();
+          code,
+          name,
+          status,
+          start_date,
+          end_date,
+          agreed_fee_value,
+          notes,
+          client_company_id,
+          opportunity_id,
+          companies!projects_client_company_id_fkey (
+            id,
+            name
+          ),
+          opportunities!projects_opportunity_id_fkey (
+            id,
+            name
+          )
+        `)
+        .eq("id", projectId)
+        .single();
 
-    if (projectError) {
-      console.error("Failed to load project:", projectError);
-      setError(`Failed to load project: ${projectError.message}`);
-      setLoading(false);
-      return;
+      if (projectError) throw projectError;
+
+      if (!projectData) {
+        setProjectError("Project not found");
+        return;
+      }
+
+      const { data: activitiesData } = await supabase
+        .from("project_activities")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: false });
+
+      const { data: variationsData } = await supabase
+        .from("variations")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: false });
+
+      const { data: costsData } = await supabase
+        .from("subcontractor_costs")
+        .select(`
+          *,
+          variations (
+            code
+          )
+        `)
+        .eq("project_id", projectId)
+        .order("cost_date", { ascending: false });
+
+      const { data: phasingDataResult } = await supabase
+        .from("project_monthly_phasing")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("year", { ascending: true })
+        .order("month", { ascending: true });
+
+      setProject(projectData);
+      setActivities(activitiesData || []);
+      setVariations(variationsData || []);
+      setCosts(costsData || []);
+      setPhasingData((phasingDataResult as unknown as PhasingRow[]) || []);
+      
+      // Generate months grid
+      generateMonthsGrid(projectData, (phasingDataResult as unknown as PhasingRow[]) || []);
+    } catch (err) {
+      console.error("Failed to load project data", err);
+      setProjectError("Failed to load project");
+    } finally {
+      setProjectLoading(false);
     }
-
-    if (!projectData) {
-      setError("Project not found");
-      setLoading(false);
-      return;
-    }
-
-    const { data: activitiesData } = await supabase
-      .from("project_activities")
-      .select("*")
-      .eq("project_id", projectId)
-      .order("created_at", { ascending: false });
-
-    const { data: variationsData } = await supabase
-      .from("variations")
-      .select("*")
-      .eq("project_id", projectId)
-      .order("created_at", { ascending: false });
-
-    const { data: costsData } = await supabase
-      .from("subcontractor_costs")
-      .select(`
-        *,
-        variations (
-          code
-        )
-      `)
-      .eq("project_id", projectId)
-      .order("cost_date", { ascending: false });
-
-    const { data: phasingDataResult } = await supabase
-      .from("project_monthly_phasing")
-      .select("*")
-      .eq("project_id", projectId)
-      .order("year", { ascending: true })
-      .order("month", { ascending: true });
-
-    setProject(projectData);
-    setActivities(activitiesData || []);
-    setVariations(variationsData || []);
-    setCosts(costsData || []);
-    setPhasingData((phasingDataResult as unknown as PhasingRow[]) || []);
-    
-    // Generate months grid
-    generateMonthsGrid(projectData, (phasingDataResult as unknown as PhasingRow[]) || []);
-    
-    setLoading(false);
   };
 
   const generateMonthsGrid = (proj: Project, phasing: PhasingRow[]) => {
@@ -245,7 +247,7 @@ function ProjectDetailContent() {
         actualRevenue: existingPhasing?.actual_revenue || 0,
         invoiceStatus: existingPhasing?.invoice_status || "none",
         invoiceRef: existingPhasing?.invoice_ref || "",
-        invoiceDate: existingPhasing?.invoice_date || "",
+        invoiceDate: existingPhasing?.invoice_date || null,
         hasData: !!existingPhasing,
       });
     }
@@ -736,7 +738,7 @@ function ProjectDetailContent() {
     return total;
   };
 
-  if (loading) {
+  if (projectLoading) {
     return (
       <Layout>
         <div className="flex items-center justify-center py-12">
@@ -746,12 +748,12 @@ function ProjectDetailContent() {
     );
   }
 
-  if (error || !project) {
+  if (projectError || !project) {
     return (
       <Layout>
         <div className="space-y-6">
           <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription>{projectError}</AlertDescription>
           </Alert>
           <Link href="/projects">
             <Button variant="outline" className="gap-2">
@@ -776,725 +778,746 @@ function ProjectDetailContent() {
           </Link>
         </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="font-mono text-sm text-slate-500">{project.code}</span>
-              <CardTitle className="text-2xl">{project.name}</CardTitle>
-              <Badge className={getStatusColor(project.status)}>
-                {project.status.replace("_", " ")}
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                {project.companies && (
-                  <div>
-                    <div className="text-sm font-medium text-slate-500">Client</div>
-                    <div className="text-slate-900">{project.companies.name}</div>
-                  </div>
-                )}
-                
-                {project.opportunities && (
-                  <div>
-                    <div className="text-sm font-medium text-slate-500">Linked Opportunity</div>
-                    <div className="text-slate-900">{project.opportunities.name}</div>
-                  </div>
-                )}
+        {/* Error State */}
+        {projectError && (
+          <Alert variant="destructive">
+            <AlertDescription>{projectError}</AlertDescription>
+          </Alert>
+        )}
 
-                {project.agreed_fee_value && (
-                  <div>
-                    <div className="text-sm font-medium text-slate-500">Agreed Fee</div>
-                    <div className="text-slate-900 font-semibold">{formatCurrency(project.agreed_fee_value)}</div>
-                  </div>
-                )}
+        {/* Loading State */}
+        {projectLoading && !projectError && (
+          <Card>
+            <CardContent className="p-8 text-center">
+              <div className="text-slate-600">Loading project...</div>
+            </CardContent>
+          </Card>
+        )}
 
-                {project.start_date && (
-                  <div>
-                    <div className="text-sm font-medium text-slate-500">Start Date</div>
-                    <div className="text-slate-900">{formatDate(project.start_date)}</div>
-                  </div>
-                )}
-
-                {project.end_date && (
-                  <div>
-                    <div className="text-sm font-medium text-slate-500">End Date</div>
-                    <div className="text-slate-900">{formatDate(project.end_date)}</div>
-                  </div>
-                )}
-              </div>
-
-              {project.notes && (
-                <div>
-                  <div className="text-sm font-medium text-slate-500 mb-1">Notes</div>
-                  <div className="text-slate-900 whitespace-pre-wrap">{project.notes}</div>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Tabs defaultValue="activities" className="w-full">
-          <TabsList>
-            <TabsTrigger value="activities">Activities</TabsTrigger>
-            <TabsTrigger value="variations">Variations</TabsTrigger>
-            <TabsTrigger value="costs">Subcontractor Costs</TabsTrigger>
-            <TabsTrigger value="phasing">Phasing</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="activities">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Project Activities</CardTitle>
-                {canEdit && (
-                  <Dialog open={activityFormOpen} onOpenChange={setActivityFormOpen}>
-                    <DialogTrigger asChild>
-                      <Button size="sm" className="gap-2" onClick={() => {
-                        setEditingActivity(null);
-                        setActivityForm({
-                          name: "",
-                          activity_type: "",
-                          billable: true,
-                          status: "not_started",
-                          notes: "",
-                        });
-                      }}>
-                        <Plus className="w-4 h-4" />
-                        New Activity
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>{editingActivity ? "Edit Activity" : "New Activity"}</DialogTitle>
-                      </DialogHeader>
-                      <form onSubmit={handleActivitySubmit} className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="activity_name">Name *</Label>
-                          <Input
-                            id="activity_name"
-                            value={activityForm.name}
-                            onChange={(e) => setActivityForm({ ...activityForm, name: e.target.value })}
-                            required
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="activity_type">Type</Label>
-                          <Input
-                            id="activity_type"
-                            value={activityForm.activity_type}
-                            onChange={(e) => setActivityForm({ ...activityForm, activity_type: e.target.value })}
-                            placeholder="e.g., Design, Review, Coordination"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="status">Status</Label>
-                          <Select
-                            value={activityForm.status}
-                            onValueChange={(value) => setActivityForm({ ...activityForm, status: value })}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="not_started">Not Started</SelectItem>
-                              <SelectItem value="in_progress">In Progress</SelectItem>
-                              <SelectItem value="complete">Complete</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id="billable"
-                            checked={activityForm.billable}
-                            onCheckedChange={(checked) => setActivityForm({ ...activityForm, billable: checked === true })}
-                          />
-                          <Label htmlFor="billable">Billable</Label>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="activity_notes">Notes</Label>
-                          <Textarea
-                            id="activity_notes"
-                            value={activityForm.notes}
-                            onChange={(e) => setActivityForm({ ...activityForm, notes: e.target.value })}
-                            rows={3}
-                          />
-                        </div>
-
-                        <div className="flex gap-3">
-                          <Button type="submit">
-                            {editingActivity ? "Update" : "Create"}
-                          </Button>
-                          <Button type="button" variant="outline" onClick={() => setActivityFormOpen(false)}>
-                            Cancel
-                          </Button>
-                        </div>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
-                )}
-              </CardHeader>
-              <CardContent>
-                {activities.length === 0 ? (
-                  <div className="text-center py-8 text-slate-600">
-                    No activities yet.
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {activities.map((activity) => (
-                      <div key={activity.id} className="p-4 border rounded-lg">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <h4 className="font-medium text-slate-900">{activity.name}</h4>
-                              <Badge className={getStatusColor(activity.status)}>
-                                {activity.status.replace("_", " ")}
-                              </Badge>
-                              {activity.billable && (
-                                <Badge variant="outline">Billable</Badge>
-                              )}
-                            </div>
-                            {activity.activity_type && (
-                              <div className="text-sm text-slate-600 mb-1">
-                                Type: {activity.activity_type}
-                              </div>
-                            )}
-                            {activity.notes && (
-                              <div className="text-sm text-slate-600 whitespace-pre-wrap">
-                                {activity.notes}
-                              </div>
-                            )}
-                          </div>
-                          {canEdit && (
-                            <div className="flex gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleEditActivity(activity)}
-                              >
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDeleteActivity(activity.id)}
-                              >
-                                <Trash2 className="w-4 h-4 text-red-600" />
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="variations">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Variations</CardTitle>
-                {canEdit && (
-                  <Dialog open={variationFormOpen} onOpenChange={setVariationFormOpen}>
-                    <DialogTrigger asChild>
-                      <Button size="sm" className="gap-2" onClick={() => {
-                        setEditingVariation(null);
-                        setVariationForm({
-                          code: "",
-                          description: "",
-                          value: "",
-                          status: "proposed",
-                        });
-                      }}>
-                        <Plus className="w-4 h-4" />
-                        New Variation
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>{editingVariation ? "Edit Variation" : "New Variation"}</DialogTitle>
-                      </DialogHeader>
-                      <form onSubmit={handleVariationSubmit} className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="variation_code">Code *</Label>
-                          <Input
-                            id="variation_code"
-                            value={variationForm.code}
-                            onChange={(e) => setVariationForm({ ...variationForm, code: e.target.value })}
-                            placeholder="e.g., VAR-001"
-                            required
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="variation_description">Description</Label>
-                          <Textarea
-                            id="variation_description"
-                            value={variationForm.description}
-                            onChange={(e) => setVariationForm({ ...variationForm, description: e.target.value })}
-                            rows={3}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="variation_value">Value (£) *</Label>
-                          <Input
-                            id="variation_value"
-                            type="number"
-                            step="0.01"
-                            value={variationForm.value}
-                            onChange={(e) => setVariationForm({ ...variationForm, value: e.target.value })}
-                            required
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="variation_status">Status</Label>
-                          <Select
-                            value={variationForm.status}
-                            onValueChange={(value) => setVariationForm({ ...variationForm, status: value })}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="proposed">Proposed</SelectItem>
-                              <SelectItem value="accepted">Accepted</SelectItem>
-                              <SelectItem value="rejected">Rejected</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="flex gap-3">
-                          <Button type="submit">
-                            {editingVariation ? "Update" : "Create"}
-                          </Button>
-                          <Button type="button" variant="outline" onClick={() => setVariationFormOpen(false)}>
-                            Cancel
-                          </Button>
-                        </div>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
-                )}
-              </CardHeader>
-              <CardContent>
-                {variations.length === 0 ? (
-                  <div className="text-center py-8 text-slate-600">
-                    No variations yet.
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {variations.map((variation) => (
-                      <div key={variation.id} className="p-4 border rounded-lg">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <span className="font-mono text-sm text-slate-500">{variation.code}</span>
-                              <Badge className={getStatusColor(variation.status)}>
-                                {variation.status}
-                              </Badge>
-                            </div>
-                            {variation.description && (
-                              <div className="text-sm text-slate-600 mb-2 whitespace-pre-wrap">
-                                {variation.description}
-                              </div>
-                            )}
-                            <div className="text-lg font-semibold text-slate-900">
-                              {formatCurrency(variation.value)}
-                            </div>
-                          </div>
-                          {canEdit && (
-                            <div className="flex gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleEditVariation(variation)}
-                              >
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDeleteVariation(variation.id)}
-                              >
-                                <Trash2 className="w-4 h-4 text-red-600" />
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="costs">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Subcontractor Costs</CardTitle>
-                {canEdit && (
-                  <Dialog open={costFormOpen} onOpenChange={setCostFormOpen}>
-                    <DialogTrigger asChild>
-                      <Button size="sm" className="gap-2" onClick={() => {
-                        setEditingCost(null);
-                        setCostForm({
-                          supplier_name: "",
-                          description: "",
-                          cost_amount: "",
-                          cost_date: "",
-                          variation_id: "",
-                        });
-                      }}>
-                        <Plus className="w-4 h-4" />
-                        New Cost
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>{editingCost ? "Edit Cost" : "New Subcontractor Cost"}</DialogTitle>
-                      </DialogHeader>
-                      <form onSubmit={handleCostSubmit} className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="supplier_name">Supplier Name *</Label>
-                          <Input
-                            id="supplier_name"
-                            value={costForm.supplier_name}
-                            onChange={(e) => setCostForm({ ...costForm, supplier_name: e.target.value })}
-                            required
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="cost_description">Description</Label>
-                          <Textarea
-                            id="cost_description"
-                            value={costForm.description}
-                            onChange={(e) => setCostForm({ ...costForm, description: e.target.value })}
-                            rows={3}
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="cost_amount">Cost Amount (£) *</Label>
-                            <Input
-                              id="cost_amount"
-                              type="number"
-                              step="0.01"
-                              value={costForm.cost_amount}
-                              onChange={(e) => setCostForm({ ...costForm, cost_amount: e.target.value })}
-                              required
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="cost_date">Date *</Label>
-                            <Input
-                              id="cost_date"
-                              type="date"
-                              value={costForm.cost_date}
-                              onChange={(e) => setCostForm({ ...costForm, cost_date: e.target.value })}
-                              required
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="cost_variation">Variation (Optional)</Label>
-                          <Select
-                            value={costForm.variation_id}
-                            onValueChange={(value) => setCostForm({ ...costForm, variation_id: value })}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="None" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="">None</SelectItem>
-                              {variations.map((v) => (
-                                <SelectItem key={v.id} value={v.id}>
-                                  {v.code}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="flex gap-3">
-                          <Button type="submit">
-                            {editingCost ? "Update" : "Create"}
-                          </Button>
-                          <Button type="button" variant="outline" onClick={() => setCostFormOpen(false)}>
-                            Cancel
-                          </Button>
-                        </div>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
-                )}
-              </CardHeader>
-              <CardContent>
-                {costs.length === 0 ? (
-                  <div className="text-center py-8 text-slate-600">
-                    No subcontractor costs yet.
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {costs.map((cost) => (
-                      <div key={cost.id} className="p-4 border rounded-lg">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <h4 className="font-medium text-slate-900">{cost.supplier_name}</h4>
-                              {cost.variations && (
-                                <Badge variant="outline">{cost.variations.code}</Badge>
-                              )}
-                            </div>
-                            {cost.description && (
-                              <div className="text-sm text-slate-600 mb-2 whitespace-pre-wrap">
-                                {cost.description}
-                              </div>
-                            )}
-                            <div className="flex items-center gap-4">
-                              <div className="text-lg font-semibold text-slate-900">
-                                {formatCurrency(cost.cost_amount)}
-                              </div>
-                              <div className="text-sm text-slate-500">
-                                {formatDate(cost.cost_date)}
-                              </div>
-                            </div>
-                          </div>
-                          {canEdit && (
-                            <div className="flex gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleEditCost(cost)}
-                              >
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDeleteCost(cost.id)}
-                              >
-                                <Trash2 className="w-4 h-4 text-red-600" />
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="phasing">
+        {/* Project Content */}
+        {!projectLoading && !projectError && project && (
+          <>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <CalendarIcon className="w-5 h-5 text-slate-600" />
-                  <CardTitle>Revenue Phasing</CardTitle>
+                  <span className="font-mono text-sm text-slate-500">{project.code}</span>
+                  <CardTitle className="text-2xl">{project.name}</CardTitle>
+                  <Badge className={getStatusColor(project.status)}>
+                    {project.status.replace("_", " ")}
+                  </Badge>
                 </div>
-                {canEdit && (
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={handleAutoFill}>
-                      Auto-fill evenly
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={handleClearPhasing}>
-                      Clear phasing
-                    </Button>
-                  </div>
-                )}
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="text-sm text-slate-600">
-                    {phasingData.length === 0 ? (
-                      <div className="bg-blue-50 border border-blue-200 rounded p-4 mb-4">
-                        <p className="font-medium text-blue-900 mb-1">Automatic allocation active</p>
-                        <p className="text-blue-700 text-sm">
-                          Revenue is automatically spread across project duration using day-based allocation.
-                          Set manual phasing below to override the automatic calculation.
-                        </p>
+                  <div className="grid grid-cols-2 gap-4">
+                    {project.companies && (
+                      <div>
+                        <div className="text-sm font-medium text-slate-500">Client</div>
+                        <div className="text-slate-900">{project.companies.name}</div>
                       </div>
-                    ) : (
-                      <div className="bg-orange-50 border border-orange-200 rounded p-4 mb-4">
-                        <p className="font-medium text-orange-900 mb-1">Manual phasing active</p>
-                        <p className="text-orange-700 text-sm">
-                          This project uses manual month-by-month revenue allocation.
-                          Clear phasing to revert to automatic day-based spread.
-                        </p>
+                    )}
+                    
+                    {project.opportunities && (
+                      <div>
+                        <div className="text-sm font-medium text-slate-500">Linked Opportunity</div>
+                        <div className="text-slate-900">{project.opportunities.name}</div>
+                      </div>
+                    )}
+
+                    {project.agreed_fee_value && (
+                      <div>
+                        <div className="text-sm font-medium text-slate-500">Agreed Fee</div>
+                        <div className="text-slate-900 font-semibold">{formatCurrency(project.agreed_fee_value)}</div>
+                      </div>
+                    )}
+
+                    {project.start_date && (
+                      <div>
+                        <div className="text-sm font-medium text-slate-500">Start Date</div>
+                        <div className="text-slate-900">{formatDate(project.start_date)}</div>
+                      </div>
+                    )}
+
+                    {project.end_date && (
+                      <div>
+                        <div className="text-sm font-medium text-slate-500">End Date</div>
+                        <div className="text-slate-900">{formatDate(project.end_date)}</div>
                       </div>
                     )}
                   </div>
 
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse text-sm">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-left p-2 font-medium text-slate-600">Month</th>
-                          <th className="text-right p-2 font-medium text-slate-600">Forecast (£)</th>
-                          <th className="text-right p-2 font-medium text-slate-600">Actual (£)</th>
-                          <th className="text-left p-2 font-medium text-slate-600">Invoice Status</th>
-                          <th className="text-left p-2 font-medium text-slate-600">Invoice Ref</th>
-                          <th className="text-left p-2 font-medium text-slate-600">Invoice Date</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {monthsGrid.map((m, idx) => (
-                          <tr key={idx} className="border-b hover:bg-slate-50">
-                            <td className="p-2 text-slate-900">
-                              {getMonthName(m.month)} {m.year}
-                            </td>
-                            <td className="p-2">
-                              {canEdit ? (
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  value={m.revenue || ""}
-                                  onChange={(e) => {
-                                    const value = e.target.value === "" ? 0 : parseFloat(e.target.value);
-                                    handlePhasingUpdate(m.year, m.month, "revenue", value);
-                                  }}
-                                  className="text-right h-8"
-                                  placeholder="0"
-                                />
-                              ) : (
-                                <div className="text-right">
-                                  {formatCurrency(m.revenue)}
-                                </div>
-                              )}
-                            </td>
-                            <td className="p-2">
-                              {canEdit ? (
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  value={m.actualRevenue || ""}
-                                  onChange={(e) => {
-                                    const value = e.target.value === "" ? 0 : parseFloat(e.target.value);
-                                    handlePhasingUpdate(m.year, m.month, "actual", value);
-                                  }}
-                                  className="text-right h-8"
-                                  placeholder="0"
-                                />
-                              ) : (
-                                <div className="text-right">
-                                  {formatCurrency(m.actualRevenue)}
-                                </div>
-                              )}
-                            </td>
-                            <td className="p-2">
-                              {canEdit ? (
-                                <Select
-                                  value={m.invoiceStatus}
-                                  onValueChange={(value) => handlePhasingUpdate(m.year, m.month, "invoiceStatus", value)}
-                                >
-                                  <SelectTrigger className="h-8 w-32">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="none">None</SelectItem>
-                                    <SelectItem value="to_invoice">To Invoice</SelectItem>
-                                    <SelectItem value="invoiced">Invoiced</SelectItem>
-                                    <SelectItem value="paid">Paid</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              ) : (
-                                <Badge variant="outline" className="capitalize">
-                                  {m.invoiceStatus.replace("_", " ")}
-                                </Badge>
-                              )}
-                            </td>
-                            <td className="p-2">
-                              {canEdit ? (
-                                <Input
-                                  type="text"
-                                  value={m.invoiceRef || ""}
-                                  onChange={(e) => handlePhasingUpdate(m.year, m.month, "invoiceRef", e.target.value)}
-                                  className="h-8"
-                                  placeholder="INV-001"
-                                  disabled={m.invoiceStatus === "none" || m.invoiceStatus === "to_invoice"}
-                                />
-                              ) : (
-                                <div className="text-slate-900">{m.invoiceRef || "—"}</div>
-                              )}
-                            </td>
-                            <td className="p-2">
-                              {canEdit ? (
-                                <Input
-                                  type="date"
-                                  value={m.invoiceDate || ""}
-                                  onChange={(e) => handlePhasingUpdate(m.year, m.month, "invoiceDate", e.target.value)}
-                                  className="h-8 w-36"
-                                  disabled={m.invoiceStatus === "none" || m.invoiceStatus === "to_invoice"}
-                                />
-                              ) : (
-                                <div className="text-slate-900">{m.invoiceDate ? formatDate(m.invoiceDate) : "—"}</div>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Summary */}
-                  <div className="border-t pt-4 mt-4">
-                    <div className="grid grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <div className="text-slate-500 mb-1">Total forecast revenue</div>
-                        <div className="text-lg font-semibold text-slate-900">
-                          {formatCurrency(getTotalPhasedRevenue())}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-slate-500 mb-1">Total actual revenue</div>
-                        <div className="text-lg font-semibold text-green-600">
-                          {formatCurrency(getTotalActualRevenue())}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-slate-500 mb-1">Project agreed fee</div>
-                        <div className="text-lg font-semibold text-slate-900">
-                          {formatCurrency(getTotalProjectFee())}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-slate-500 mb-1">Forecast difference</div>
-                        <div className={`text-lg font-semibold ${
-                          Math.abs(getTotalPhasedRevenue() - getTotalProjectFee()) > 0.01
-                            ? "text-orange-600"
-                            : "text-green-600"
-                        }`}>
-                          {formatCurrency(getTotalPhasedRevenue() - getTotalProjectFee())}
-                        </div>
-                      </div>
+                  {project.notes && (
+                    <div>
+                      <div className="text-sm font-medium text-slate-500 mb-1">Notes</div>
+                      <div className="text-slate-900 whitespace-pre-wrap">{project.notes}</div>
                     </div>
-                    {Math.abs(getTotalPhasedRevenue() - getTotalProjectFee()) > 0.01 && (
-                      <div className="mt-3 text-xs text-orange-600">
-                        ⚠️ Forecast phased revenue does not match project fee. Adjust phasing or use "Auto-fill evenly".
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
-        </Tabs>
+
+            <Tabs defaultValue="activities" className="w-full">
+              <TabsList>
+                <TabsTrigger value="activities">Activities</TabsTrigger>
+                <TabsTrigger value="variations">Variations</TabsTrigger>
+                <TabsTrigger value="costs">Subcontractor Costs</TabsTrigger>
+                <TabsTrigger value="phasing">Phasing</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="activities">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle>Project Activities</CardTitle>
+                    {canEdit && (
+                      <Dialog open={activityFormOpen} onOpenChange={setActivityFormOpen}>
+                        <DialogTrigger asChild>
+                          <Button size="sm" className="gap-2" onClick={() => {
+                            setEditingActivity(null);
+                            setActivityForm({
+                              name: "",
+                              activity_type: "",
+                              billable: true,
+                              status: "not_started",
+                              notes: "",
+                            });
+                          }}>
+                            <Plus className="w-4 h-4" />
+                            New Activity
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>{editingActivity ? "Edit Activity" : "New Activity"}</DialogTitle>
+                          </DialogHeader>
+                          <form onSubmit={handleActivitySubmit} className="space-y-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="activity_name">Name *</Label>
+                              <Input
+                                id="activity_name"
+                                value={activityForm.name}
+                                onChange={(e) => setActivityForm({ ...activityForm, name: e.target.value })}
+                                required
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="activity_type">Type</Label>
+                              <Input
+                                id="activity_type"
+                                value={activityForm.activity_type}
+                                onChange={(e) => setActivityForm({ ...activityForm, activity_type: e.target.value })}
+                                placeholder="e.g., Design, Review, Coordination"
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="status">Status</Label>
+                              <Select
+                                value={activityForm.status}
+                                onValueChange={(value) => setActivityForm({ ...activityForm, status: value })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="not_started">Not Started</SelectItem>
+                                  <SelectItem value="in_progress">In Progress</SelectItem>
+                                  <SelectItem value="complete">Complete</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="flex items-center space-x-2">
+                              <Checkbox
+                                id="billable"
+                                checked={activityForm.billable}
+                                onCheckedChange={(checked) => setActivityForm({ ...activityForm, billable: checked === true })}
+                              />
+                              <Label htmlFor="billable">Billable</Label>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="activity_notes">Notes</Label>
+                              <Textarea
+                                id="activity_notes"
+                                value={activityForm.notes}
+                                onChange={(e) => setActivityForm({ ...activityForm, notes: e.target.value })}
+                                rows={3}
+                              />
+                            </div>
+
+                            <div className="flex gap-3">
+                              <Button type="submit">
+                                {editingActivity ? "Update" : "Create"}
+                              </Button>
+                              <Button type="button" variant="outline" onClick={() => setActivityFormOpen(false)}>
+                                Cancel
+                              </Button>
+                            </div>
+                          </form>
+                        </DialogContent>
+                      </Dialog>
+                    )}
+                  </CardHeader>
+                  <CardContent>
+                    {activities.length === 0 ? (
+                      <div className="text-center py-8 text-slate-600">
+                        No activities yet.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {activities.map((activity) => (
+                          <div key={activity.id} className="p-4 border rounded-lg">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-2">
+                                  <h4 className="font-medium text-slate-900">{activity.name}</h4>
+                                  <Badge className={getStatusColor(activity.status)}>
+                                    {activity.status.replace("_", " ")}
+                                  </Badge>
+                                  {activity.billable && (
+                                    <Badge variant="outline">Billable</Badge>
+                                  )}
+                                </div>
+                                {activity.activity_type && (
+                                  <div className="text-sm text-slate-600 mb-1">
+                                    Type: {activity.activity_type}
+                                  </div>
+                                )}
+                                {activity.notes && (
+                                  <div className="text-sm text-slate-600 whitespace-pre-wrap">
+                                    {activity.notes}
+                                  </div>
+                                )}
+                              </div>
+                              {canEdit && (
+                                <div className="flex gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleEditActivity(activity)}
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteActivity(activity.id)}
+                                  >
+                                    <Trash2 className="w-4 h-4 text-red-600" />
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="variations">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle>Variations</CardTitle>
+                    {canEdit && (
+                      <Dialog open={variationFormOpen} onOpenChange={setVariationFormOpen}>
+                        <DialogTrigger asChild>
+                          <Button size="sm" className="gap-2" onClick={() => {
+                            setEditingVariation(null);
+                            setVariationForm({
+                              code: "",
+                              description: "",
+                              value: "",
+                              status: "proposed",
+                            });
+                          }}>
+                            <Plus className="w-4 h-4" />
+                            New Variation
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>{editingVariation ? "Edit Variation" : "New Variation"}</DialogTitle>
+                          </DialogHeader>
+                          <form onSubmit={handleVariationSubmit} className="space-y-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="variation_code">Code *</Label>
+                              <Input
+                                id="variation_code"
+                                value={variationForm.code}
+                                onChange={(e) => setVariationForm({ ...variationForm, code: e.target.value })}
+                                placeholder="e.g., VAR-001"
+                                required
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="variation_description">Description</Label>
+                              <Textarea
+                                id="variation_description"
+                                value={variationForm.description}
+                                onChange={(e) => setVariationForm({ ...variationForm, description: e.target.value })}
+                                rows={3}
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="variation_value">Value (£) *</Label>
+                              <Input
+                                id="variation_value"
+                                type="number"
+                                step="0.01"
+                                value={variationForm.value}
+                                onChange={(e) => setVariationForm({ ...variationForm, value: e.target.value })}
+                                required
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="variation_status">Status</Label>
+                              <Select
+                                value={variationForm.status}
+                                onValueChange={(value) => setVariationForm({ ...variationForm, status: value })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="proposed">Proposed</SelectItem>
+                                  <SelectItem value="accepted">Accepted</SelectItem>
+                                  <SelectItem value="rejected">Rejected</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="flex gap-3">
+                              <Button type="submit">
+                                {editingVariation ? "Update" : "Create"}
+                              </Button>
+                              <Button type="button" variant="outline" onClick={() => setVariationFormOpen(false)}>
+                                Cancel
+                              </Button>
+                            </div>
+                          </form>
+                        </DialogContent>
+                      </Dialog>
+                    )}
+                  </CardHeader>
+                  <CardContent>
+                    {variations.length === 0 ? (
+                      <div className="text-center py-8 text-slate-600">
+                        No variations yet.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {variations.map((variation) => (
+                          <div key={variation.id} className="p-4 border rounded-lg">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-2">
+                                  <span className="font-mono text-sm text-slate-500">{variation.code}</span>
+                                  <Badge className={getStatusColor(variation.status)}>
+                                    {variation.status}
+                                  </Badge>
+                                </div>
+                                {variation.description && (
+                                  <div className="text-sm text-slate-600 mb-2 whitespace-pre-wrap">
+                                    {variation.description}
+                                  </div>
+                                )}
+                                <div className="text-lg font-semibold text-slate-900">
+                                  {formatCurrency(variation.value)}
+                                </div>
+                              </div>
+                              {canEdit && (
+                                <div className="flex gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleEditVariation(variation)}
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteVariation(variation.id)}
+                                  >
+                                    <Trash2 className="w-4 h-4 text-red-600" />
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="costs">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle>Subcontractor Costs</CardTitle>
+                    {canEdit && (
+                      <Dialog open={costFormOpen} onOpenChange={setCostFormOpen}>
+                        <DialogTrigger asChild>
+                          <Button size="sm" className="gap-2" onClick={() => {
+                            setEditingCost(null);
+                            setCostForm({
+                              supplier_name: "",
+                              description: "",
+                              cost_amount: "",
+                              cost_date: "",
+                              variation_id: "",
+                            });
+                          }}>
+                            <Plus className="w-4 h-4" />
+                            New Cost
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>{editingCost ? "Edit Cost" : "New Subcontractor Cost"}</DialogTitle>
+                          </DialogHeader>
+                          <form onSubmit={handleCostSubmit} className="space-y-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="supplier_name">Supplier Name *</Label>
+                              <Input
+                                id="supplier_name"
+                                value={costForm.supplier_name}
+                                onChange={(e) => setCostForm({ ...costForm, supplier_name: e.target.value })}
+                                required
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="cost_description">Description</Label>
+                              <Textarea
+                                id="cost_description"
+                                value={costForm.description}
+                                onChange={(e) => setCostForm({ ...costForm, description: e.target.value })}
+                                rows={3}
+                              />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="cost_amount">Cost Amount (£) *</Label>
+                                <Input
+                                  id="cost_amount"
+                                  type="number"
+                                  step="0.01"
+                                  value={costForm.cost_amount}
+                                  onChange={(e) => setCostForm({ ...costForm, cost_amount: e.target.value })}
+                                  required
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label htmlFor="cost_date">Date *</Label>
+                                <Input
+                                  id="cost_date"
+                                  type="date"
+                                  value={costForm.cost_date}
+                                  onChange={(e) => setCostForm({ ...costForm, cost_date: e.target.value })}
+                                  required
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="cost_variation">Variation (Optional)</Label>
+                              <Select
+                                value={costForm.variation_id}
+                                onValueChange={(value) => setCostForm({ ...costForm, variation_id: value })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="None" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="">None</SelectItem>
+                                  {variations.map((v) => (
+                                    <SelectItem key={v.id} value={v.id}>
+                                      {v.code}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="flex gap-3">
+                              <Button type="submit">
+                                {editingCost ? "Update" : "Create"}
+                              </Button>
+                              <Button type="button" variant="outline" onClick={() => setCostFormOpen(false)}>
+                                Cancel
+                              </Button>
+                            </div>
+                          </form>
+                        </DialogContent>
+                      </Dialog>
+                    )}
+                  </CardHeader>
+                  <CardContent>
+                    {costs.length === 0 ? (
+                      <div className="text-center py-8 text-slate-600">
+                        No subcontractor costs yet.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {costs.map((cost) => (
+                          <div key={cost.id} className="p-4 border rounded-lg">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-2">
+                                  <h4 className="font-medium text-slate-900">{cost.supplier_name}</h4>
+                                  {cost.variations && (
+                                    <Badge variant="outline">{cost.variations.code}</Badge>
+                                  )}
+                                </div>
+                                {cost.description && (
+                                  <div className="text-sm text-slate-600 mb-2 whitespace-pre-wrap">
+                                    {cost.description}
+                                  </div>
+                                )}
+                                <div className="flex items-center gap-4">
+                                  <div className="text-lg font-semibold text-slate-900">
+                                    {formatCurrency(cost.cost_amount)}
+                                  </div>
+                                  <div className="text-sm text-slate-500">
+                                    {formatDate(cost.cost_date)}
+                                  </div>
+                                </div>
+                              </div>
+                              {canEdit && (
+                                <div className="flex gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleEditCost(cost)}
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteCost(cost.id)}
+                                  >
+                                    <Trash2 className="w-4 h-4 text-red-600" />
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="phasing">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <CalendarIcon className="w-5 h-5 text-slate-600" />
+                      <CardTitle>Revenue Phasing</CardTitle>
+                    </div>
+                    {canEdit && (
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" onClick={handleAutoFill}>
+                          Auto-fill evenly
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={handleClearPhasing}>
+                          Clear phasing
+                        </Button>
+                      </div>
+                    )}
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="text-sm text-slate-600">
+                        {phasingData.length === 0 ? (
+                          <div className="bg-blue-50 border border-blue-200 rounded p-4 mb-4">
+                            <p className="font-medium text-blue-900 mb-1">Automatic allocation active</p>
+                            <p className="text-blue-700 text-sm">
+                              Revenue is automatically spread across project duration using day-based allocation.
+                              Set manual phasing below to override the automatic calculation.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="bg-orange-50 border border-orange-200 rounded p-4 mb-4">
+                            <p className="font-medium text-orange-900 mb-1">Manual phasing active</p>
+                            <p className="text-orange-700 text-sm">
+                              This project uses manual month-by-month revenue allocation.
+                              Clear phasing to revert to automatic day-based spread.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse text-sm">
+                          <thead>
+                            <tr className="border-b">
+                              <th className="text-left p-2 font-medium text-slate-600">Month</th>
+                              <th className="text-right p-2 font-medium text-slate-600">Forecast (£)</th>
+                              <th className="text-right p-2 font-medium text-slate-600">Actual (£)</th>
+                              <th className="text-left p-2 font-medium text-slate-600">Invoice Status</th>
+                              <th className="text-left p-2 font-medium text-slate-600">Invoice Ref</th>
+                              <th className="text-left p-2 font-medium text-slate-600">Invoice Date</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {monthsGrid.map((m, idx) => (
+                              <tr key={idx} className="border-b hover:bg-slate-50">
+                                <td className="p-2 text-slate-900">
+                                  {getMonthName(m.month)} {m.year}
+                                </td>
+                                <td className="p-2">
+                                  {canEdit ? (
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      value={m.revenue || ""}
+                                      onChange={(e) => {
+                                        const value = e.target.value === "" ? 0 : parseFloat(e.target.value);
+                                        handlePhasingUpdate(m.year, m.month, "revenue", value);
+                                      }}
+                                      className="text-right h-8"
+                                      placeholder="0"
+                                    />
+                                  ) : (
+                                    <div className="text-right">
+                                      {formatCurrency(m.revenue)}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="p-2">
+                                  {canEdit ? (
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      value={m.actualRevenue || ""}
+                                      onChange={(e) => {
+                                        const value = e.target.value === "" ? 0 : parseFloat(e.target.value);
+                                        handlePhasingUpdate(m.year, m.month, "actual", value);
+                                      }}
+                                      className="text-right h-8"
+                                      placeholder="0"
+                                    />
+                                  ) : (
+                                    <div className="text-right">
+                                      {formatCurrency(m.actualRevenue)}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="p-2">
+                                  {canEdit ? (
+                                    <Select
+                                      value={m.invoiceStatus}
+                                      onValueChange={(value) => handlePhasingUpdate(m.year, m.month, "invoiceStatus", value)}
+                                    >
+                                      <SelectTrigger className="h-8 w-32">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="none">None</SelectItem>
+                                        <SelectItem value="to_invoice">To Invoice</SelectItem>
+                                        <SelectItem value="invoiced">Invoiced</SelectItem>
+                                        <SelectItem value="paid">Paid</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  ) : (
+                                    <Badge variant="outline" className="capitalize">
+                                      {m.invoiceStatus.replace("_", " ")}
+                                    </Badge>
+                                  )}
+                                </td>
+                                <td className="p-2">
+                                  {canEdit ? (
+                                    <Input
+                                      type="text"
+                                      value={m.invoiceRef || ""}
+                                      onChange={(e) => handlePhasingUpdate(m.year, m.month, "invoiceRef", e.target.value)}
+                                      className="h-8"
+                                      placeholder="INV-001"
+                                      disabled={m.invoiceStatus === "none" || m.invoiceStatus === "to_invoice"}
+                                    />
+                                  ) : (
+                                    <div className="text-slate-900">{m.invoiceRef || "—"}</div>
+                                  )}
+                                </td>
+                                <td className="p-2">
+                                  {canEdit ? (
+                                    <Input
+                                      type="date"
+                                      value={m.invoiceDate || ""}
+                                      onChange={(e) => handlePhasingUpdate(m.year, m.month, "invoiceDate", e.target.value)}
+                                      className="h-8 w-36"
+                                      disabled={m.invoiceStatus === "none" || m.invoiceStatus === "to_invoice"}
+                                    />
+                                  ) : (
+                                    <div className="text-slate-900">{m.invoiceDate ? formatDate(m.invoiceDate) : "—"}</div>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Summary */}
+                      <div className="border-t pt-4 mt-4">
+                        <div className="grid grid-cols-4 gap-4 text-sm">
+                          <div>
+                            <div className="text-slate-500 mb-1">Total forecast revenue</div>
+                            <div className="text-lg font-semibold text-slate-900">
+                              {formatCurrency(getTotalPhasedRevenue())}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-slate-500 mb-1">Total actual revenue</div>
+                            <div className="text-lg font-semibold text-green-600">
+                              {formatCurrency(getTotalActualRevenue())}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-slate-500 mb-1">Project agreed fee</div>
+                            <div className="text-lg font-semibold text-slate-900">
+                              {formatCurrency(getTotalProjectFee())}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-slate-500 mb-1">Forecast difference</div>
+                            <div className={`text-lg font-semibold ${
+                              Math.abs(getTotalPhasedRevenue() - getTotalProjectFee()) > 0.01
+                                ? "text-orange-600"
+                                : "text-green-600"
+                            }`}>
+                              {formatCurrency(getTotalPhasedRevenue() - getTotalProjectFee())}
+                            </div>
+                          </div>
+                        </div>
+                        {Math.abs(getTotalPhasedRevenue() - getTotalProjectFee()) > 0.01 && (
+                          <div className="mt-3 text-xs text-orange-600">
+                            ⚠️ Forecast phased revenue does not match project fee. Adjust phasing or use "Auto-fill evenly".
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </>
+        )}
       </div>
     </Layout>
   );

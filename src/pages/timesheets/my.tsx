@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus, Edit, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface Timesheet {
   id: string;
@@ -56,6 +57,7 @@ function MyTimesheetsContent() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [variations, setVariations] = useState<Variation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(getWeekStart(new Date()));
   
   const [formOpen, setFormOpen] = useState(false);
@@ -104,110 +106,129 @@ function MyTimesheetsContent() {
 
   const fetchData = async () => {
     if (!user) return;
-    setLoading(true);
+    
+    try {
+      setLoading(true);
+      setError(null);
 
-    const weekEnd = new Date(currentWeekStart);
-    weekEnd.setDate(weekEnd.getDate() + 7);
+      const weekEnd = new Date(currentWeekStart);
+      weekEnd.setDate(weekEnd.getDate() + 7);
 
-    const { data: timesheetsData } = await supabase
-      .from("timesheets")
-      .select(`
-        *,
-        projects (
-          code,
-          name
-        ),
-        project_activities (
-          name
-        ),
-        variations (
-          code
-        )
-      `)
-      .eq("user_id", user.id)
-      .gte("date", currentWeekStart.toISOString().split("T")[0])
-      .lt("date", weekEnd.toISOString().split("T")[0])
-      .order("date", { ascending: true });
+      const { data: timesheetsData, error: timesheetsError } = await supabase
+        .from("timesheets")
+        .select(`
+          *,
+          projects (
+            code,
+            name
+          ),
+          project_activities (
+            name
+          ),
+          variations (
+            code
+          )
+        `)
+        .eq("user_id", user.id)
+        .gte("date", currentWeekStart.toISOString().split("T")[0])
+        .lt("date", weekEnd.toISOString().split("T")[0])
+        .order("date", { ascending: true });
 
-    const { data: projectsData } = await supabase
-      .from("projects")
-      .select("id, code, name")
-      .in("status", ["live", "pipeline"])
-      .order("code");
+      if (timesheetsError) throw timesheetsError;
 
-    setTimesheets(timesheetsData || []);
-    setProjects(projectsData || []);
-    setLoading(false);
+      const { data: projectsData, error: projectsError } = await supabase
+        .from("projects")
+        .select("id, code, name")
+        .in("status", ["live", "pipeline"])
+        .order("code");
+
+      if (projectsError) throw projectsError;
+
+      setTimesheets(timesheetsData || []);
+      setProjects(projectsData || []);
+    } catch (err) {
+      console.error("Failed to load timesheets data", err);
+      setError("Failed to load timesheets. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const fetchProjectDetails = async (projectId: string) => {
-    const { data: activitiesData } = await supabase
-      .from("project_activities")
-      .select("id, name")
-      .eq("project_id", projectId)
-      .order("name");
+    try {
+      const { data: activitiesData, error: activitiesError } = await supabase
+        .from("project_activities")
+        .select("id, name")
+        .eq("project_id", projectId)
+        .order("name");
 
-    const { data: variationsData } = await supabase
-      .from("variations")
-      .select("id, code")
-      .eq("project_id", projectId)
-      .order("code");
+      if (activitiesError) throw activitiesError;
 
-    setActivities(activitiesData || []);
-    setVariations(variationsData || []);
+      const { data: variationsData, error: variationsError } = await supabase
+        .from("variations")
+        .select("id, code")
+        .eq("project_id", projectId)
+        .order("code");
+
+      if (variationsError) throw variationsError;
+
+      setActivities(activitiesData || []);
+      setVariations(variationsData || []);
+    } catch (err) {
+      console.error("Failed to load project details", err);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
-    if (editingTimesheet) {
-      const { error } = await supabase
-        .from("timesheets")
-        .update({
-          date: formData.date,
-          project_id: formData.project_id,
-          activity_id: formData.activity_id || null,
-          variation_id: formData.variation_id || null,
-          hours: parseFloat(formData.hours),
-          notes: formData.notes || null,
-        })
-        .eq("id", editingTimesheet.id);
+    try {
+      if (editingTimesheet) {
+        const { error } = await supabase
+          .from("timesheets")
+          .update({
+            date: formData.date,
+            project_id: formData.project_id,
+            activity_id: formData.activity_id || null,
+            variation_id: formData.variation_id || null,
+            hours: parseFloat(formData.hours),
+            notes: formData.notes || null,
+          })
+          .eq("id", editingTimesheet.id);
 
-      if (error) {
-        alert("Error updating timesheet");
-        return;
-      }
-    } else {
-      const { error } = await supabase
-        .from("timesheets")
-        .insert({
-          user_id: user.id,
-          date: formData.date,
-          project_id: formData.project_id,
-          activity_id: formData.activity_id || null,
-          variation_id: formData.variation_id || null,
-          hours: parseFloat(formData.hours),
-          notes: formData.notes || null,
-        });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("timesheets")
+          .insert({
+            user_id: user.id,
+            date: formData.date,
+            project_id: formData.project_id,
+            activity_id: formData.activity_id || null,
+            variation_id: formData.variation_id || null,
+            hours: parseFloat(formData.hours),
+            notes: formData.notes || null,
+          });
 
-      if (error) {
-        alert("Error creating timesheet");
-        return;
+        if (error) throw error;
       }
+
+      await fetchData();
+      setFormOpen(false);
+      setEditingTimesheet(null);
+      setFormData({
+        date: "",
+        project_id: "",
+        activity_id: "",
+        variation_id: "",
+        hours: "",
+        notes: "",
+      });
+    } catch (err) {
+      console.error("Failed to save timesheet", err);
+      alert("Error saving timesheet. Please try again.");
     }
-
-    await fetchData();
-    setFormOpen(false);
-    setEditingTimesheet(null);
-    setFormData({
-      date: "",
-      project_id: "",
-      activity_id: "",
-      variation_id: "",
-      hours: "",
-      notes: "",
-    });
   };
 
   const handleEdit = (timesheet: Timesheet) => {
@@ -226,17 +247,18 @@ function MyTimesheetsContent() {
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this timesheet entry?")) return;
 
-    const { error } = await supabase
-      .from("timesheets")
-      .delete()
-      .eq("id", id);
+    try {
+      const { error } = await supabase
+        .from("timesheets")
+        .delete()
+        .eq("id", id);
 
-    if (error) {
-      alert("Error deleting timesheet");
-      return;
+      if (error) throw error;
+      await fetchData();
+    } catch (err) {
+      console.error("Failed to delete timesheet", err);
+      alert("Error deleting timesheet. Please try again.");
     }
-
-    await fetchData();
   };
 
   const getTimesheetsForDate = (date: Date) => {
@@ -267,16 +289,6 @@ function MyTimesheetsContent() {
   const thisWeek = () => {
     setCurrentWeekStart(getWeekStart(new Date()));
   };
-
-  if (loading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center py-12">
-          <div className="text-slate-600">Loading...</div>
-        </div>
-      </Layout>
-    );
-  }
 
   return (
     <Layout>
@@ -435,80 +447,100 @@ function MyTimesheetsContent() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-6">
-              {weekDates.map((date) => {
-                const dayTimesheets = getTimesheetsForDate(date);
-                const totalHours = getTotalHoursForDate(date);
+            {loading ? (
+              <div className="text-center py-8 text-slate-600 text-sm">
+                Loading timesheets...
+              </div>
+            ) : error ? (
+              <div className="text-center py-8">
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+                <Button 
+                  onClick={fetchData} 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-4"
+                >
+                  Try Again
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {weekDates.map((date) => {
+                  const dayTimesheets = getTimesheetsForDate(date);
+                  const totalHours = getTotalHoursForDate(date);
 
-                return (
-                  <div key={date.toISOString()} className="border-b pb-4 last:border-b-0">
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <div className="font-medium text-sm sm:text-base text-slate-900">
-                          {date.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" })}
+                  return (
+                    <div key={date.toISOString()} className="border-b pb-4 last:border-b-0">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <div className="font-medium text-sm sm:text-base text-slate-900">
+                            {date.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" })}
+                          </div>
+                          {totalHours > 0 && (
+                            <div className="text-xs sm:text-sm text-slate-500">
+                              Total: {totalHours}h
+                            </div>
+                          )}
                         </div>
-                        {totalHours > 0 && (
-                          <div className="text-xs sm:text-sm text-slate-500">
-                            Total: {totalHours}h
-                          </div>
-                        )}
                       </div>
+
+                      {dayTimesheets.length === 0 ? (
+                        <div className="text-sm text-slate-400 italic">No time logged</div>
+                      ) : (
+                        <div className="space-y-2">
+                          {dayTimesheets.map((ts) => (
+                            <div key={ts.id} className="flex items-start justify-between p-3 bg-slate-50 rounded gap-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-sm">
+                                  {ts.projects?.code} - {ts.projects?.name}
+                                </div>
+                                {ts.project_activities && (
+                                  <div className="text-xs text-slate-600 truncate">
+                                    Activity: {ts.project_activities.name}
+                                  </div>
+                                )}
+                                {ts.variations && (
+                                  <div className="text-xs text-slate-600">
+                                    Variation: {ts.variations.code}
+                                  </div>
+                                )}
+                                {ts.notes && (
+                                  <div className="text-xs text-slate-600 mt-1 line-clamp-2">
+                                    {ts.notes}
+                                  </div>
+                                )}
+                                <div className="text-sm font-semibold text-slate-900 mt-1">
+                                  {ts.hours}h
+                                </div>
+                              </div>
+                              <div className="flex gap-1 flex-shrink-0">
+                                <Button variant="ghost" size="sm" onClick={() => handleEdit(ts)}>
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => handleDelete(ts.id)}>
+                                  <Trash2 className="w-4 h-4 text-red-600" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
+                  );
+                })}
 
-                    {dayTimesheets.length === 0 ? (
-                      <div className="text-sm text-slate-400 italic">No time logged</div>
-                    ) : (
-                      <div className="space-y-2">
-                        {dayTimesheets.map((ts) => (
-                          <div key={ts.id} className="flex items-start justify-between p-3 bg-slate-50 rounded gap-3">
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-sm">
-                                {ts.projects?.code} - {ts.projects?.name}
-                              </div>
-                              {ts.project_activities && (
-                                <div className="text-xs text-slate-600 truncate">
-                                  Activity: {ts.project_activities.name}
-                                </div>
-                              )}
-                              {ts.variations && (
-                                <div className="text-xs text-slate-600">
-                                  Variation: {ts.variations.code}
-                                </div>
-                              )}
-                              {ts.notes && (
-                                <div className="text-xs text-slate-600 mt-1 line-clamp-2">
-                                  {ts.notes}
-                                </div>
-                              )}
-                              <div className="text-sm font-semibold text-slate-900 mt-1">
-                                {ts.hours}h
-                              </div>
-                            </div>
-                            <div className="flex gap-1 flex-shrink-0">
-                              <Button variant="ghost" size="sm" onClick={() => handleEdit(ts)}>
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={() => handleDelete(ts.id)}>
-                                <Trash2 className="w-4 h-4 text-red-600" />
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-
-              <div className="pt-4 border-t">
-                <div className="text-right">
-                  <div className="text-sm text-slate-600">Week Total</div>
-                  <div className="text-xl sm:text-2xl font-bold text-slate-900">
-                    {getTotalHoursForWeek()}h
+                <div className="pt-4 border-t">
+                  <div className="text-right">
+                    <div className="text-sm text-slate-600">Week Total</div>
+                    <div className="text-xl sm:text-2xl font-bold text-slate-900">
+                      {getTotalHoursForWeek()}h
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>

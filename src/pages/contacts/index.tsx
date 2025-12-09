@@ -7,10 +7,12 @@ import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Mail, Phone, Building2, User, Briefcase } from "lucide-react";
+import { Plus, Search, Mail, Phone, Building2, User, Briefcase, AlertTriangle, FileText } from "lucide-react";
 
 interface Contact {
   id: string;
@@ -18,6 +20,7 @@ interface Contact {
   email: string | null;
   phone: string | null;
   job_title: string | null;
+  notes: string | null;
   company_id: string;
   companies?: {
     name: string;
@@ -35,7 +38,8 @@ function ContactsContent() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [filteredContacts, setFilteredContacts] = useState<Contact[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -43,6 +47,7 @@ function ContactsContent() {
     email: "",
     phone: "",
     job_title: "",
+    notes: "",
     company_id: "",
   });
 
@@ -57,27 +62,37 @@ function ContactsContent() {
   }, [contacts, searchTerm]);
 
   const fetchData = async () => {
-    setLoading(true);
-    
-    const { data: contactsData } = await supabase
-      .from("contacts")
-      .select(`
-        *,
-        companies (
-          name
-        )
-      `)
-      .order("name");
+    try {
+      setIsLoading(true);
+      setError(null);
 
-    const { data: companiesData } = await supabase
-      .from("companies")
-      .select("id, name")
-      .order("name");
+      const { data: contactsData, error: contactsError } = await supabase
+        .from("contacts")
+        .select(`
+          *,
+          companies (
+            name
+          )
+        `)
+        .order("name");
 
-    if (contactsData) setContacts(contactsData);
-    if (companiesData) setCompanies(companiesData);
-    
-    setLoading(false);
+      if (contactsError) throw contactsError;
+
+      const { data: companiesData, error: companiesError } = await supabase
+        .from("companies")
+        .select("id, name")
+        .order("name");
+
+      if (companiesError) throw companiesError;
+
+      setContacts(contactsData || []);
+      setCompanies(companiesData || []);
+    } catch (err) {
+      console.error("Failed to load contacts data", err);
+      setError("Failed to load contacts");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const filterContacts = () => {
@@ -92,6 +107,7 @@ function ContactsContent() {
         contact.name.toLowerCase().includes(searchLower) ||
         contact.email?.toLowerCase().includes(searchLower) ||
         contact.phone?.toLowerCase().includes(searchLower) ||
+        contact.notes?.toLowerCase().includes(searchLower) ||
         contact.companies?.name.toLowerCase().includes(searchLower)
       );
     });
@@ -102,30 +118,26 @@ function ContactsContent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const { error } = await supabase.from("contacts").insert({
-      name: formData.name,
-      email: formData.email || null,
-      phone: formData.phone || null,
-      job_title: formData.job_title || null,
-      company_id: formData.company_id,
-    });
+    try {
+      const { error: submitError } = await supabase.from("contacts").insert({
+        name: formData.name,
+        email: formData.email || null,
+        phone: formData.phone || null,
+        job_title: formData.job_title || null,
+        notes: formData.notes || null,
+        company_id: formData.company_id,
+      });
 
-    if (!error) {
+      if (submitError) throw submitError;
+
       setFormOpen(false);
-      setFormData({ name: "", email: "", phone: "", job_title: "", company_id: "" });
+      setFormData({ name: "", email: "", phone: "", job_title: "", notes: "", company_id: "" });
       fetchData();
+    } catch (err) {
+      console.error("Failed to create contact", err);
+      alert("Failed to create contact");
     }
   };
-
-  if (loading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center py-12">
-          <div className="text-slate-600">Loading...</div>
-        </div>
-      </Layout>
-    );
-  }
 
   return (
     <Layout>
@@ -144,7 +156,7 @@ function ContactsContent() {
                   <span>New Contact</span>
                 </Button>
               </DialogTrigger>
-              <DialogContent className="w-[95vw] max-w-md">
+              <DialogContent className="w-[95vw] max-w-md max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Add New Contact</DialogTitle>
                 </DialogHeader>
@@ -180,6 +192,15 @@ function ContactsContent() {
                   </div>
 
                   <div className="space-y-2">
+                    <Label htmlFor="job_title">Job Title</Label>
+                    <Input
+                      id="job_title"
+                      value={formData.job_title}
+                      onChange={(e) => setFormData({ ...formData, job_title: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
                     <Input
                       id="email"
@@ -199,15 +220,21 @@ function ContactsContent() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="job_title">Job Title</Label>
-                    <Input
-                      id="job_title"
-                      value={formData.job_title}
-                      onChange={(e) => setFormData({ ...formData, job_title: e.target.value })}
+                    <Label htmlFor="notes">Comments / Notes</Label>
+                    <Textarea
+                      id="notes"
+                      value={formData.notes}
+                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                      placeholder="Add any helpful details about this contact..."
+                      rows={4}
+                      className="resize-none"
                     />
+                    <p className="text-xs text-slate-500">
+                      Add CRM notes, conversation history, preferences, or any other relevant information
+                    </p>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="flex flex-col sm:flex-row gap-3 pt-2">
                     <Button type="submit" className="w-full sm:w-auto">Add Contact</Button>
                     <Button type="button" variant="outline" onClick={() => setFormOpen(false)} className="w-full sm:w-auto">
                       Cancel
@@ -223,16 +250,30 @@ function ContactsContent() {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
           <Input
-            placeholder="Search contacts..."
+            placeholder="Search contacts by name, email, phone, company, or notes..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
           />
         </div>
 
+        {/* Error State */}
+        {error && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
         {/* Contacts List - Mobile: Cards, Desktop: Cards with more details */}
         <div className="space-y-3">
-          {filteredContacts.length === 0 ? (
+          {isLoading ? (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <div className="text-slate-600">Loading contacts...</div>
+              </CardContent>
+            </Card>
+          ) : filteredContacts.length === 0 ? (
             <Card>
               <CardContent className="p-8 text-center">
                 <User className="w-12 h-12 mx-auto text-slate-300 mb-3" />
@@ -295,6 +336,21 @@ function ContactsContent() {
                         </a>
                       )}
                     </div>
+
+                    {/* Notes/Comments Section */}
+                    {contact.notes && (
+                      <div className="pt-2 border-t">
+                        <div className="flex items-start gap-2">
+                          <FileText className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-medium text-slate-500 mb-1">Notes</div>
+                            <div className="text-sm text-slate-700 whitespace-pre-wrap">
+                              {contact.notes}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -303,7 +359,7 @@ function ContactsContent() {
         </div>
 
         {/* Results count - Mobile friendly */}
-        {filteredContacts.length > 0 && (
+        {!isLoading && filteredContacts.length > 0 && (
           <div className="text-center text-sm text-slate-600">
             Showing {filteredContacts.length} {filteredContacts.length === 1 ? 'contact' : 'contacts'}
           </div>

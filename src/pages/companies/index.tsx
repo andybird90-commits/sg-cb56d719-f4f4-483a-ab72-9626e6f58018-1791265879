@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Building2, ChevronRight } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Plus, Search, Building2, ChevronRight, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 
 interface Company {
@@ -25,7 +26,8 @@ function CompaniesContent() {
   const router = useRouter();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [filteredCompanies, setFilteredCompanies] = useState<Company[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
   const canEdit = profile?.role === "admin" || profile?.role === "director";
@@ -39,16 +41,23 @@ function CompaniesContent() {
   }, [companies, searchTerm]);
 
   const fetchCompanies = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("companies")
-      .select("*")
-      .order("name");
+    try {
+      setIsLoading(true);
+      setError(null);
 
-    if (!error && data) {
-      setCompanies(data);
+      const { data, error: fetchError } = await supabase
+        .from("companies")
+        .select("*")
+        .order("name");
+
+      if (fetchError) throw fetchError;
+      setCompanies(data || []);
+    } catch (err) {
+      console.error("Failed to load companies data", err);
+      setError("Failed to load companies");
+    } finally {
+      setIsLoading(false);
     }
-    setLoading(false);
   };
 
   const filterCompanies = () => {
@@ -77,16 +86,6 @@ function CompaniesContent() {
         return "bg-slate-100 text-slate-800";
     }
   };
-
-  if (loading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center py-12">
-          <div className="text-slate-600">Loading...</div>
-        </div>
-      </Layout>
-    );
-  }
 
   return (
     <Layout>
@@ -118,9 +117,23 @@ function CompaniesContent() {
           />
         </div>
 
+        {/* Error State */}
+        {error && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
         {/* Companies List */}
         <div className="space-y-3">
-          {filteredCompanies.length === 0 ? (
+          {isLoading ? (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <div className="text-slate-600">Loading companies...</div>
+              </CardContent>
+            </Card>
+          ) : filteredCompanies.length === 0 ? (
             <Card>
               <CardContent className="p-8 text-center">
                 <Building2 className="w-12 h-12 mx-auto text-slate-300 mb-3" />

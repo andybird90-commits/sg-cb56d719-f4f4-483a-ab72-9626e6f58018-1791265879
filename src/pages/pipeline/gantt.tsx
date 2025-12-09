@@ -3,6 +3,7 @@ import { Layout } from "@/components/Layout";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface GanttItem {
   id: string;
@@ -18,94 +19,106 @@ interface GanttItem {
 function PipelineGanttContent() {
   const [items, setItems] = useState<GanttItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchGanttData();
   }, []);
 
   const fetchGanttData = async () => {
-    setLoading(true);
+    try {
+      setLoading(true);
+      setError(null);
 
-    const ganttItems: GanttItem[] = [];
+      const ganttItems: GanttItem[] = [];
 
-    // Fetch opportunities
-    const { data: oppsData } = await supabase
-      .from("opportunities")
-      .select(`
-        id,
-        name,
-        stage,
-        expected_start_date,
-        expected_end_date,
-        tender_due_date,
-        companies (
-          short_name,
-          name
-        )
-      `)
-      .not("expected_start_date", "is", null)
-      .not("expected_end_date", "is", null);
+      // Fetch opportunities
+      const { data: oppsData, error: oppsError } = await supabase
+        .from("opportunities")
+        .select(`
+          id,
+          name,
+          stage,
+          expected_start_date,
+          expected_end_date,
+          tender_due_date,
+          companies (
+            short_name,
+            name
+          )
+        `)
+        .not("expected_start_date", "is", null)
+        .not("expected_end_date", "is", null);
 
-    if (oppsData) {
-      oppsData.forEach((opp) => {
-        const startDate = new Date(opp.expected_start_date || opp.tender_due_date || "");
-        const endDate = new Date(opp.expected_end_date || "");
+      if (oppsError) throw oppsError;
 
-        if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-          ganttItems.push({
-            id: opp.id,
-            name: opp.name,
-            companyShortName: opp.companies?.short_name || opp.companies?.name || "",
-            startDate,
-            endDate,
-            type: "opportunity",
-            stage: opp.stage,
-          });
-        }
-      });
+      if (oppsData) {
+        oppsData.forEach((opp) => {
+          const startDate = new Date(opp.expected_start_date || opp.tender_due_date || "");
+          const endDate = new Date(opp.expected_end_date || "");
+
+          if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+            ganttItems.push({
+              id: opp.id,
+              name: opp.name,
+              companyShortName: opp.companies?.short_name || opp.companies?.name || "",
+              startDate,
+              endDate,
+              type: "opportunity",
+              stage: opp.stage,
+            });
+          }
+        });
+      }
+
+      // Fetch projects
+      const { data: projectsData, error: projectsError } = await supabase
+        .from("projects")
+        .select(`
+          id,
+          name,
+          status,
+          start_date,
+          end_date,
+          companies!projects_client_company_id_fkey (
+            short_name,
+            name
+          )
+        `)
+        .not("start_date", "is", null)
+        .not("end_date", "is", null);
+
+      if (projectsError) throw projectsError;
+
+      if (projectsData) {
+        projectsData.forEach((proj) => {
+          const startDate = new Date(proj.start_date || "");
+          const endDate = new Date(proj.end_date || "");
+
+          if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+            ganttItems.push({
+              id: proj.id,
+              name: proj.name,
+              companyShortName: proj.companies?.short_name || proj.companies?.name || "",
+              startDate,
+              endDate,
+              type: "project",
+              status: proj.status,
+            });
+          }
+        });
+      }
+
+      // Sort by start date
+      ganttItems.sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+
+      setItems(ganttItems);
+    } catch (err) {
+      console.error("Failed to load gantt data", err);
+      setError("Failed to load timeline data. Please try again.");
+    } finally {
+      setLoading(false);
     }
-
-    // Fetch projects
-    const { data: projectsData } = await supabase
-      .from("projects")
-      .select(`
-        id,
-        name,
-        status,
-        start_date,
-        end_date,
-        companies!projects_client_company_id_fkey (
-          short_name,
-          name
-        )
-      `)
-      .not("start_date", "is", null)
-      .not("end_date", "is", null);
-
-    if (projectsData) {
-      projectsData.forEach((proj) => {
-        const startDate = new Date(proj.start_date || "");
-        const endDate = new Date(proj.end_date || "");
-
-        if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-          ganttItems.push({
-            id: proj.id,
-            name: proj.name,
-            companyShortName: proj.companies?.short_name || proj.companies?.name || "",
-            startDate,
-            endDate,
-            type: "project",
-            status: proj.status,
-          });
-        }
-      });
-    }
-
-    // Sort by start date
-    ganttItems.sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
-
-    setItems(ganttItems);
-    setLoading(false);
   };
 
   const getBarColor = (item: GanttItem) => {
@@ -163,41 +176,6 @@ function PipelineGanttContent() {
     return months;
   };
 
-  if (loading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center py-12">
-          <div className="text-slate-600">Loading...</div>
-        </div>
-      </Layout>
-    );
-  }
-
-  if (items.length === 0) {
-    return (
-      <Layout>
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">Pipeline Gantt</h1>
-            <p className="text-slate-600 mt-1">Visual timeline of opportunities and projects</p>
-          </div>
-          <Card>
-            <CardContent className="p-12 text-center">
-              <div className="text-slate-400 mb-2">No items with dates available</div>
-              <p className="text-sm text-slate-600">
-                Add start and end dates to opportunities and projects to see them here.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      </Layout>
-    );
-  }
-
-  const earliestStart = new Date(Math.min(...items.map(i => i.startDate.getTime())));
-  const latestEnd = new Date(Math.max(...items.map(i => i.endDate.getTime())));
-  const timelineMonths = getMonthsBetween(earliestStart, latestEnd);
-
   return (
     <Layout>
       <div className="space-y-6">
@@ -210,9 +188,24 @@ function PipelineGanttContent() {
           <CardHeader>
             <CardTitle>Timeline View</CardTitle>
           </CardHeader>
-          <CardContent className="p-0 sm:p-6">
-            <div className="overflow-x-auto">
-              <div className="min-w-[800px] p-4 sm:p-0">
+          <CardContent>
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-slate-600">Loading timeline...</div>
+              </div>
+            ) : error ? (
+              <Alert variant="destructive" className="my-4">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            ) : items.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-slate-400 mb-2">No items with dates available</div>
+                <p className="text-sm text-slate-600">
+                  Add start and end dates to opportunities and projects to see them here.
+                </p>
+              </div>
+            ) : (
+              <>
                 {/* Timeline Header */}
                 <div className="flex mb-4 pb-2 border-b border-slate-200">
                   <div className="w-48 sm:w-64 flex-shrink-0 font-medium text-sm text-slate-600 pr-2 sm:pr-4">
@@ -293,8 +286,8 @@ function PipelineGanttContent() {
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

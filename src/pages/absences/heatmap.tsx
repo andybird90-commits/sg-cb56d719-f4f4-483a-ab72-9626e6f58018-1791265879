@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertCircle } from "@/components/ui/alert";
 
 interface User {
   id: string;
@@ -29,7 +30,8 @@ function AbsenceHeatmapContent() {
   const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
   const [absences, setAbsences] = useState<Absence[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [holidayBalances, setHolidayBalances] = useState<Record<string, { taken: number; remaining: number }>>({});
@@ -45,62 +47,69 @@ function AbsenceHeatmapContent() {
   }, [profile, canView, router, selectedYear, selectedMonth]);
 
   const fetchData = async () => {
-    setLoading(true);
+    try {
+      setLoading(true);
+      setError(null);
 
-    // Fetch active users
-    const { data: usersData } = await supabase
-      .from("profiles")
-      .select("id, full_name, annual_holiday_days")
-      .eq("is_active", true)
-      .order("full_name");
+      const { data: usersData, error: usersError } = await supabase
+        .from("profiles")
+        .select("id, full_name, annual_holiday_days")
+        .eq("is_active", true)
+        .order("full_name");
 
-    // Fetch absences for selected month
-    const startOfMonth = new Date(selectedYear, selectedMonth - 1, 1);
-    const endOfMonth = new Date(selectedYear, selectedMonth, 0);
+      if (usersError) throw usersError;
 
-    const { data: absencesData } = await supabase
-      .from("absences")
-      .select("*")
-      .not("approved_by", "is", null)
-      .or(`and(start_date.lte.${endOfMonth.toISOString().split("T")[0]},end_date.gte.${startOfMonth.toISOString().split("T")[0]})`);
+      const startOfMonth = new Date(selectedYear, selectedMonth - 1, 1);
+      const endOfMonth = new Date(selectedYear, selectedMonth, 0);
 
-    setUsers((usersData as unknown as User[]) || []);
-    setAbsences(absencesData || []);
+      const { data: absencesData, error: absencesError } = await supabase
+        .from("absences")
+        .select("*")
+        .not("approved_by", "is", null)
+        .or(`and(start_date.lte.${endOfMonth.toISOString().split("T")[0]},end_date.gte.${startOfMonth.toISOString().split("T")[0]})`);
 
-    // Calculate holiday balances for all users
-    if (usersData) {
-      const balances: Record<string, { taken: number; remaining: number }> = {};
-      
-      for (const user of usersData) {
-        const { data: holidays } = await supabase
-          .from("absences")
-          .select("start_date, end_date")
-          .eq("user_id", user.id)
-          .eq("type", "holiday")
-          .not("approved_by", "is", null)
-          .gte("start_date", `${selectedYear}-01-01`)
-          .lte("start_date", `${selectedYear}-12-31`);
+      if (absencesError) throw absencesError;
 
-        let taken = 0;
-        if (holidays) {
-          holidays.forEach((holiday) => {
-            const start = new Date(holiday.start_date);
-            const end = new Date(holiday.end_date);
-            const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-            taken += days;
-          });
+      setUsers((usersData as unknown as User[]) || []);
+      setAbsences(absencesData || []);
+
+      if (usersData) {
+        const balances: Record<string, { taken: number; remaining: number }> = {};
+        
+        for (const user of usersData) {
+          const { data: holidays, error: holidaysError } = await supabase
+            .from("absences")
+            .select("start_date, end_date")
+            .eq("user_id", user.id)
+            .eq("type", "holiday")
+            .not("approved_by", "is", null)
+            .gte("start_date", `${selectedYear}-01-01`)
+            .lte("start_date", `${selectedYear}-12-31`);
+
+          if (!holidaysError && holidays) {
+            let taken = 0;
+            holidays.forEach((holiday) => {
+              const start = new Date(holiday.start_date);
+              const end = new Date(holiday.end_date);
+              const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+              taken += days;
+            });
+
+            balances[user.id] = {
+              taken,
+              remaining: (user.annual_holiday_days || 0) - taken,
+            };
+          }
         }
 
-        balances[user.id] = {
-          taken,
-          remaining: (user.annual_holiday_days || 0) - taken,
-        };
+        setHolidayBalances(balances);
       }
-
-      setHolidayBalances(balances);
+    } catch (err) {
+      console.error("Failed to load absence heatmap data", err);
+      setError("Failed to load absence heatmap");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const getDaysInMonth = (year: number, month: number) => {
@@ -178,6 +187,13 @@ function AbsenceHeatmapContent() {
           <h1 className="text-3xl font-bold text-slate-900">Team Absence Heatmap</h1>
           <p className="text-slate-600 mt-1">Visual overview of team absences</p>
         </div>
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
         <Card>
           <CardHeader>

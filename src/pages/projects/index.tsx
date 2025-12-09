@@ -7,7 +7,8 @@ import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, ChevronRight, Briefcase } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Plus, ChevronRight, Briefcase, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 
 interface Project {
@@ -25,6 +26,7 @@ function ProjectsContent() {
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const canEdit = profile?.role === "admin" || profile?.role === "director";
 
@@ -33,19 +35,28 @@ function ProjectsContent() {
   }, []);
 
   const fetchProjects = async () => {
-    setLoading(true);
-    const { data } = await supabase
-      .from("projects")
-      .select(`
-        *,
-        companies!projects_client_company_id_fkey (
-          name
-        )
-      `)
-      .order("created_at", { ascending: false });
+    try {
+      setLoading(true);
+      setError(null);
 
-    if (data) setProjects(data);
-    setLoading(false);
+      const { data, error: fetchError } = await supabase
+        .from("projects")
+        .select(`
+          *,
+          companies!projects_client_company_id_fkey (
+            name
+          )
+        `)
+        .order("created_at", { ascending: false });
+
+      if (fetchError) throw fetchError;
+      setProjects(data || []);
+    } catch (err) {
+      console.error("Failed to load projects data", err);
+      setError("Failed to load projects");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -64,16 +75,6 @@ function ProjectsContent() {
         return "bg-slate-100 text-slate-800";
     }
   };
-
-  if (loading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center py-12">
-          <div className="text-slate-600">Loading...</div>
-        </div>
-      </Layout>
-    );
-  }
 
   return (
     <Layout>
@@ -94,53 +95,72 @@ function ProjectsContent() {
           )}
         </div>
 
+        {/* Error State */}
+        {error && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {/* Loading State */}
+        {loading && !error && (
+          <Card>
+            <CardContent className="p-8 text-center">
+              <div className="text-slate-600">Loading projects...</div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Projects List - Mobile: Cards, Desktop: Cards with more details */}
-        <div className="space-y-3">
-          {projects.length === 0 ? (
-            <Card>
-              <CardContent className="p-8 text-center">
-                <Briefcase className="w-12 h-12 mx-auto text-slate-300 mb-3" />
-                <p className="text-slate-600">No projects yet</p>
-              </CardContent>
-            </Card>
-          ) : (
-            projects.map((project) => (
-              <Card 
-                key={project.id} 
-                className="hover:shadow-md transition-shadow cursor-pointer"
-                onClick={() => router.push(`/projects/${project.id}`)}
-              >
-                <CardContent className="p-4 sm:p-6">
-                  {/* Mobile & Tablet Layout */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
-                        <span className="font-mono text-xs sm:text-sm text-slate-500 flex-shrink-0">
-                          {project.code}
-                        </span>
-                        <h3 className="text-base sm:text-lg font-semibold text-slate-900 truncate">
-                          {project.name}
-                        </h3>
-                      </div>
-                      
-                      {/* Client */}
-                      <p className="text-sm text-slate-600 mb-2">{project.companies?.name}</p>
-                      
-                      {/* Status Badge */}
-                      <Badge className={`${getStatusColor(project.status)} w-fit text-xs`}>
-                        {project.status.replace("_", " ")}
-                      </Badge>
-                    </div>
-                    <ChevronRight className="w-5 h-5 text-slate-400 flex-shrink-0 mt-1" />
-                  </div>
+        {!loading && !error && (
+          <div className="space-y-3">
+            {projects.length === 0 ? (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <Briefcase className="w-12 h-12 mx-auto text-slate-300 mb-3" />
+                  <p className="text-slate-600">No projects yet</p>
                 </CardContent>
               </Card>
-            ))
-          )}
-        </div>
+            ) : (
+              projects.map((project) => (
+                <Card 
+                  key={project.id} 
+                  className="hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => router.push(`/projects/${project.id}`)}
+                >
+                  <CardContent className="p-4 sm:p-6">
+                    {/* Mobile & Tablet Layout */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
+                          <span className="font-mono text-xs sm:text-sm text-slate-500 flex-shrink-0">
+                            {project.code}
+                          </span>
+                          <h3 className="text-base sm:text-lg font-semibold text-slate-900 truncate">
+                            {project.name}
+                          </h3>
+                        </div>
+                        
+                        {/* Client */}
+                        <p className="text-sm text-slate-600 mb-2">{project.companies?.name}</p>
+                        
+                        {/* Status Badge */}
+                        <Badge className={`${getStatusColor(project.status)} w-fit text-xs`}>
+                          {project.status.replace("_", " ")}
+                        </Badge>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-slate-400 flex-shrink-0 mt-1" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        )}
 
         {/* Results count - Mobile friendly */}
-        {projects.length > 0 && (
+        {!loading && !error && projects.length > 0 && (
           <div className="text-center text-sm text-slate-600">
             Showing {projects.length} {projects.length === 1 ? 'project' : 'projects'}
           </div>

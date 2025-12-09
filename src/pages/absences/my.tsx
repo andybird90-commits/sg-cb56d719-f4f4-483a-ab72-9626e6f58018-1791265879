@@ -30,7 +30,8 @@ interface Absence {
 function MyAbsencesContent() {
   const { user, profile } = useAuth();
   const [absences, setAbsences] = useState<Absence[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [holidayStats, setHolidayStats] = useState({
     annual: 0,
@@ -58,60 +59,73 @@ function MyAbsencesContent() {
 
   const fetchAbsences = async () => {
     if (!user) return;
-    setLoading(true);
-
-    const { data } = await supabase
-      .from("absences")
-      .select(`
-        *,
-        profiles!absences_approved_by_fkey (
-          full_name
-        )
-      `)
-      .eq("user_id", user.id)
-      .order("start_date", { ascending: false });
-
-    const absencesList = data || [];
-    setAbsences(absencesList);
     
-    // Count pending absences
-    const pending = absencesList.filter(a => a.approved_by === null).length;
-    setPendingCount(pending);
-    
-    setLoading(false);
+    try {
+      setLoading(true);
+      setError(null);
+
+      const { data, error: fetchError } = await supabase
+        .from("absences")
+        .select(`
+          *,
+          profiles!absences_approved_by_fkey (
+            full_name
+          )
+        `)
+        .eq("user_id", user.id)
+        .order("start_date", { ascending: false });
+
+      if (fetchError) throw fetchError;
+
+      const absencesList = data || [];
+      setAbsences(absencesList);
+      
+      const pending = absencesList.filter(a => a.approved_by === null).length;
+      setPendingCount(pending);
+    } catch (err) {
+      console.error("Failed to load absences data", err);
+      setError("Failed to load absences");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const calculateHolidayBalance = async () => {
     if (!user || !profile) return;
 
-    const currentYear = new Date().getFullYear();
-    const annual = (profile as any).annual_holiday_days || 0;
+    try {
+      const currentYear = new Date().getFullYear();
+      const annual = (profile as any).annual_holiday_days || 0;
 
-    // Get APPROVED holidays only for current year
-    const { data: holidays } = await supabase
-      .from("absences")
-      .select("start_date, end_date")
-      .eq("user_id", user.id)
-      .eq("type", "holiday")
-      .not("approved_by", "is", null) // Only approved holidays
-      .gte("start_date", `${currentYear}-01-01`)
-      .lte("start_date", `${currentYear}-12-31`);
+      const { data: holidays, error: fetchError } = await supabase
+        .from("absences")
+        .select("start_date, end_date")
+        .eq("user_id", user.id)
+        .eq("type", "holiday")
+        .not("approved_by", "is", null)
+        .gte("start_date", `${currentYear}-01-01`)
+        .lte("start_date", `${currentYear}-12-31`);
 
-    let taken = 0;
-    if (holidays) {
-      holidays.forEach((holiday) => {
-        const start = new Date(holiday.start_date);
-        const end = new Date(holiday.end_date);
-        const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-        taken += days;
+      if (fetchError) throw fetchError;
+
+      let taken = 0;
+      if (holidays) {
+        holidays.forEach((holiday) => {
+          const start = new Date(holiday.start_date);
+          const end = new Date(holiday.end_date);
+          const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+          taken += days;
+        });
+      }
+
+      setHolidayStats({
+        annual,
+        taken,
+        remaining: annual - taken,
       });
+    } catch (err) {
+      console.error("Failed to calculate holiday balance", err);
     }
-
-    setHolidayStats({
-      annual,
-      taken,
-      remaining: annual - taken,
-    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
