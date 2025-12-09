@@ -169,7 +169,7 @@ function ProjectDetailContent() {
             id,
             name
           ),
-          opportunities (
+          opportunities!projects_opportunity_id_fkey (
             id,
             name
           )
