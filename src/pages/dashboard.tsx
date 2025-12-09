@@ -195,7 +195,7 @@ function DashboardContent() {
           )
         `)
         .eq("status", "live")
-        .order("name")
+        .order("created_at", { ascending: false })
         .limit(5);
 
       if (error) throw error;
@@ -846,11 +846,13 @@ function DashboardContent() {
                   {upcomingTenders.map((opp) => (
                     <div
                       key={opp.id}
-                      className="p-3 border rounded-lg cursor-pointer hover:bg-slate-50"
-                      onClick={() => router.push(`/opportunities/${opp.id}`)}
+                      className="p-3 border rounded-lg hover:bg-slate-50 transition-colors"
                     >
                       <div className="flex items-start justify-between gap-2 mb-2">
-                        <div className="font-medium text-sm text-slate-900 line-clamp-2">
+                        <div 
+                          className="font-medium text-sm text-slate-900 line-clamp-2 cursor-pointer hover:text-blue-600"
+                          onClick={() => router.push(`/opportunities/${opp.id}`)}
+                        >
                           {opp.name}
                         </div>
                         <Badge className={`${getStageColor(opp.stage)} flex-shrink-0 text-xs`}>
@@ -895,14 +897,16 @@ function DashboardContent() {
                   {liveProjects.map((proj) => (
                     <div
                       key={proj.id}
-                      className="p-3 border rounded-lg cursor-pointer hover:bg-slate-50"
-                      onClick={() => router.push(`/projects/${proj.id}`)}
+                      className="p-3 border rounded-lg hover:bg-slate-50 transition-colors"
                     >
                       <div className="flex items-start gap-2 mb-2">
                         <span className="font-mono text-xs text-slate-500 flex-shrink-0">
                           {proj.code}
                         </span>
-                        <div className="font-medium text-sm text-slate-900 line-clamp-2">
+                        <div 
+                          className="font-medium text-sm text-slate-900 line-clamp-2 cursor-pointer hover:text-blue-600"
+                          onClick={() => router.push(`/projects/${proj.id}`)}
+                        >
                           {proj.name}
                         </div>
                       </div>
@@ -941,7 +945,10 @@ function DashboardContent() {
                   {thisWeekAbsences.map((absence) => (
                     <div key={absence.id} className="p-3 border rounded-lg">
                       <div className="flex items-start justify-between gap-2 mb-2">
-                        <div className="font-medium text-sm text-slate-900">
+                        <div 
+                          className="font-medium text-sm text-slate-900 cursor-pointer hover:text-blue-600"
+                          onClick={() => router.push("/absences/team")}
+                        >
                           {absence.profiles?.full_name}
                         </div>
                         <Badge className={`${getAbsenceColor(absence.type)} flex-shrink-0 text-xs`}>
