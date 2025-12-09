@@ -221,67 +221,72 @@ function PipelineGanttContent() {
                 </p>
               </div>
             ) : (
-              <>
-                {/* Timeline Header */}
-                <div className="flex mb-4 pb-2 border-b border-slate-200">
-                  <div className="w-48 sm:w-64 flex-shrink-0 font-medium text-sm text-slate-600 pr-2 sm:pr-4">
-                    Item
-                  </div>
-                  <div className="flex-1 flex min-w-0">
-                    {timelineMonths.map((month, idx) => (
-                      <div
-                        key={idx}
-                        className="flex-1 text-center text-xs text-slate-500 border-l border-slate-200 px-1"
-                        style={{ minWidth: "60px" }}
-                      >
-                        {month.toLocaleDateString("en-GB", { month: "short", year: "2-digit" })}
+              <div className="space-y-6">
+                {/* Scrollable Timeline Container */}
+                <div className="overflow-x-auto border rounded-lg">
+                  <div style={{ minWidth: `${Math.max(800, timelineMonths.length * 80)}px` }}>
+                    {/* Timeline Header */}
+                    <div className="flex mb-4 pb-2 border-b border-slate-200">
+                      <div className="w-48 sm:w-64 flex-shrink-0 font-medium text-sm text-slate-600 pr-2 sm:pr-4">
+                        Item
                       </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Gantt Rows */}
-                <div className="space-y-3">
-                  {items.map((item) => {
-                    const totalDays = (latestEnd.getTime() - earliestStart.getTime()) / (1000 * 60 * 60 * 24);
-                    const startOffset = (item.startDate.getTime() - earliestStart.getTime()) / (1000 * 60 * 60 * 24);
-                    const duration = (item.endDate.getTime() - item.startDate.getTime()) / (1000 * 60 * 60 * 24);
-
-                    const leftPercent = Math.max(0, (startOffset / totalDays) * 100);
-                    const widthPercent = Math.max(2, (duration / totalDays) * 100);
-
-                    return (
-                      <div key={item.id} className="flex items-center group">
-                        <div className="w-48 sm:w-64 flex-shrink-0 pr-2 sm:pr-4">
-                          <div className={`text-xs sm:text-sm font-medium ${getTextColor(item)} truncate`}>
-                            {item.name}
-                          </div>
-                          <div className="text-xs text-slate-500 truncate">
-                            {item.companyShortName}
-                          </div>
-                        </div>
-                        <div className="flex-1 relative h-10 min-w-0">
+                      <div className="flex-1 flex">
+                        {timelineMonths.map((month, idx) => (
                           <div
-                            className={`absolute h-7 ${getBarColor(item)} rounded text-white text-xs flex items-center justify-center px-2 overflow-hidden shadow-sm hover:shadow-md transition-shadow`}
-                            style={{
-                              left: `${leftPercent}%`,
-                              width: `${widthPercent}%`,
-                              minWidth: "40px",
-                            }}
-                            title={`${item.name}: ${formatDate(item.startDate)} - ${formatDate(item.endDate)}`}
+                            key={idx}
+                            className="flex-1 text-center text-xs text-slate-500 border-l border-slate-200 px-1"
+                            style={{ minWidth: "80px" }}
                           >
-                            <span className="truncate text-[10px] sm:text-xs">
-                              {widthPercent > 15 ? `${formatDate(item.startDate)} - ${formatDate(item.endDate)}` : ""}
-                            </span>
+                            {month.toLocaleDateString("en-GB", { month: "short", year: "2-digit" })}
                           </div>
-                        </div>
+                        ))}
                       </div>
-                    );
-                  })}
+                    </div>
+
+                    {/* Gantt Rows */}
+                    <div className="space-y-3 pb-4">
+                      {items.map((item) => {
+                        const totalDays = (latestEnd.getTime() - earliestStart.getTime()) / (1000 * 60 * 60 * 24);
+                        const startOffset = (item.startDate.getTime() - earliestStart.getTime()) / (1000 * 60 * 60 * 24);
+                        const duration = (item.endDate.getTime() - item.startDate.getTime()) / (1000 * 60 * 60 * 24);
+
+                        const leftPercent = Math.max(0, (startOffset / totalDays) * 100);
+                        const widthPercent = Math.max(2, (duration / totalDays) * 100);
+
+                        return (
+                          <div key={item.id} className="flex items-center group">
+                            <div className="w-48 sm:w-64 flex-shrink-0 pr-2 sm:pr-4">
+                              <div className={`text-xs sm:text-sm font-medium ${getTextColor(item)} truncate`}>
+                                {item.name}
+                              </div>
+                              <div className="text-xs text-slate-500 truncate">
+                                {item.companyShortName}
+                              </div>
+                            </div>
+                            <div className="flex-1 relative h-10">
+                              <div
+                                className={`absolute h-7 ${getBarColor(item)} rounded text-white text-xs flex items-center justify-center px-2 overflow-hidden shadow-sm hover:shadow-md transition-shadow`}
+                                style={{
+                                  left: `${leftPercent}%`,
+                                  width: `${widthPercent}%`,
+                                  minWidth: "40px",
+                                }}
+                                title={`${item.name}: ${formatDate(item.startDate)} - ${formatDate(item.endDate)}`}
+                              >
+                                <span className="truncate text-[10px] sm:text-xs">
+                                  {widthPercent > 15 ? `${formatDate(item.startDate)} - ${formatDate(item.endDate)}` : ""}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Legend */}
-                <div className="mt-6 pt-4 border-t border-slate-200">
+                <div className="pt-4 border-t border-slate-200">
                   <div className="text-sm font-medium text-slate-600 mb-3">Legend:</div>
                   <div className="flex flex-wrap gap-3 sm:gap-4 text-xs">
                     <div className="flex items-center gap-2">
@@ -302,7 +307,7 @@ function PipelineGanttContent() {
                     </div>
                   </div>
                 </div>
-              </>
+              </div>
             )}
           </CardContent>
         </Card>
