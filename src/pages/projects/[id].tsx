@@ -31,6 +31,7 @@ interface Project {
     name: string;
   };
   opportunities?: {
+    id: string;
     name: string;
   };
 }
@@ -166,7 +167,7 @@ function ProjectDetailContent() {
             id,
             name
           ),
-          opportunities!projects_opportunity_id_fkey (
+          opportunities (
             id,
             name
           )
@@ -857,6 +858,32 @@ function ProjectDetailContent() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Source Opportunity Section */}
+            {project.opportunities && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Source Opportunity</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between p-4 border rounded-lg bg-blue-50">
+                    <div>
+                      <div className="text-sm font-medium text-slate-500 mb-1">
+                        Created from opportunity
+                      </div>
+                      <div className="font-semibold text-slate-900">
+                        {project.opportunities.name}
+                      </div>
+                    </div>
+                    <Link href={`/opportunities/${project.opportunities.id}`}>
+                      <Button variant="outline" size="sm">
+                        View Opportunity
+                      </Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             <Tabs defaultValue="activities" className="w-full">
               <TabsList>

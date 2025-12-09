@@ -242,8 +242,17 @@ function DashboardContent() {
       // Fetch all opportunities
       const { data: allOpportunities } = await supabase
         .from("opportunities")
-        .select("id, stage, expected_fee_value, expected_start_date")
+        .select("id, stage, expected_fee_value, expected_start_date, linked_project_id")
         .in("stage", ["bid", "high_potential", "secured"]);
+
+      // Count opportunities by stage for pipeline
+      const bidOpportunities = allOpportunities.filter((opp) => opp.stage === "bid");
+      const prospectOpportunities = allOpportunities.filter((opp) => opp.stage === "high_potential");
+      const securedOpportunities = allOpportunities.filter((opp) => opp.stage === "secured");
+
+      // Separate Won opportunities with and without projects
+      const wonWithProjects = securedOpportunities.filter((opp) => opp.linked_project_id);
+      const wonWithoutProjects = securedOpportunities.filter((opp) => !opp.linked_project_id);
 
       // Group opportunities by month and stage
       (allOpportunities || []).forEach((opp) => {
@@ -317,6 +326,10 @@ function DashboardContent() {
         return "bg-blue-100 text-blue-800";
       case "bid":
         return "bg-yellow-100 text-yellow-800";
+      case "lead":
+        return "bg-purple-100 text-purple-800";
+      case "lost":
+        return "bg-red-100 text-red-800";
       default:
         return "bg-slate-100 text-slate-800";
     }

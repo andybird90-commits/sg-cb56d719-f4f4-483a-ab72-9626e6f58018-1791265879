@@ -213,18 +213,20 @@ function NewOpportunityContent() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="stage" className="text-sm sm:text-base">Stage</Label>
+                  <Label htmlFor="stage">Stage</Label>
                   <Select
                     value={formData.stage}
                     onValueChange={(value) => setFormData({ ...formData, stage: value })}
                   >
-                    <SelectTrigger className="h-10 sm:h-11">
+                    <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="secured">Secured</SelectItem>
+                      <SelectItem value="lead">Lead</SelectItem>
+                      <SelectItem value="bid">In Bid</SelectItem>
                       <SelectItem value="high_potential">High Potential</SelectItem>
-                      <SelectItem value="bid">Bid</SelectItem>
+                      <SelectItem value="secured">Won</SelectItem>
+                      <SelectItem value="lost">Lost</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

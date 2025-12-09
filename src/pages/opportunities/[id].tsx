@@ -29,6 +29,7 @@ interface Opportunity {
   expected_fee_value: number | null;
   probability_percent: number | null;
   added_by_user_id: string | null;
+  linked_project_id: string | null;
   companies?: {
     name: string;
   };
@@ -38,6 +39,11 @@ interface Opportunity {
   added_by_profile?: {
     full_name: string | null;
     email: string;
+  } | null;
+  projects?: {
+    id: string;
+    code: string;
+    name: string;
   } | null;
 }
 
@@ -112,6 +118,11 @@ function OpportunityDetailContent() {
           added_by_profile:profiles (
             full_name,
             email
+          ),
+          projects (
+            id,
+            code,
+            name
           )
         `)
         .eq("id", oppId)
@@ -305,18 +316,20 @@ function OpportunityDetailContent() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="stage" className="text-sm sm:text-base">Stage</Label>
+                      <Label htmlFor="edit-stage">Stage</Label>
                       <Select
                         value={editData.stage}
                         onValueChange={(value) => setEditData({ ...editData, stage: value })}
                       >
-                        <SelectTrigger className="h-10 sm:h-11">
+                        <SelectTrigger id="edit-stage">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="secured">Secured</SelectItem>
+                          <SelectItem value="lead">Lead</SelectItem>
+                          <SelectItem value="bid">In Bid</SelectItem>
                           <SelectItem value="high_potential">High Potential</SelectItem>
-                          <SelectItem value="bid">Bid</SelectItem>
+                          <SelectItem value="secured">Won</SelectItem>
+                          <SelectItem value="lost">Lost</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -493,14 +506,63 @@ function OpportunityDetailContent() {
                   )}
                 </div>
               )}
+            </CardContent>
 
-              {opportunity.added_by_user_id && !isEditing && (
-                <div className="pt-4 border-t mt-4">
-                  <div className="text-xs text-slate-500">
-                    Added by {opportunity.added_by_profile?.full_name || opportunity.added_by_profile?.email || "Unknown"}
+            {opportunity.added_by_user_id && !isEditing && (
+              <div className="pt-4 border-t mt-4">
+                <div className="text-xs text-slate-500">
+                  Added by {opportunity.added_by_profile?.full_name || opportunity.added_by_profile?.email || "Unknown"}
+                </div>
+              </div>
+            )}
+          </Card>
+        )}
+
+        {/* Linked Project Section */}
+        {!loading && opportunity && opportunity.projects && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Linked Project</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-mono text-sm text-slate-500 mb-1">
+                    {opportunity.projects.code}
+                  </div>
+                  <div className="font-medium text-slate-900">
+                    {opportunity.projects.name}
                   </div>
                 </div>
-              )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push(`/projects/${opportunity.projects?.id}`)}
+                >
+                  View Project
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Convert to Project Button */}
+        {!loading && opportunity && !opportunity.projects && canEdit && (
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-medium text-slate-900 mb-1">Convert to Project</h3>
+                  <p className="text-sm text-slate-600">
+                    Create a new project from this opportunity
+                  </p>
+                </div>
+                <Link href={`/projects/new?opportunity_id=${opportunity.id}`}>
+                  <Button>
+                    Create Project
+                  </Button>
+                </Link>
+              </div>
             </CardContent>
           </Card>
         )}

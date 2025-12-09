@@ -38,7 +38,7 @@ function NewProjectContent() {
     client_company_id: "",
     start_date: "",
     end_date: "",
-    status: "pipeline",
+    status: "live",
     agreed_fee_value: "",
     notes: "",
   });
@@ -76,7 +76,7 @@ function NewProjectContent() {
         code: formData.code,
         name: formData.name,
         client_company_id: formData.client_company_id,
-        status: formData.status.toLowerCase() as "pipeline" | "live" | "on_hold" | "completed" | "cancelled",
+        status: "live" as "pipeline" | "live" | "on_hold" | "completed" | "cancelled", // Set to live on creation
         opportunity_id: formData.opportunity_id || null,
         start_date: formData.start_date || null,
         end_date: formData.end_date || null,
@@ -102,6 +102,23 @@ function NewProjectContent() {
         setError("Project created but id is missing.");
         setLoading(false);
         return;
+      }
+
+      // If project is linked to an opportunity, update the opportunity
+      if (formData.opportunity_id) {
+        const { error: oppUpdateError } = await supabase
+          .from("opportunities")
+          .update({
+            linked_project_id: data.id,
+            stage: "secured",
+            status: "closed_won"
+          })
+          .eq("id", formData.opportunity_id);
+
+        if (oppUpdateError) {
+          console.error("Failed to link opportunity:", oppUpdateError);
+          // Don't fail the whole operation, just log the error
+        }
       }
 
       // Success - redirect to the new project detail page
