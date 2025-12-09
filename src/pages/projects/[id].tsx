@@ -150,6 +150,8 @@ function ProjectDetailContent() {
       setProjectLoading(true);
       setProjectError(null);
 
+      console.log("Fetching project:", projectId);
+
       const { data: projectData, error: projectError } = await supabase
         .from("projects")
         .select(`
@@ -163,7 +165,7 @@ function ProjectDetailContent() {
           notes,
           client_company_id,
           opportunity_id,
-          companies!projects_client_company_id_fkey (
+          companies (
             id,
             name
           ),
@@ -175,12 +177,17 @@ function ProjectDetailContent() {
         .eq("id", projectId)
         .single();
 
-      if (projectError) throw projectError;
+      if (projectError) {
+        console.error("Project fetch error:", projectError);
+        throw projectError;
+      }
 
       if (!projectData) {
         setProjectError("Project not found");
         return;
       }
+
+      console.log("Project data loaded:", projectData);
 
       const { data: activitiesData } = await supabase
         .from("project_activities")
