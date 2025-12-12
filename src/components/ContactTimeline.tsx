@@ -60,11 +60,11 @@ export function ContactTimeline({ contactId, contactName }: ContactTimelineProps
         .from("contact_timeline" as any)
         .select(`
           *,
-          author:profiles (
+          author:created_by_user_id (
             full_name,
             email
           ),
-          event:contact_events (
+          event:event_id (
             title,
             event_type,
             event_date
