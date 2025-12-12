@@ -319,10 +319,11 @@ function DashboardContent() {
       setVisitsLoading(true);
       setVisitsError(null);
 
-      // Get start and end of current month
-      const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      // Get today and 7 days from now
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const sevenDaysFromNow = new Date(today);
+      sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
 
       // Cast to any to bypass type checking for the new table
       const { data, error } = await (supabase
@@ -336,11 +337,11 @@ function DashboardContent() {
             )
           )
         `)
-        .gte("event_date", startOfMonth.toISOString().split("T")[0])
-        .lte("event_date", endOfMonth.toISOString().split("T")[0])
+        .gte("event_date", today.toISOString().split("T")[0])
+        .lte("event_date", sevenDaysFromNow.toISOString().split("T")[0])
         .order("event_date")
         .order("start_time")
-        .limit(10)) as any;
+        .limit(20)) as any;
 
       if (error) throw error;
       setUpcomingVisits((data as ContactEvent[]) || []);
@@ -1090,7 +1091,7 @@ function DashboardContent() {
               <Calendar className="w-5 h-5 text-purple-600" />
               <CardTitle className="text-base sm:text-lg">Client Visits & Functions</CardTitle>
             </div>
-            <p className="text-xs sm:text-sm text-slate-600">This month's scheduled visits and events</p>
+            <p className="text-xs sm:text-sm text-slate-600">Next 7 days</p>
           </CardHeader>
           <CardContent>
             {visitsError ? (
@@ -1101,7 +1102,7 @@ function DashboardContent() {
               </div>
             ) : upcomingVisits.length === 0 ? (
               <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
-                No visits or functions scheduled this month
+                No visits or functions scheduled in the next 7 days
               </div>
             ) : (
               <div className="space-y-3">
