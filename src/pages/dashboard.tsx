@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Building2, Users, Target, Briefcase, TrendingUp, Calendar, AlertCircle, AlertTriangle } from "lucide-react";
+import { Building2, Users, Target, Briefcase, TrendingUp, Calendar, AlertCircle, AlertTriangle, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -29,12 +29,16 @@ interface Opportunity {
   companies?: { name: string };
 }
 
-interface Project {
+interface ActivityEntry {
   id: string;
-  code: string;
-  name: string;
-  status: string;
-  companies?: { name: string };
+  source: "contact" | "opportunity";
+  source_id: string;
+  source_name: string;
+  post_type: "event" | "post" | "note";
+  content: string;
+  created_at: string;
+  author_name: string;
+  event_type?: string;
 }
 
 interface Absence {
@@ -88,9 +92,9 @@ function DashboardContent() {
   const [tendersError, setTendersError] = useState<string | null>(null);
   const [upcomingTenders, setUpcomingTenders] = useState<Opportunity[]>([]);
 
-  const [projectsLoading, setProjectsLoading] = useState(true);
-  const [projectsError, setProjectsError] = useState<string | null>(null);
-  const [liveProjects, setLiveProjects] = useState<Project[]>([]);
+  const [activityLoading, setActivityLoading] = useState(true);
+  const [activityError, setActivityError] = useState<string | null>(null);
+  const [latestActivity, setLatestActivity] = useState<ActivityEntry[]>([]);
 
   const [absencesLoading, setAbsencesLoading] = useState(true);
   const [absencesError, setAbsencesError] = useState<string | null>(null);
@@ -108,7 +112,7 @@ function DashboardContent() {
   useEffect(() => {
     fetchStats();
     fetchTenders();
-    fetchLiveProjects();
+    fetchLatestActivity();
     fetchAbsences();
     fetchUpcomingVisits();
     fetchPipelineData();
@@ -178,33 +182,98 @@ function DashboardContent() {
     }
   };
 
-  const fetchLiveProjects = async () => {
+  const fetchLatestActivity = async () => {
     try {
-      setProjectsLoading(true);
-      setProjectsError(null);
+      setActivityLoading(true);
+      setActivityError(null);
 
-      const { data, error } = await supabase
-        .from("projects")
+      // Fetch contact timeline entries
+      const { data: contactTimeline, error: contactError } = await (supabase
+        .from("contact_timeline" as any)
         .select(`
           id,
-          code,
-          name,
-          status,
-          companies (
+          post_type,
+          content,
+          created_at,
+          contact_id,
+          contacts!contact_timeline_contact_id_fkey (
             name
+          ),
+          profiles!contact_timeline_created_by_user_id_fkey (
+            full_name,
+            email
+          ),
+          contact_events (
+            event_type
           )
         `)
-        .eq("status", "live")
         .order("created_at", { ascending: false })
-        .limit(5);
+        .limit(10)) as any;
 
-      if (error) throw error;
-      setLiveProjects(data || []);
+      if (contactError) throw contactError;
+
+      // Fetch opportunity timeline entries
+      const { data: opportunityTimeline, error: opportunityError } = await (supabase
+        .from("opportunity_timeline" as any)
+        .select(`
+          id,
+          post_type,
+          content,
+          created_at,
+          opportunity_id,
+          opportunities!opportunity_timeline_opportunity_id_fkey (
+            name
+          ),
+          profiles!opportunity_timeline_created_by_user_id_fkey (
+            full_name,
+            email
+          ),
+          opportunity_events (
+            event_type
+          )
+        `)
+        .order("created_at", { ascending: false })
+        .limit(10)) as any;
+
+      if (opportunityError) throw opportunityError;
+
+      // Combine and format both timelines
+      const combinedActivity: ActivityEntry[] = [
+        ...(contactTimeline || []).map((entry: any) => ({
+          id: entry.id,
+          source: "contact" as const,
+          source_id: entry.contact_id,
+          source_name: entry.contacts?.name || "Unknown Contact",
+          post_type: entry.post_type,
+          content: entry.content,
+          created_at: entry.created_at,
+          author_name: entry.profiles?.full_name || entry.profiles?.email || "Unknown User",
+          event_type: entry.contact_events?.event_type,
+        })),
+        ...(opportunityTimeline || []).map((entry: any) => ({
+          id: entry.id,
+          source: "opportunity" as const,
+          source_id: entry.opportunity_id,
+          source_name: entry.opportunities?.name || "Unknown Opportunity",
+          post_type: entry.post_type,
+          content: entry.content,
+          created_at: entry.created_at,
+          author_name: entry.profiles?.full_name || entry.profiles?.email || "Unknown User",
+          event_type: entry.opportunity_events?.event_type,
+        })),
+      ];
+
+      // Sort by date and take top 10
+      combinedActivity.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
+      setLatestActivity(combinedActivity.slice(0, 10));
     } catch (error) {
-      console.error("Failed to load live projects", error);
-      setProjectsError("Failed to load projects");
+      console.error("Failed to load latest activity", error);
+      setActivityError("Failed to load activity");
     } finally {
-      setProjectsLoading(false);
+      setActivityLoading(false);
     }
   };
 
@@ -522,6 +591,41 @@ function DashboardContent() {
 
   const getEventTypeColor = (type: "visit" | "function") => {
     return type === "visit" ? "bg-blue-100 text-blue-800" : "bg-purple-100 text-purple-800";
+  };
+
+  const getActivityPostTypeColor = (type: string) => {
+    switch (type) {
+      case "event":
+        return "bg-blue-100 text-blue-700";
+      case "post":
+        return "bg-purple-100 text-purple-700";
+      default:
+        return "bg-slate-100 text-slate-700";
+    }
+  };
+
+  const getActivitySourceIcon = (source: "contact" | "opportunity") => {
+    return source === "contact" ? "👤" : "🎯";
+  };
+
+  const formatActivityDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+
+    return date.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
+    });
   };
 
   const maxValue = 200000;
@@ -872,46 +976,59 @@ function DashboardContent() {
             </CardContent>
           </Card>
 
-          {/* Live Projects */}
+          {/* Latest Activity */}
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
-                <Briefcase className="w-5 h-5 text-green-600" />
-                <CardTitle className="text-base sm:text-lg">Live Projects</CardTitle>
+                <MessageSquare className="w-5 h-5 text-purple-600" />
+                <CardTitle className="text-base sm:text-lg">Latest Activity</CardTitle>
               </div>
-              <p className="text-xs sm:text-sm text-slate-600">Currently active</p>
+              <p className="text-xs sm:text-sm text-slate-600">Recent updates</p>
             </CardHeader>
             <CardContent>
-              {projectsError ? (
-                <ErrorState message={projectsError} />
-              ) : projectsLoading ? (
+              {activityError ? (
+                <ErrorState message={activityError} />
+              ) : activityLoading ? (
                 <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
-                  Loading projects...
+                  Loading activity...
                 </div>
-              ) : liveProjects.length === 0 ? (
+              ) : latestActivity.length === 0 ? (
                 <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
-                  No live projects
+                  No recent activity
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {liveProjects.map((proj) => (
+                  {latestActivity.map((activity) => (
                     <div
-                      key={proj.id}
-                      className="p-3 border rounded-lg hover:bg-slate-50 transition-colors"
+                      key={`${activity.source}-${activity.id}`}
+                      className="p-3 border rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                      onClick={() => {
+                        const path = activity.source === "contact" 
+                          ? `/contacts/${activity.source_id}`
+                          : `/opportunities/${activity.source_id}`;
+                        router.push(path);
+                      }}
                     >
                       <div className="flex items-start gap-2 mb-2">
-                        <span className="font-mono text-xs text-slate-500 flex-shrink-0">
-                          {proj.code}
-                        </span>
-                        <div 
-                          className="font-medium text-sm text-slate-900 line-clamp-2 cursor-pointer hover:text-blue-600"
-                          onClick={() => router.push(`/projects/${proj.id}`)}
-                        >
-                          {proj.name}
+                        <span className="text-sm">{getActivitySourceIcon(activity.source)}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className="text-xs font-medium text-slate-900 truncate">
+                              {activity.source_name}
+                            </span>
+                            <Badge variant="outline" className={`text-xs ${getActivityPostTypeColor(activity.post_type)}`}>
+                              {activity.post_type}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-slate-700 line-clamp-2 mb-1">
+                            {activity.content}
+                          </p>
+                          <div className="flex items-center gap-2 text-xs text-slate-500">
+                            <span>{activity.author_name}</span>
+                            <span>•</span>
+                            <span>{formatActivityDate(activity.created_at)}</span>
+                          </div>
                         </div>
-                      </div>
-                      <div className="text-xs text-slate-600">
-                        {proj.companies?.name}
                       </div>
                     </div>
                   ))}
