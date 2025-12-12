@@ -30,7 +30,7 @@ interface TimelineEntry {
   } | null;
   opportunity_events?: {
     title: string;
-    event_type: "meeting" | "pitch" | "follow_up" | "demo";
+    event_type: "meeting" | "pitch" | "follow_up" | "demo" | "call";
     event_date: string;
   } | null;
 }
@@ -197,12 +197,13 @@ export function OpportunityTimeline({ opportunityId, opportunityName }: Opportun
     }
   };
 
-  const getEventTypeColor = (type: "meeting" | "pitch" | "follow_up" | "demo") => {
+  const getEventTypeColor = (type: "meeting" | "pitch" | "follow_up" | "demo" | "call") => {
     const colors = {
       meeting: "bg-blue-500",
       pitch: "bg-purple-500",
       follow_up: "bg-green-500",
-      demo: "bg-orange-500"
+      demo: "bg-orange-500",
+      call: "bg-pink-500"
     };
     return colors[type];
   };

@@ -15,7 +15,7 @@ interface OpportunityEvent {
   id: string;
   opportunity_id: string;
   title: string;
-  event_type: "meeting" | "pitch" | "follow_up" | "demo";
+  event_type: "meeting" | "pitch" | "follow_up" | "demo" | "call";
   event_date: string;
   start_time: string | null;
   end_time: string | null;
@@ -120,7 +120,8 @@ export function OpportunityCalendar({ opportunityId, opportunityName, isDetailVi
             meeting: "Meeting",
             pitch: "Pitch",
             follow_up: "Follow-up",
-            demo: "Demo"
+            demo: "Demo",
+            call: "Call"
           };
           const eventTypeLabel = eventTypeLabels[formData.event_type as keyof typeof eventTypeLabels];
           const timeInfo = formData.start_time ? ` at ${formData.start_time.substring(0, 5)}` : "";
@@ -216,12 +217,13 @@ export function OpportunityCalendar({ opportunityId, opportunityName, isDetailVi
     return time.substring(0, 5);
   };
 
-  const getEventColor = (type: "meeting" | "pitch" | "follow_up" | "demo") => {
+  const getEventColor = (type: "meeting" | "pitch" | "follow_up" | "demo" | "call") => {
     const colors = {
       meeting: "bg-blue-500",
       pitch: "bg-purple-500",
       follow_up: "bg-green-500",
-      demo: "bg-orange-500"
+      demo: "bg-orange-500",
+      call: "bg-pink-500"
     };
     return colors[type];
   };
@@ -331,6 +333,7 @@ export function OpportunityCalendar({ opportunityId, opportunityName, isDetailVi
                     <SelectItem value="pitch">Pitch</SelectItem>
                     <SelectItem value="follow_up">Follow-up</SelectItem>
                     <SelectItem value="demo">Demo</SelectItem>
+                    <SelectItem value="call">Call</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -548,6 +551,10 @@ export function OpportunityCalendar({ opportunityId, opportunityName, isDetailVi
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 bg-orange-500 rounded"></div>
                 <span className="text-slate-600">Demo</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-pink-500 rounded"></div>
+                <span className="text-slate-600">Call</span>
               </div>
             </div>
           </div>
