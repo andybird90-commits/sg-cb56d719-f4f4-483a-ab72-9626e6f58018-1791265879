@@ -14,6 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ArrowLeft, Edit, AlertTriangle, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { OpportunityCalendar } from "@/components/OpportunityCalendar";
+import { OpportunityTimeline } from "@/components/OpportunityTimeline";
 
 interface Opportunity {
   id: string;
@@ -516,6 +518,22 @@ function OpportunityDetailContent() {
               </div>
             )}
           </Card>
+        )}
+
+        {/* Calendar and Timeline Section */}
+        {!loading && opportunity && (
+          <div className="space-y-6">
+            <OpportunityCalendar 
+              opportunityId={opportunity.id} 
+              opportunityName={opportunity.name} 
+              isDetailView={true} 
+            />
+            
+            <OpportunityTimeline 
+              opportunityId={opportunity.id}
+              opportunityName={opportunity.name}
+            />
+          </div>
         )}
 
         {/* Linked Project Section */}
