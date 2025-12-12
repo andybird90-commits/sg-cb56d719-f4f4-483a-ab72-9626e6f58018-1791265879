@@ -26,6 +26,8 @@ interface Opportunity {
   tender_due_date: string | null;
   expected_fee_value?: number | null;
   expected_start_date?: string | null;
+  expected_end_date?: string | null;
+  probability_percent?: number | null;
   companies?: { name: string };
 }
 
