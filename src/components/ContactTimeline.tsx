@@ -60,11 +60,11 @@ export function ContactTimeline({ contactId, contactName }: ContactTimelineProps
         .from("contact_timeline" as any)
         .select(`
           *,
-          author:profiles!contact_timeline_created_by_user_id_fkey (
+          author:profiles (
             full_name,
             email
           ),
-          event:contact_events!contact_timeline_event_id_fkey (
+          event:contact_events (
             title,
             event_type,
             event_date
@@ -73,7 +73,10 @@ export function ContactTimeline({ contactId, contactName }: ContactTimelineProps
         .eq("contact_id", contactId)
         .order("created_at", { ascending: false })) as any;
 
-      if (error) throw error;
+      if (error) {
+        console.error("Timeline fetch error:", error);
+        throw error;
+      }
       setEntries((data as TimelineEntry[]) || []);
     } catch (err) {
       console.error("Failed to load timeline", err);

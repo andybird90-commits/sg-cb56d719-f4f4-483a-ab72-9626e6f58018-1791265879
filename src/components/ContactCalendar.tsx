@@ -94,7 +94,7 @@ export function ContactCalendar({ contactId, contactName, isDetailView = false }
 
         if (error) throw error;
       } else {
-        // Insert new event
+        // Insert new event with created_by field
         const { data: newEvent, error: insertError } = await (supabase
           .from("contact_events" as any)
           .insert({
@@ -106,11 +106,15 @@ export function ContactCalendar({ contactId, contactName, isDetailView = false }
             end_time: formData.end_time || null,
             location: formData.location || null,
             notes: formData.notes || null,
+            created_by: user?.id || null,
           })
           .select()
           .single()) as any;
 
-        if (insertError) throw insertError;
+        if (insertError) {
+          console.error("Failed to create event:", insertError);
+          throw insertError;
+        }
 
         // Create timeline entry for the new event
         if (newEvent && user) {
@@ -122,13 +126,18 @@ export function ContactCalendar({ contactId, contactName, isDetailView = false }
           
           const timelineContent = `Scheduled ${eventTypeLabel.toLowerCase()}: ${formData.title}${timeInfo}${locationInfo}`;
 
-          await (supabase.from("contact_timeline" as any).insert({
+          const { error: timelineError } = await (supabase.from("contact_timeline" as any).insert({
             contact_id: contactId,
             post_type: "event",
             content: timelineContent,
             event_id: newEvent.id,
             created_by_user_id: user.id,
           })) as any;
+
+          if (timelineError) {
+            console.error("Failed to create timeline entry:", timelineError);
+            alert("Event created but timeline entry failed. Please refresh the page.");
+          }
         }
       }
 
