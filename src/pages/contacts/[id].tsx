@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ArrowLeft, Mail, Phone, Building2, User, Briefcase, FileText, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { ContactCalendar } from "@/components/ContactCalendar";
+import { ContactTimeline } from "@/components/ContactTimeline";
 
 interface Contact {
   id: string;
@@ -197,12 +198,17 @@ function ContactDetailContent() {
             </Card>
           </div>
 
-          {/* Calendar Section */}
-          <div className="lg:col-span-2">
+          {/* Calendar and Timeline Section */}
+          <div className="lg:col-span-2 space-y-6">
             <ContactCalendar 
               contactId={contact.id} 
               contactName={contact.name} 
               isDetailView={true} 
+            />
+            
+            <ContactTimeline 
+              contactId={contact.id}
+              contactName={contact.name}
             />
           </div>
         </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,7 @@ interface ContactCalendarProps {
 }
 
 export function ContactCalendar({ contactId, contactName, isDetailView = false }: ContactCalendarProps) {
+  const { user } = useAuth();
   const [events, setEvents] = useState<ContactEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
@@ -92,18 +94,42 @@ export function ContactCalendar({ contactId, contactName, isDetailView = false }
 
         if (error) throw error;
       } else {
-        const { error } = await (supabase.from("contact_events" as any).insert({
-          contact_id: contactId,
-          title: formData.title,
-          event_type: formData.event_type as "visit" | "function",
-          event_date: formData.event_date,
-          start_time: formData.start_time || null,
-          end_time: formData.end_time || null,
-          location: formData.location || null,
-          notes: formData.notes || null,
-        })) as any;
+        // Insert new event
+        const { data: newEvent, error: insertError } = await (supabase
+          .from("contact_events" as any)
+          .insert({
+            contact_id: contactId,
+            title: formData.title,
+            event_type: formData.event_type as "visit" | "function",
+            event_date: formData.event_date,
+            start_time: formData.start_time || null,
+            end_time: formData.end_time || null,
+            location: formData.location || null,
+            notes: formData.notes || null,
+          })
+          .select()
+          .single()) as any;
 
-        if (error) throw error;
+        if (insertError) throw insertError;
+
+        // Create timeline entry for the new event
+        if (newEvent && user) {
+          const eventTypeLabel = formData.event_type === "visit" ? "Visit" : "Function";
+          const timeInfo = formData.start_time 
+            ? ` at ${formData.start_time.substring(0, 5)}`
+            : "";
+          const locationInfo = formData.location ? ` at ${formData.location}` : "";
+          
+          const timelineContent = `Scheduled ${eventTypeLabel.toLowerCase()}: ${formData.title}${timeInfo}${locationInfo}`;
+
+          await (supabase.from("contact_timeline" as any).insert({
+            contact_id: contactId,
+            post_type: "event",
+            content: timelineContent,
+            event_id: newEvent.id,
+            created_by_user_id: user.id,
+          })) as any;
+        }
       }
 
       await fetchEvents();

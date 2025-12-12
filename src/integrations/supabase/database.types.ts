@@ -160,6 +160,54 @@ export type Database = {
           },
         ]
       }
+      contact_timeline: {
+        Row: {
+          contact_id: string
+          content: string
+          created_at: string | null
+          created_by_user_id: string | null
+          event_id: string | null
+          id: string
+          post_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          contact_id: string
+          content: string
+          created_at?: string | null
+          created_by_user_id?: string | null
+          event_id?: string | null
+          id?: string
+          post_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          contact_id?: string
+          content?: string
+          created_at?: string | null
+          created_by_user_id?: string | null
+          event_id?: string | null
+          id?: string
+          post_type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_timeline_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_timeline_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "contact_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contacts: {
         Row: {
           added_by_user_id: string | null
