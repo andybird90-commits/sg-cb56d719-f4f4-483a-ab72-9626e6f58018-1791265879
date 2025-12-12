@@ -94,6 +94,11 @@ export function ContactCalendar({ contactId, contactName, isDetailView = false }
 
         if (error) throw error;
       } else {
+        console.log("=== CREATING NEW EVENT ===");
+        console.log("User:", user);
+        console.log("Contact ID:", contactId);
+        console.log("Form Data:", formData);
+
         // Insert new event with created_by field
         const { data: newEvent, error: insertError } = await (supabase
           .from("contact_events" as any)
@@ -111,6 +116,8 @@ export function ContactCalendar({ contactId, contactName, isDetailView = false }
           .select()
           .single()) as any;
 
+        console.log("Event insert result:", { newEvent, insertError });
+
         if (insertError) {
           console.error("Failed to create event:", insertError);
           throw insertError;
@@ -118,6 +125,7 @@ export function ContactCalendar({ contactId, contactName, isDetailView = false }
 
         // Create timeline entry for the new event
         if (newEvent && user) {
+          console.log("=== CREATING TIMELINE ENTRY ===");
           const eventTypeLabel = formData.event_type === "visit" ? "Visit" : "Function";
           const timeInfo = formData.start_time 
             ? ` at ${formData.start_time.substring(0, 5)}`
@@ -126,18 +134,33 @@ export function ContactCalendar({ contactId, contactName, isDetailView = false }
           
           const timelineContent = `Scheduled ${eventTypeLabel.toLowerCase()}: ${formData.title}${timeInfo}${locationInfo}`;
 
-          const { error: timelineError } = await (supabase.from("contact_timeline" as any).insert({
-            contact_id: contactId,
-            post_type: "event",
-            content: timelineContent,
-            event_id: newEvent.id,
-            created_by_user_id: user.id,
-          })) as any;
+          console.log("Timeline content:", timelineContent);
+          console.log("Event ID:", newEvent.id);
+          console.log("User ID:", user.id);
+
+          const { data: timelineEntry, error: timelineError } = await (supabase
+            .from("contact_timeline" as any)
+            .insert({
+              contact_id: contactId,
+              post_type: "event",
+              content: timelineContent,
+              event_id: newEvent.id,
+              created_by_user_id: user.id,
+            })
+            .select()
+            .single()) as any;
+
+          console.log("Timeline insert result:", { timelineEntry, timelineError });
 
           if (timelineError) {
-            console.error("Failed to create timeline entry:", timelineError);
-            alert("Event created but timeline entry failed. Please refresh the page.");
+            console.error("Timeline creation failed:", timelineError);
+            console.error("Timeline error details:", JSON.stringify(timelineError, null, 2));
+            alert("Event created but timeline entry failed. Check console for details.");
+          } else {
+            console.log("✅ Timeline entry created successfully!");
           }
+        } else {
+          console.warn("Missing data for timeline creation:", { newEvent, user });
         }
       }
 
