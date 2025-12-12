@@ -72,7 +72,7 @@ export function ContactTimeline({ contactId, contactName }: ContactTimelineProps
         .from("contact_timeline" as any)
         .select(`
           *,
-          profiles (
+          profiles!contact_timeline_created_by_user_id_fkey (
             full_name,
             email
           ),
