@@ -58,7 +58,6 @@ export function ContactCalendar({ contactId, contactName, isDetailView = false }
   const fetchEvents = async () => {
     try {
       setLoading(true);
-      // Cast to any to bypass type checking for the new table
       const { data, error } = await (supabase
         .from("contact_events" as any)
         .select("*")
@@ -95,9 +94,14 @@ export function ContactCalendar({ contactId, contactName, isDetailView = false }
         if (error) throw error;
       } else {
         console.log("=== CREATING NEW EVENT ===");
-        console.log("User:", user);
+        console.log("User ID:", user?.id);
         console.log("Contact ID:", contactId);
         console.log("Form Data:", formData);
+
+        if (!user?.id) {
+          alert("You must be logged in to create events");
+          return;
+        }
 
         // Insert new event with created_by field
         const { data: newEvent, error: insertError } = await (supabase
@@ -111,20 +115,20 @@ export function ContactCalendar({ contactId, contactName, isDetailView = false }
             end_time: formData.end_time || null,
             location: formData.location || null,
             notes: formData.notes || null,
-            created_by: user?.id || null,
+            created_by: user.id,
           })
           .select()
           .single()) as any;
-
-        console.log("Event insert result:", { newEvent, insertError });
 
         if (insertError) {
           console.error("Failed to create event:", insertError);
           throw insertError;
         }
 
+        console.log("✅ Event created successfully:", newEvent);
+
         // Create timeline entry for the new event
-        if (newEvent && user) {
+        if (newEvent) {
           console.log("=== CREATING TIMELINE ENTRY ===");
           const eventTypeLabel = formData.event_type === "visit" ? "Visit" : "Function";
           const timeInfo = formData.start_time 
@@ -150,17 +154,13 @@ export function ContactCalendar({ contactId, contactName, isDetailView = false }
             .select()
             .single()) as any;
 
-          console.log("Timeline insert result:", { timelineEntry, timelineError });
-
           if (timelineError) {
-            console.error("Timeline creation failed:", timelineError);
+            console.error("❌ Timeline creation failed:", timelineError);
             console.error("Timeline error details:", JSON.stringify(timelineError, null, 2));
-            alert("Event created but timeline entry failed. Check console for details.");
+            alert("Event created but timeline entry failed. Please refresh the page.");
           } else {
-            console.log("✅ Timeline entry created successfully!");
+            console.log("✅ Timeline entry created successfully:", timelineEntry);
           }
-        } else {
-          console.warn("Missing data for timeline creation:", { newEvent, user });
         }
       }
 
@@ -176,6 +176,9 @@ export function ContactCalendar({ contactId, contactName, isDetailView = false }
         location: "",
         notes: "",
       });
+
+      // Trigger a custom event to notify timeline to refresh
+      window.dispatchEvent(new CustomEvent("timeline-refresh"));
     } catch (err) {
       console.error("Failed to save event", err);
       alert("Failed to save event");

@@ -24,11 +24,11 @@ interface TimelineEntry {
   created_by_user_id: string | null;
   created_at: string;
   updated_at: string;
-  author?: {
+  profiles?: {
     full_name: string | null;
     email: string;
   } | null;
-  event?: {
+  contact_events?: {
     title: string;
     event_type: "visit" | "function";
     event_date: string;
@@ -51,20 +51,32 @@ export function ContactTimeline({ contactId, contactName }: ContactTimelineProps
 
   useEffect(() => {
     fetchTimeline();
+
+    // Listen for timeline refresh events from calendar
+    const handleRefresh = () => {
+      console.log("Timeline refresh event received");
+      fetchTimeline();
+    };
+
+    window.addEventListener("timeline-refresh", handleRefresh);
+    return () => window.removeEventListener("timeline-refresh", handleRefresh);
   }, [contactId]);
 
   const fetchTimeline = async () => {
     try {
       setLoading(true);
+      console.log("=== FETCHING TIMELINE ===");
+      console.log("Contact ID:", contactId);
+
       const { data, error } = await (supabase
         .from("contact_timeline" as any)
         .select(`
           *,
-          author:created_by_user_id (
+          profiles (
             full_name,
             email
           ),
-          event:event_id (
+          contact_events (
             title,
             event_type,
             event_date
@@ -74,9 +86,11 @@ export function ContactTimeline({ contactId, contactName }: ContactTimelineProps
         .order("created_at", { ascending: false })) as any;
 
       if (error) {
-        console.error("Timeline fetch error:", error);
+        console.error("❌ Timeline fetch error:", error);
         throw error;
       }
+
+      console.log("✅ Timeline data fetched:", data);
       setEntries((data as TimelineEntry[]) || []);
     } catch (err) {
       console.error("Failed to load timeline", err);
@@ -243,7 +257,7 @@ export function ContactTimeline({ contactId, contactName }: ContactTimelineProps
               {entries.map((entry) => {
                 const isEditing = editingEntry?.id === entry.id;
                 const canEdit = user?.id === entry.created_by_user_id && entry.post_type === "post";
-                const authorName = entry.author?.full_name || entry.author?.email || "Unknown User";
+                const authorName = entry.profiles?.full_name || entry.profiles?.email || "Unknown User";
 
                 return (
                   <div key={entry.id} className="flex items-start gap-3 pb-4 border-b last:border-b-0">
@@ -296,16 +310,16 @@ export function ContactTimeline({ contactId, contactName }: ContactTimelineProps
                       </div>
 
                       {/* Event badge if linked to calendar event */}
-                      {entry.event && (
+                      {entry.contact_events && (
                         <div className="mb-2">
                           <Badge
                             className={`${
-                              entry.event.event_type === "visit" ? "bg-blue-500" : "bg-purple-500"
+                              entry.contact_events.event_type === "visit" ? "bg-blue-500" : "bg-purple-500"
                             } text-white text-xs`}
                           >
-                            {entry.event.event_type === "visit" ? "Visit" : "Function"}: {entry.event.title}
+                            {entry.contact_events.event_type === "visit" ? "Visit" : "Function"}: {entry.contact_events.title}
                             {" • "}
-                            {new Date(entry.event.event_date).toLocaleDateString("en-GB", {
+                            {new Date(entry.contact_events.event_date).toLocaleDateString("en-GB", {
                               day: "numeric",
                               month: "short",
                             })}
