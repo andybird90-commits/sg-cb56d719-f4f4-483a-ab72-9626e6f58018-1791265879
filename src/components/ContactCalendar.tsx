@@ -454,8 +454,8 @@ export function ContactCalendar({ contactId, contactName, isDetailView = false }
                               >
                                 {event.title}
                               </div>
-                              {/* Hover tooltip */}
-                              <div className="absolute left-0 top-full mt-1 w-64 bg-white border shadow-lg rounded-lg p-3 z-50 opacity-0 group-hover:opacity-100 invisible group-hover:visible transition-all pointer-events-none">
+                              {/* Hover tooltip - FIXED: Allow pointer events */}
+                              <div className="absolute left-0 top-full mt-1 w-64 bg-white border shadow-lg rounded-lg p-3 z-50 opacity-0 group-hover:opacity-100 invisible group-hover:visible transition-all">
                                 <div className="space-y-2">
                                   <div>
                                     <Badge
@@ -485,7 +485,7 @@ export function ContactCalendar({ contactId, contactName, isDetailView = false }
                                     <Button
                                       size="sm"
                                       variant="outline"
-                                      className="h-7 text-xs flex-1 pointer-events-auto"
+                                      className="h-7 text-xs flex-1"
                                       onClick={() => handleEdit(event)}
                                     >
                                       <Edit className="w-3 h-3 mr-1" />
@@ -494,7 +494,7 @@ export function ContactCalendar({ contactId, contactName, isDetailView = false }
                                     <Button
                                       size="sm"
                                       variant="outline"
-                                      className="h-7 text-xs flex-1 pointer-events-auto text-red-600 hover:text-red-700"
+                                      className="h-7 text-xs flex-1 text-red-600 hover:text-red-700"
                                       onClick={() => handleDelete(event.id)}
                                     >
                                       <Trash2 className="w-3 h-3 mr-1" />
