@@ -41,12 +41,14 @@ interface ActivityEntry {
   event_type?: string;
 }
 
-interface Absence {
+interface LatestOpportunity {
   id: string;
-  type: string;
-  start_date: string;
-  end_date: string;
-  profiles?: { full_name: string };
+  name: string;
+  stage: string;
+  status: string;
+  expected_fee_value: number | null;
+  created_at: string;
+  companies?: { name: string };
 }
 
 interface ContactEvent {
@@ -96,26 +98,31 @@ function DashboardContent() {
   const [activityError, setActivityError] = useState<string | null>(null);
   const [latestActivity, setLatestActivity] = useState<ActivityEntry[]>([]);
 
-  const [absencesLoading, setAbsencesLoading] = useState(true);
-  const [absencesError, setAbsencesError] = useState<string | null>(null);
-  const [thisWeekAbsences, setThisWeekAbsences] = useState<Absence[]>([]);
-
   const [visitsLoading, setVisitsLoading] = useState(true);
   const [visitsError, setVisitsError] = useState<string | null>(null);
   const [upcomingVisits, setUpcomingVisits] = useState<ContactEvent[]>([]);
 
+  const [latestOpportunitiesLoading, setLatestOpportunitiesLoading] = useState(true);
+  const [latestOpportunitiesError, setLatestOpportunitiesError] = useState<string | null>(null);
+  const [latestOpportunities, setLatestOpportunities] = useState<LatestOpportunity[]>([]);
+
   const [pipelineLoading, setPipelineLoading] = useState(true);
   const [pipelineError, setPipelineError] = useState<string | null>(null);
   const [pipelineData, setPipelineData] = useState<PipelineData[]>([]);
-  const [pipelineView, setPipelineView] = useState<"all" | "secured" | "secured_prospects">("all");
+  const [pipelineView, setPipelineView] = useState<"all" | "secured_prospects" | "secured">("all");
+
+  const [opportunitiesTableLoading, setOpportunitiesTableLoading] = useState(true);
+  const [opportunitiesTableError, setOpportunitiesTableError] = useState<string | null>(null);
+  const [opportunitiesTable, setOpportunitiesTable] = useState<Opportunity[]>([]);
 
   useEffect(() => {
     fetchStats();
     fetchTenders();
     fetchLatestActivity();
-    fetchAbsences();
+    fetchLatestOpportunities();
     fetchUpcomingVisits();
     fetchPipelineData();
+    fetchOpportunitiesTable();
   }, []);
 
   const fetchStats = async () => {
@@ -277,40 +284,34 @@ function DashboardContent() {
     }
   };
 
-  const fetchAbsences = async () => {
+  const fetchLatestOpportunities = async () => {
     try {
-      setAbsencesLoading(true);
-      setAbsencesError(null);
-
-      const startOfWeek = new Date();
-      startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay() + 1);
-      const endOfWeek = new Date(startOfWeek);
-      endOfWeek.setDate(endOfWeek.getDate() + 6);
+      setLatestOpportunitiesLoading(true);
+      setLatestOpportunitiesError(null);
 
       const { data, error } = await supabase
-        .from("absences")
+        .from("opportunities")
         .select(`
           id,
-          type,
-          start_date,
-          end_date,
-          profiles!absences_user_id_fkey (
-            full_name
+          name,
+          stage,
+          status,
+          expected_fee_value,
+          created_at,
+          companies (
+            name
           )
         `)
-        .not("approved_by", "is", null)
-        .lte("start_date", endOfWeek.toISOString().split("T")[0])
-        .gte("end_date", startOfWeek.toISOString().split("T")[0])
-        .order("start_date")
-        .limit(10);
+        .order("created_at", { ascending: false })
+        .limit(5);
 
       if (error) throw error;
-      setThisWeekAbsences(data || []);
+      setLatestOpportunities(data || []);
     } catch (error) {
-      console.error("Failed to load absences", error);
-      setAbsencesError("Failed to load absences");
+      console.error("Failed to load latest opportunities", error);
+      setLatestOpportunitiesError("Failed to load opportunities");
     } finally {
-      setAbsencesLoading(false);
+      setLatestOpportunitiesLoading(false);
     }
   };
 
@@ -541,6 +542,39 @@ function DashboardContent() {
       setPipelineError("Failed to load pipeline");
     } finally {
       setPipelineLoading(false);
+    }
+  };
+
+  const fetchOpportunitiesTable = async () => {
+    try {
+      setOpportunitiesTableLoading(true);
+      setOpportunitiesTableError(null);
+
+      const { data, error } = await supabase
+        .from("opportunities")
+        .select(`
+          id,
+          name,
+          stage,
+          expected_fee_value,
+          tender_due_date,
+          expected_start_date,
+          expected_end_date,
+          probability_percent,
+          companies (
+            name
+          )
+        `)
+        .in("stage", ["bid", "high_potential"])
+        .order("expected_start_date", { ascending: true });
+
+      if (error) throw error;
+      setOpportunitiesTable(data || []);
+    } catch (error) {
+      console.error("Failed to load opportunities table", error);
+      setOpportunitiesTableError("Failed to load opportunities");
+    } finally {
+      setOpportunitiesTableLoading(false);
     }
   };
 
@@ -924,6 +958,87 @@ function DashboardContent() {
           </CardContent>
         </Card>
 
+        {/* Live Opportunities & High Potentials Table */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Target className="w-5 h-5 text-orange-600" />
+              <CardTitle className="text-base sm:text-lg">Live Opportunities & High Potentials</CardTitle>
+            </div>
+            <p className="text-xs sm:text-sm text-slate-600">Active pipeline opportunities</p>
+          </CardHeader>
+          <CardContent>
+            {opportunitiesTableError ? (
+              <ErrorState message={opportunitiesTableError} />
+            ) : opportunitiesTableLoading ? (
+              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
+                Loading opportunities...
+              </div>
+            ) : opportunitiesTable.length === 0 ? (
+              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
+                No active opportunities in pipeline
+              </div>
+            ) : (
+              <div className="overflow-x-auto -mx-2 sm:mx-0">
+                <table className="w-full min-w-[800px]">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-3 px-3 text-xs font-medium text-slate-600">Reference</th>
+                      <th className="text-left py-3 px-3 text-xs font-medium text-slate-600">Opportunity Name</th>
+                      <th className="text-left py-3 px-3 text-xs font-medium text-slate-600">Company</th>
+                      <th className="text-left py-3 px-3 text-xs font-medium text-slate-600">Stage</th>
+                      <th className="text-right py-3 px-3 text-xs font-medium text-slate-600">Value</th>
+                      <th className="text-left py-3 px-3 text-xs font-medium text-slate-600">Due Date</th>
+                      <th className="text-left py-3 px-3 text-xs font-medium text-slate-600">Start Date</th>
+                      <th className="text-left py-3 px-3 text-xs font-medium text-slate-600">Finish Date</th>
+                      <th className="text-right py-3 px-3 text-xs font-medium text-slate-600">Probability</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {opportunitiesTable.map((opp) => (
+                      <tr
+                        key={opp.id}
+                        className="border-b hover:bg-slate-50 cursor-pointer transition-colors"
+                        onClick={() => router.push(`/opportunities/${opp.id}`)}
+                      >
+                        <td className="py-3 px-3 text-sm text-slate-500">
+                          —
+                        </td>
+                        <td className="py-3 px-3">
+                          <div className="font-medium text-sm text-slate-900">{opp.name}</div>
+                        </td>
+                        <td className="py-3 px-3 text-sm text-slate-700">
+                          {opp.companies?.name || "—"}
+                        </td>
+                        <td className="py-3 px-3">
+                          <Badge className={`${getStageColor(opp.stage)} text-xs`}>
+                            {opp.stage === "high_potential" ? "High Potential" : opp.stage}
+                          </Badge>
+                        </td>
+                        <td className="py-3 px-3 text-right text-sm font-medium text-slate-900">
+                          {opp.expected_fee_value ? formatCurrency(opp.expected_fee_value) : "—"}
+                        </td>
+                        <td className="py-3 px-3 text-sm text-slate-700">
+                          {formatDate(opp.tender_due_date)}
+                        </td>
+                        <td className="py-3 px-3 text-sm text-slate-700">
+                          {formatDate(opp.expected_start_date)}
+                        </td>
+                        <td className="py-3 px-3 text-sm text-slate-700">
+                          {formatDate(opp.expected_end_date)}
+                        </td>
+                        <td className="py-3 px-3 text-right text-sm text-slate-700">
+                          {opp.probability_percent !== null ? `${opp.probability_percent}%` : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Three Column Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Upcoming Tenders */}
@@ -1038,43 +1153,52 @@ function DashboardContent() {
             </CardContent>
           </Card>
 
-          {/* This Week's Absences */}
+          {/* Latest Opportunities */}
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-blue-600" />
-                <CardTitle className="text-base sm:text-lg">This Week's Absences</CardTitle>
+                <Target className="w-5 h-5 text-orange-600" />
+                <CardTitle className="text-base sm:text-lg">Latest Opportunities</CardTitle>
               </div>
-              <p className="text-xs sm:text-sm text-slate-600">Team availability</p>
+              <p className="text-xs sm:text-sm text-slate-600">Recently added</p>
             </CardHeader>
             <CardContent>
-              {absencesError ? (
-                <ErrorState message={absencesError} />
-              ) : absencesLoading ? (
+              {latestOpportunitiesError ? (
+                <ErrorState message={latestOpportunitiesError} />
+              ) : latestOpportunitiesLoading ? (
                 <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
-                  Loading absences...
+                  Loading opportunities...
                 </div>
-              ) : thisWeekAbsences.length === 0 ? (
+              ) : latestOpportunities.length === 0 ? (
                 <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
-                  No absences this week
+                  No opportunities yet
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {thisWeekAbsences.map((absence) => (
-                    <div key={absence.id} className="p-3 border rounded-lg">
+                  {latestOpportunities.map((opp) => (
+                    <div
+                      key={opp.id}
+                      className="p-3 border rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                      onClick={() => router.push(`/opportunities/${opp.id}`)}
+                    >
                       <div className="flex items-start justify-between gap-2 mb-2">
-                        <div 
-                          className="font-medium text-sm text-slate-900 cursor-pointer hover:text-blue-600"
-                          onClick={() => router.push("/absences/team")}
-                        >
-                          {absence.profiles?.full_name}
+                        <div className="font-medium text-sm text-slate-900 line-clamp-2">
+                          {opp.name}
                         </div>
-                        <Badge className={`${getAbsenceColor(absence.type)} flex-shrink-0 text-xs`}>
-                          {absence.type}
+                        <Badge className={`${getStageColor(opp.stage)} flex-shrink-0 text-xs`}>
+                          {opp.stage.replace("_", " ")}
                         </Badge>
                       </div>
-                      <div className="text-xs text-slate-600">
-                        {formatDate(absence.start_date)} → {formatDate(absence.end_date)}
+                      <div className="text-xs text-slate-600 mb-1">
+                        {opp.companies?.name}
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-slate-500">
+                        <span>{formatDate(opp.created_at)}</span>
+                        {opp.expected_fee_value && (
+                          <span className="font-medium text-slate-700">
+                            {formatCurrency(opp.expected_fee_value)}
+                          </span>
+                        )}
                       </div>
                     </div>
                   ))}
