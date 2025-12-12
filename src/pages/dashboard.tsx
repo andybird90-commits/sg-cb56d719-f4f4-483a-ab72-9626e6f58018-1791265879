@@ -28,6 +28,7 @@ interface Opportunity {
   expected_start_date?: string | null;
   expected_end_date?: string | null;
   probability_percent?: number | null;
+  created_at?: string;
   companies?: { name: string };
 }
 
@@ -563,12 +564,13 @@ function DashboardContent() {
           expected_start_date,
           expected_end_date,
           probability_percent,
+          created_at,
           companies (
             name
           )
         `)
         .in("stage", ["bid", "high_potential"])
-        .order("expected_start_date", { ascending: true });
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
       setOpportunitiesTable(data || []);
@@ -1035,6 +1037,35 @@ function DashboardContent() {
                       </tr>
                     ))}
                   </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 bg-slate-50">
+                      <td colSpan={4} className="py-3 px-3 text-sm font-semibold text-slate-900">
+                        Totals:
+                      </td>
+                      <td className="py-3 px-3 text-right text-sm font-bold text-slate-900">
+                        {(() => {
+                          const highPotentialTotal = opportunitiesTable
+                            .filter(opp => opp.stage === "high_potential")
+                            .reduce((sum, opp) => sum + (opp.expected_fee_value || 0), 0);
+                          const bidTotal = opportunitiesTable
+                            .filter(opp => opp.stage === "bid")
+                            .reduce((sum, opp) => sum + (opp.expected_fee_value || 0), 0);
+                          
+                          return (
+                            <div className="space-y-1">
+                              <div className="text-blue-600">
+                                High Potential: {formatCurrency(highPotentialTotal)}
+                              </div>
+                              <div className="text-yellow-600">
+                                Bids: {formatCurrency(bidTotal)}
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </td>
+                      <td colSpan={4}></td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             )}
