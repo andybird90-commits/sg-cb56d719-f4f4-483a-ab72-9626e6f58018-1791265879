@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Building2, Users, Target, Briefcase, TrendingUp, Calendar, AlertCircle, AlertTriangle, MessageSquare } from "lucide-react";
+import { Building2, Users, Target, Briefcase, TrendingUp, Calendar, AlertCircle, AlertTriangle, MessageSquare, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -79,6 +79,9 @@ interface PipelineData {
   budget: number;
 }
 
+type SortField = "name" | "company" | "stage" | "value" | "due_date" | "start_date" | "end_date" | "probability";
+type SortDirection = "asc" | "desc";
+
 function DashboardContent() {
   const { profile } = useAuth();
   const router = useRouter();
@@ -117,6 +120,10 @@ function DashboardContent() {
   const [opportunitiesTableLoading, setOpportunitiesTableLoading] = useState(true);
   const [opportunitiesTableError, setOpportunitiesTableError] = useState<string | null>(null);
   const [opportunitiesTable, setOpportunitiesTable] = useState<Opportunity[]>([]);
+  
+  // Sorting state
+  const [sortField, setSortField] = useState<SortField>("created_at");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
   useEffect(() => {
     fetchStats();
@@ -161,7 +168,7 @@ function DashboardContent() {
       setTendersError(null);
 
       const now = new Date();
-      now.setHours(0, 0, 0, 0); // Set to start of today
+      now.setHours(0, 0, 0, 0);
       const thirtyDaysFromNow = new Date();
       thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
 
@@ -177,7 +184,7 @@ function DashboardContent() {
           )
         `)
         .not("tender_due_date", "is", null)
-        .gte("tender_due_date", now.toISOString().split("T")[0]) // Only future dates
+        .gte("tender_due_date", now.toISOString().split("T")[0])
         .lte("tender_due_date", thirtyDaysFromNow.toISOString().split("T")[0])
         .order("tender_due_date")
         .limit(5);
@@ -197,7 +204,6 @@ function DashboardContent() {
       setActivityLoading(true);
       setActivityError(null);
 
-      // Fetch contact timeline entries
       const { data: contactTimeline, error: contactError } = await (supabase
         .from("contact_timeline" as any)
         .select(`
@@ -222,7 +228,6 @@ function DashboardContent() {
 
       if (contactError) throw contactError;
 
-      // Fetch opportunity timeline entries
       const { data: opportunityTimeline, error: opportunityError } = await (supabase
         .from("opportunity_timeline" as any)
         .select(`
@@ -247,7 +252,6 @@ function DashboardContent() {
 
       if (opportunityError) throw opportunityError;
 
-      // Combine and format both timelines
       const combinedActivity: ActivityEntry[] = [
         ...(contactTimeline || []).map((entry: any) => ({
           id: entry.id,
@@ -273,7 +277,6 @@ function DashboardContent() {
         })),
       ];
 
-      // Sort by date and take top 10
       combinedActivity.sort((a, b) => 
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
@@ -323,13 +326,11 @@ function DashboardContent() {
       setVisitsLoading(true);
       setVisitsError(null);
 
-      // Get today and 7 days from now
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const sevenDaysFromNow = new Date(today);
       sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
 
-      // Cast to any to bypass type checking for the new table
       const { data, error } = await (supabase
         .from("contact_events" as any)
         .select(`
@@ -365,7 +366,6 @@ function DashboardContent() {
       const today = new Date();
       const months: PipelineData[] = [];
 
-      // Initialize 12 months
       for (let i = 0; i < 12; i++) {
         const date = new Date(today.getFullYear(), today.getMonth() + i, 1);
         months.push({
@@ -377,27 +377,23 @@ function DashboardContent() {
         });
       }
 
-      // Fetch all opportunities (excluding those linked to projects to avoid double-counting)
       const { data: allOpportunities } = await supabase
         .from("opportunities")
         .select("id, stage, expected_fee_value, expected_start_date, expected_end_date, linked_project_id")
         .in("stage", ["bid", "high_potential", "secured"])
-        .is("linked_project_id", null); // Only get opportunities NOT yet converted to projects
+        .is("linked_project_id", null);
 
-      // Fetch all live projects
       const { data: liveProjects } = await supabase
         .from("projects")
         .select("id, status, agreed_fee_value, start_date, end_date")
         .eq("status", "live");
 
-      // Fetch ALL manual phasing data for live projects
       const liveProjectIds = (liveProjects || []).map(p => p.id);
       const { data: phasingData } = await supabase
         .from("project_monthly_phasing")
         .select("*")
         .in("project_id", liveProjectIds);
 
-      // Create a map of phasing data by project
       const phasingByProject = new Map<string, any[]>();
       (phasingData || []).forEach(phasing => {
         if (!phasingByProject.has(phasing.project_id)) {
@@ -406,10 +402,8 @@ function DashboardContent() {
         phasingByProject.get(phasing.project_id)!.push(phasing);
       });
 
-      // Debug logging object
       const debugLog: Record<string, any> = {};
 
-      // Process opportunities (only those not converted to projects)
       (allOpportunities || []).forEach((opp) => {
         if (!opp.expected_start_date || !opp.expected_fee_value) return;
 
@@ -445,7 +439,6 @@ function DashboardContent() {
         }
       });
 
-      // Process live projects as secured work
       (liveProjects || []).forEach((project) => {
         if (!project.start_date || !project.agreed_fee_value) return;
 
@@ -453,7 +446,6 @@ function DashboardContent() {
         const hasManualPhasing = projectPhasing && projectPhasing.length > 0;
 
         if (hasManualPhasing) {
-          // Use manual phasing data
           projectPhasing.forEach((phasing: any) => {
             const phasingDate = new Date(phasing.year, phasing.month - 1, 1);
             const monthIndex = (phasingDate.getFullYear() - today.getFullYear()) * 12 + 
@@ -463,7 +455,6 @@ function DashboardContent() {
               const revenueAmount = phasing.revenue_amount || 0;
               months[monthIndex].secured += revenueAmount;
 
-              // Debug logging
               const monthKey = `${phasing.year}-${String(phasing.month).padStart(2, '0')}`;
               if (!debugLog[monthKey]) {
                 debugLog[monthKey] = { projects: [], total: 0 };
@@ -477,7 +468,6 @@ function DashboardContent() {
             }
           });
         } else {
-          // Use auto-spread for projects without manual phasing
           const startDate = new Date(project.start_date);
           const endDate = project.end_date ? new Date(project.end_date) : startDate;
           
@@ -501,7 +491,6 @@ function DashboardContent() {
             if (monthIndex >= 0 && monthIndex < 12) {
               months[monthIndex].secured += monthlyValue;
 
-              // Debug logging
               const monthKey = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`;
               if (!debugLog[monthKey]) {
                 debugLog[monthKey] = { projects: [], total: 0 };
@@ -517,11 +506,9 @@ function DashboardContent() {
         }
       });
 
-      // Console log for debugging
       console.log('🔍 Pipeline Debug - Secured Work by Month:', debugLog);
       console.log('📊 Final Pipeline Data:', months);
 
-      // Fetch budgets for each month
       for (let i = 0; i < 12; i++) {
         const date = new Date(today.getFullYear(), today.getMonth() + i, 1);
         const year = date.getFullYear();
@@ -580,6 +567,89 @@ function DashboardContent() {
     } finally {
       setOpportunitiesTableLoading(false);
     }
+  };
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  const getSortedOpportunities = () => {
+    const sorted = [...opportunitiesTable].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      switch (sortField) {
+        case "name":
+          aValue = a.name.toLowerCase();
+          bValue = b.name.toLowerCase();
+          break;
+        case "company":
+          aValue = (a.companies?.name || "").toLowerCase();
+          bValue = (b.companies?.name || "").toLowerCase();
+          break;
+        case "stage":
+          aValue = a.stage;
+          bValue = b.stage;
+          break;
+        case "value":
+          aValue = a.expected_fee_value || 0;
+          bValue = b.expected_fee_value || 0;
+          break;
+        case "due_date":
+          aValue = a.tender_due_date ? new Date(a.tender_due_date).getTime() : 0;
+          bValue = b.tender_due_date ? new Date(b.tender_due_date).getTime() : 0;
+          break;
+        case "start_date":
+          aValue = a.expected_start_date ? new Date(a.expected_start_date).getTime() : 0;
+          bValue = b.expected_start_date ? new Date(b.expected_start_date).getTime() : 0;
+          break;
+        case "end_date":
+          aValue = a.expected_end_date ? new Date(a.expected_end_date).getTime() : 0;
+          bValue = b.expected_end_date ? new Date(b.expected_end_date).getTime() : 0;
+          break;
+        case "probability":
+          aValue = a.probability_percent || 0;
+          bValue = b.probability_percent || 0;
+          break;
+        default:
+          aValue = a.created_at;
+          bValue = b.created_at;
+      }
+
+      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+
+    return sorted;
+  };
+
+  const SortableHeader = ({ field, label }: { field: SortField; label: string }) => {
+    const isActive = sortField === field;
+    return (
+      <th 
+        className="text-left py-3 px-3 text-xs font-medium text-slate-600 cursor-pointer hover:bg-slate-50 select-none"
+        onClick={() => handleSort(field)}
+      >
+        <div className="flex items-center gap-1">
+          {label}
+          {isActive ? (
+            sortDirection === "asc" ? (
+              <ArrowUp className="w-3 h-3" />
+            ) : (
+              <ArrowDown className="w-3 h-3" />
+            )
+          ) : (
+            <ArrowUpDown className="w-3 h-3 opacity-30" />
+          )}
+        </div>
+      </th>
+    );
   };
 
   const formatCurrency = (value: number) => {
@@ -675,6 +745,8 @@ function DashboardContent() {
       <AlertDescription>{message}</AlertDescription>
     </Alert>
   );
+
+  const sortedOpportunities = getSortedOpportunities();
 
   return (
     <Layout>
@@ -818,7 +890,6 @@ function DashboardContent() {
                       {/* Chart area */}
                       <div className="flex-1 flex gap-1 items-end pl-2">
                         {pipelineData.map((data, idx) => {
-                          // Filter data based on selected view
                           let displayBid = 0;
                           let displayProspect = 0;
                           const displaySecured = data.secured;
@@ -829,11 +900,10 @@ function DashboardContent() {
                           } else if (pipelineView === "secured_prospects") {
                             displayProspect = data.prospect;
                           }
-                          // secured view: only displaySecured (already set)
 
                           const total = displayBid + displayProspect + displaySecured;
                           const budgetGap = data.budget > 0 ? Math.max(0, data.budget - total) : 0;
-                          const chartHeight = 256; // Fixed chart height in pixels (h-64 = 256px)
+                          const chartHeight = 256;
                           const bidHeight = (displayBid / maxValue) * chartHeight;
                           const prospectHeight = (displayProspect / maxValue) * chartHeight;
                           const securedHeight = (displaySecured / maxValue) * chartHeight;
@@ -969,7 +1039,7 @@ function DashboardContent() {
               <Target className="w-5 h-5 text-orange-600" />
               <CardTitle className="text-base sm:text-lg">Live Opportunities & High Potentials</CardTitle>
             </div>
-            <p className="text-xs sm:text-sm text-slate-600">Active pipeline opportunities</p>
+            <p className="text-xs sm:text-sm text-slate-600">Active pipeline opportunities - Click column headers to sort</p>
           </CardHeader>
           <CardContent>
             {opportunitiesTableError ? (
@@ -988,18 +1058,18 @@ function DashboardContent() {
                   <thead>
                     <tr className="border-b">
                       <th className="text-left py-3 px-3 text-xs font-medium text-slate-600">Reference</th>
-                      <th className="text-left py-3 px-3 text-xs font-medium text-slate-600">Opportunity Name</th>
-                      <th className="text-left py-3 px-3 text-xs font-medium text-slate-600">Company</th>
-                      <th className="text-left py-3 px-3 text-xs font-medium text-slate-600">Stage</th>
-                      <th className="text-right py-3 px-3 text-xs font-medium text-slate-600">Value</th>
-                      <th className="text-left py-3 px-3 text-xs font-medium text-slate-600">Due Date</th>
-                      <th className="text-left py-3 px-3 text-xs font-medium text-slate-600">Start Date</th>
-                      <th className="text-left py-3 px-3 text-xs font-medium text-slate-600">Finish Date</th>
-                      <th className="text-right py-3 px-3 text-xs font-medium text-slate-600">Probability</th>
+                      <SortableHeader field="name" label="Opportunity Name" />
+                      <SortableHeader field="company" label="Company" />
+                      <SortableHeader field="stage" label="Stage" />
+                      <SortableHeader field="value" label="Value" />
+                      <SortableHeader field="due_date" label="Due Date" />
+                      <SortableHeader field="start_date" label="Start Date" />
+                      <SortableHeader field="end_date" label="Finish Date" />
+                      <SortableHeader field="probability" label="Probability" />
                     </tr>
                   </thead>
                   <tbody>
-                    {opportunitiesTable.map((opp) => (
+                    {sortedOpportunities.map((opp) => (
                       <tr
                         key={opp.id}
                         className="border-b hover:bg-slate-50 cursor-pointer transition-colors"
