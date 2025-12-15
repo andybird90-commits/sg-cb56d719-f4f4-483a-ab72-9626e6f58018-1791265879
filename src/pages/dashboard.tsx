@@ -79,7 +79,7 @@ interface PipelineData {
   budget: number;
 }
 
-type SortField = "name" | "company" | "stage" | "value" | "due_date" | "start_date" | "end_date" | "probability";
+type SortField = "name" | "company" | "stage" | "value" | "due_date" | "start_date" | "end_date" | "probability" | "created_at";
 type SortDirection = "asc" | "desc";
 
 function DashboardContent() {
