@@ -309,6 +309,9 @@ export type Database = {
       opportunities: {
         Row: {
           added_by_user_id: string | null
+          archived: boolean | null
+          archived_at: string | null
+          archived_by_user_id: string | null
           company_id: string
           contact_id: string | null
           created_at: string
@@ -330,6 +333,9 @@ export type Database = {
         }
         Insert: {
           added_by_user_id?: string | null
+          archived?: boolean | null
+          archived_at?: string | null
+          archived_by_user_id?: string | null
           company_id: string
           contact_id?: string | null
           created_at?: string
@@ -351,6 +357,9 @@ export type Database = {
         }
         Update: {
           added_by_user_id?: string | null
+          archived?: boolean | null
+          archived_at?: string | null
+          archived_by_user_id?: string | null
           company_id?: string
           contact_id?: string | null
           created_at?: string
@@ -374,6 +383,13 @@ export type Database = {
           {
             foreignKeyName: "opportunities_added_by_user_id_fkey"
             columns: ["added_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunities_archived_by_user_id_fkey"
+            columns: ["archived_by_user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -744,6 +760,9 @@ export type Database = {
       projects: {
         Row: {
           agreed_fee_value: number | null
+          archived: boolean | null
+          archived_at: string | null
+          archived_by_user_id: string | null
           client_company_id: string
           code: string
           created_at: string
@@ -758,6 +777,9 @@ export type Database = {
         }
         Insert: {
           agreed_fee_value?: number | null
+          archived?: boolean | null
+          archived_at?: string | null
+          archived_by_user_id?: string | null
           client_company_id: string
           code: string
           created_at?: string
@@ -772,6 +794,9 @@ export type Database = {
         }
         Update: {
           agreed_fee_value?: number | null
+          archived?: boolean | null
+          archived_at?: string | null
+          archived_by_user_id?: string | null
           client_company_id?: string
           code?: string
           created_at?: string
@@ -785,6 +810,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "projects_archived_by_user_id_fkey"
+            columns: ["archived_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "projects_client_company_id_fkey"
             columns: ["client_company_id"]

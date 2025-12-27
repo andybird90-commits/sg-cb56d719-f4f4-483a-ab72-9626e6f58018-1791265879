@@ -9,31 +9,29 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Plus, ChevronRight, Building2, AlertTriangle, Search, CheckCircle2 } from "lucide-react";
+import { Plus, ChevronRight, Building2, AlertTriangle, Search, CheckCircle2, Target, TrendingUp, Calendar, Filter, AlertCircle } from "lucide-react";
 import Link from "next/link";
 
 interface Opportunity {
   id: string;
   name: string;
   stage: string;
-  status: string;
   expected_fee_value: number | null;
   tender_due_date: string | null;
   tender_received_date: string | null;
   submitted_date: string | null;
-  expected_start_date: string | null;
-  expected_end_date: string | null;
   probability_percent: number | null;
   project_reference: string | null;
   created_at: string;
   added_by_user_id?: string;
+  archived?: boolean;
   companies?: {
     name: string;
   };
   added_by_profile?: {
-    full_name: string | null;
-    email: string;
-  } | null;
+    full_name: string;
+    email?: string;
+  };
 }
 
 function OpportunitiesContent() {
@@ -60,23 +58,26 @@ function OpportunitiesContent() {
   const fetchOpportunities = async () => {
     try {
       setLoading(true);
-      setError(null);
-
       const { data, error } = await supabase
-        .from("opportunities")
+        .from("opportunities" as any)
         .select(`
           *,
           companies (
             name
+          ),
+          added_by_profile:profiles!opportunities_added_by_user_id_fkey (
+            full_name,
+            email
           )
         `)
+        .eq("archived", false)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setOpportunities((data as unknown as Opportunity[]) || []);
-      setFilteredOpportunities((data as unknown as Opportunity[]) || []);
+      setOpportunities((data as any) || []);
+      setFilteredOpportunities((data as any) || []);
     } catch (err) {
-      console.error("Failed to load opportunities data", err);
+      console.error("Failed to load opportunities", err);
       setError("Failed to load opportunities");
     } finally {
       setLoading(false);
@@ -132,62 +133,237 @@ function OpportunitiesContent() {
     }).format(value);
   };
 
-  const OpportunityCard = ({ opportunity }: { opportunity: Opportunity }) => (
-    <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push(`/opportunities/${opportunity.id}`)}>
-      <CardHeader>
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
-            <CardTitle className="text-lg mb-1 truncate">{opportunity.name}</CardTitle>
+  const OpportunityCard = ({ opportunity }: { opportunity: Opportunity }) => {
+    const router = useRouter();
+    const [isUpdating, setIsUpdating] = useState(false);
+    const [showSubmittedDate, setShowSubmittedDate] = useState(false);
+    const [submittedDate, setSubmittedDate] = useState(opportunity.submitted_date || "");
+
+    const handleStageChange = async (newStage: string) => {
+      if (!profile) return;
+      
+      setIsUpdating(true);
+      try {
+        const updates: any = {
+          stage: newStage,
+          probability_percent: 
+            newStage === "lead" ? 10 :
+            newStage === "in_bid" ? 25 :
+            newStage === "high_potential" ? 50 :
+            newStage === "secured" ? 100 :
+            newStage === "lost" ? 0 : opportunity.probability_percent
+        };
+
+        if (newStage === "secured" || newStage === "lost") {
+          updates.archived = true;
+          updates.archived_at = new Date().toISOString();
+          updates.archived_by_user_id = profile.id;
+        }
+
+        const { error } = await supabase
+          .from("opportunities")
+          .update(updates)
+          .eq("id", opportunity.id);
+
+        if (error) throw error;
+
+        if (newStage === "secured") {
+          // Convert to project
+          await convertToProject(opportunity);
+        } else {
+          // Refresh the list
+          await fetchOpportunities();
+        }
+      } catch (err) {
+        console.error("Failed to update stage", err);
+        alert("Failed to update stage");
+      } finally {
+        setIsUpdating(false);
+      }
+    };
+
+    const handleSubmittedDateSave = async () => {
+      if (!submittedDate) return;
+      
+      setIsUpdating(true);
+      try {
+        const updates: any = {
+          submitted_date: submittedDate,
+          stage: "in_bid",
+          probability_percent: 25
+        };
+
+        const { error } = await supabase
+          .from("opportunities")
+          .update(updates)
+          .eq("id", opportunity.id);
+
+        if (error) throw error;
+
+        setShowSubmittedDate(false);
+        await fetchOpportunities();
+      } catch (err) {
+        console.error("Failed to save submitted date", err);
+        alert("Failed to save submitted date");
+      } finally {
+        setIsUpdating(false);
+      }
+    };
+
+    const convertToProject = async (opp: Opportunity) => {
+      try {
+        // Navigate to new project page with opportunity data
+        router.push(`/projects/new?opportunity_id=${opp.id}`);
+      } catch (err) {
+        console.error("Failed to convert to project", err);
+        alert("Failed to convert to project");
+      }
+    };
+
+    const getStageDisplay = () => {
+      if (opportunity.stage === "lead" && !opportunity.submitted_date) return "Lead";
+      if (opportunity.stage === "in_bid" || opportunity.submitted_date) return "In Bid";
+      if (opportunity.stage === "high_potential") return "High Potential";
+      return opportunity.stage;
+    };
+
+    return (
+      <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex items-start justify-between gap-2 mb-3">
+            <div className="flex-1" onClick={() => router.push(`/opportunities/${opportunity.id}`)}>
+              <h3 className="font-semibold text-base sm:text-lg mb-1">{opportunity.name}</h3>
+              {opportunity.companies && (
+                <p className="text-sm text-slate-600 flex items-center gap-1">
+                  <Building2 className="w-3 h-3" />
+                  {opportunity.companies.name}
+                </p>
+              )}
+            </div>
+            <Badge className={getStageColor(opportunity.stage)}>
+              {getStageDisplay()}
+            </Badge>
+          </div>
+
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm text-slate-600 mb-4">
             {opportunity.project_reference && (
-              <div className="text-sm text-slate-600 font-mono mb-2">
-                Ref: {opportunity.project_reference}
+              <div className="flex items-center gap-2">
+                <Target className="w-4 h-4" />
+                <span className="font-medium">{opportunity.project_reference}</span>
               </div>
             )}
-            <p className="text-sm text-slate-600">{opportunity.companies?.name}</p>
-          </div>
-          <Badge className={getStageColor(opportunity.stage)}>
-            {opportunity.stage.replace("_", " ")}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-slate-600">Value:</span>
-          <span className="font-semibold">
-            {opportunity.expected_fee_value ? formatCurrency(opportunity.expected_fee_value) : "—"}
-          </span>
-        </div>
-        
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-slate-600">Probability:</span>
-          <span className="font-semibold">{opportunity.probability_percent || 0}%</span>
-        </div>
+            
+            {opportunity.expected_fee_value && (
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-4 h-4" />
+                <span>£{opportunity.expected_fee_value.toLocaleString()}</span>
+              </div>
+            )}
 
-        {opportunity.submitted_date && (
-          <div className="flex items-center gap-2 text-sm bg-green-50 border border-green-200 rounded px-2 py-1">
-            <CheckCircle2 className="w-4 h-4 text-green-600" />
-            <span className="text-green-700 font-medium">
-              Submitted: {formatDate(opportunity.submitted_date)}
-            </span>
-          </div>
-        )}
+            {opportunity.tender_due_date && (
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                <span>Due: {formatDate(opportunity.tender_due_date)}</span>
+              </div>
+            )}
 
-        {opportunity.tender_due_date && (
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-600">Due:</span>
-            <span>{formatDate(opportunity.tender_due_date)}</span>
-          </div>
-        )}
+            {opportunity.tender_received_date && (
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                <span>Received: {formatDate(opportunity.tender_received_date)}</span>
+              </div>
+            )}
 
-        {opportunity.tender_received_date && (
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-600">Received:</span>
-            <span>{formatDate(opportunity.tender_received_date)}</span>
+            {opportunity.submitted_date ? (
+              <div className="flex items-center gap-2 text-green-600">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Submitted: {formatDate(opportunity.submitted_date)}</span>
+              </div>
+            ) : (
+              <div className="col-span-2">
+                {showSubmittedDate ? (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="date"
+                      value={submittedDate}
+                      onChange={(e) => setSubmittedDate(e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                    <Button size="sm" onClick={handleSubmittedDateSave} disabled={isUpdating}>
+                      Save
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setShowSubmittedDate(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={() => setShowSubmittedDate(true)}
+                    className="w-full"
+                  >
+                    <CheckCircle2 className="w-3 h-3 mr-1" />
+                    Mark as Submitted
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
-        )}
-      </CardContent>
-    </Card>
-  );
+
+          {/* Stage Progression Buttons */}
+          <div className="flex flex-wrap gap-2 pt-3 border-t">
+            {opportunity.stage === "lead" && opportunity.submitted_date && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleStageChange("high_potential")}
+                disabled={isUpdating}
+                className="flex-1"
+              >
+                High Potential
+              </Button>
+            )}
+
+            {opportunity.stage === "in_bid" && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleStageChange("high_potential")}
+                disabled={isUpdating}
+                className="flex-1"
+              >
+                High Potential
+              </Button>
+            )}
+
+            {(opportunity.stage === "high_potential" || opportunity.stage === "in_bid") && (
+              <>
+                <Button
+                  size="sm"
+                  variant="default"
+                  onClick={() => handleStageChange("secured")}
+                  disabled={isUpdating}
+                  className="flex-1 bg-green-600 hover:bg-green-700"
+                >
+                  Win
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => handleStageChange("lost")}
+                  disabled={isUpdating}
+                  className="flex-1"
+                >
+                  Lose
+                </Button>
+              </>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <Layout>
@@ -264,7 +440,6 @@ function OpportunitiesContent() {
                             <Badge className={`${getStageColor(opp.stage)} w-fit text-xs`}>
                               {opp.stage.replace("_", " ")}
                             </Badge>
-                            <Badge variant="outline" className="w-fit text-xs">{opp.status}</Badge>
                           </div>
                         </div>
                         
