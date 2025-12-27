@@ -408,19 +408,22 @@ function DashboardContent() {
         if (!opp.expected_start_date || !opp.expected_fee_value) return;
 
         const startDate = new Date(opp.expected_start_date);
-        const endDate = opp.expected_end_date ? new Date(opp.expected_end_date) : startDate;
-        
-        const durationMonths = Math.max(1, 
-          (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
+        const endDate = opp.expected_end_date ? new Date(opp.expected_end_date) : new Date(startDate);
+        endDate.setMonth(endDate.getMonth() + 3);
+
+        const durationMonths = Math.max(
+          1,
+          (endDate.getFullYear() - startDate.getFullYear()) * 12 +
           (endDate.getMonth() - startDate.getMonth()) + 1
         );
-        
-        const monthlyValue = opp.expected_fee_value / durationMonths;
 
-        for (let monthOffset = 0; monthOffset < durationMonths; monthOffset++) {
+        const baseMonthlyValue = Math.floor((opp.expected_fee_value / durationMonths) * 100) / 100;
+        const remainder = Number((opp.expected_fee_value - (baseMonthlyValue * durationMonths)).toFixed(2));
+
+        for (let i = 0; i < durationMonths; i++) {
           const currentMonth = new Date(
             startDate.getFullYear(), 
-            startDate.getMonth() + monthOffset, 
+            startDate.getMonth() + i, 
             1
           );
           
@@ -428,6 +431,9 @@ function DashboardContent() {
                             (currentMonth.getMonth() - today.getMonth());
 
           if (monthIndex >= 0 && monthIndex < 12) {
+            // Add base value, plus remainder if it's the last month
+            const monthlyValue = i === durationMonths - 1 ? baseMonthlyValue + remainder : baseMonthlyValue;
+
             if (opp.stage === "bid") {
               months[monthIndex].bid += monthlyValue;
             } else if (opp.stage === "high_potential") {

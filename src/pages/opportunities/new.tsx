@@ -324,17 +324,6 @@ function NewOpportunityContent() {
                     onChange={(e) => setFormData({ ...formData, tender_received_date: e.target.value })}
                   />
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="project_reference">Project Reference</Label>
-                  <Input
-                    id="project_reference"
-                    type="text"
-                    value={formData.project_reference}
-                    onChange={(e) => setFormData({ ...formData, project_reference: e.target.value })}
-                    placeholder="e.g., PRJ-2025-001"
-                  />
-                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -998,7 +998,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_opportunity_reference: { Args: never; Returns: string }
     }
     Enums: {
       company_status: "active" | "prospect" | "inactive"

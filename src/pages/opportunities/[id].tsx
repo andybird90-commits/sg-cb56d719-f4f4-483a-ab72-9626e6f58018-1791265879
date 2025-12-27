@@ -69,18 +69,6 @@ function OpportunityDetailContent() {
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [users, setUsers] = useState<User[]>([]);
-  const [editData, setEditData] = useState({
-    name: "",
-    description: "",
-    stage: "",
-    status: "",
-    tender_due_date: "",
-    expected_start_date: "",
-    expected_end_date: "",
-    expected_fee_value: "",
-    probability_percent: "",
-    added_by_user_id: "",
-  });
   const [editFormData, setEditFormData] = useState({
     name: "",
     stage: "",
@@ -92,6 +80,7 @@ function OpportunityDetailContent() {
     submitted_date: "",
     project_reference: "",
     description: "",
+    probability_percent: "",
     added_by_user_id: "",
   });
 
@@ -157,6 +146,7 @@ function OpportunityDetailContent() {
         submitted_date: opportunityData.submitted_date || "",
         project_reference: opportunityData.project_reference || "",
         description: opportunityData.description || "",
+        probability_percent: opportunityData.probability_percent?.toString() || "",
         added_by_user_id: opportunityData.added_by_user_id || opportunityData.created_by_user_id || "",
       });
     } catch (err) {
@@ -175,15 +165,15 @@ function OpportunityDetailContent() {
       const { error: updateError } = await supabase
         .from("opportunities")
         .update({
-          name: editData.name,
-          description: editData.description || null,
-          stage: editData.stage as any,
-          tender_due_date: editData.tender_due_date || null,
-          expected_start_date: editData.expected_start_date || null,
-          expected_end_date: editData.expected_end_date || null,
-          expected_fee_value: editData.expected_fee_value ? parseFloat(editData.expected_fee_value) : null,
-          probability_percent: editData.probability_percent ? parseInt(editData.probability_percent as string) : null,
-          added_by_user_id: editData.added_by_user_id || null,
+          name: editFormData.name,
+          description: editFormData.description || null,
+          stage: editFormData.stage as any,
+          tender_due_date: editFormData.tender_due_date || null,
+          expected_start_date: editFormData.expected_start_date || null,
+          expected_end_date: editFormData.expected_end_date || null,
+          expected_fee_value: editFormData.expected_fee_value ? parseFloat(editFormData.expected_fee_value) : null,
+          probability_percent: editFormData.probability_percent ? parseInt(editFormData.probability_percent as string) : null,
+          added_by_user_id: editFormData.added_by_user_id || null,
         })
         .eq("id", id);
 
@@ -348,8 +338,8 @@ function OpportunityDetailContent() {
                     <Label htmlFor="name" className="text-sm sm:text-base">Opportunity Name *</Label>
                     <Input
                       id="name"
-                      value={editData.name}
-                      onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                      value={editFormData.name}
+                      onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
                       required
                       className="h-10 sm:h-11"
                     />
@@ -359,8 +349,8 @@ function OpportunityDetailContent() {
                     <Label htmlFor="description" className="text-sm sm:text-base">Description</Label>
                     <Textarea
                       id="description"
-                      value={editData.description}
-                      onChange={(e) => setEditData({ ...editData, description: e.target.value })}
+                      value={editFormData.description}
+                      onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
                       rows={4}
                       className="text-sm sm:text-base"
                     />
@@ -370,8 +360,8 @@ function OpportunityDetailContent() {
                     <div className="space-y-2">
                       <Label htmlFor="edit-stage">Stage</Label>
                       <Select
-                        value={editData.stage}
-                        onValueChange={(value) => setEditData({ ...editData, stage: value as any })}
+                        value={editFormData.stage}
+                        onValueChange={(value) => setEditFormData({ ...editFormData, stage: value as any })}
                       >
                         <SelectTrigger id="edit-stage">
                           <SelectValue />
@@ -394,8 +384,8 @@ function OpportunityDetailContent() {
                         id="expected_fee_value"
                         type="number"
                         step="0.01"
-                        value={editData.expected_fee_value}
-                        onChange={(e) => setEditData({ ...editData, expected_fee_value: e.target.value })}
+                        value={editFormData.expected_fee_value}
+                        onChange={(e) => setEditFormData({ ...editFormData, expected_fee_value: e.target.value })}
                         className="h-10 sm:h-11"
                       />
                     </div>
@@ -407,9 +397,11 @@ function OpportunityDetailContent() {
                         type="number"
                         min="0"
                         max="100"
-                        value={editData.probability_percent}
-                        onChange={(e) => setEditData({ ...editData, probability_percent: e.target.value })}
+                        value={editFormData.probability_percent}
+                        onChange={(e) => setEditFormData({ ...editFormData, probability_percent: e.target.value })}
                         className="h-10 sm:h-11"
+                        readOnly
+                        disabled
                       />
                     </div>
                   </div>
@@ -420,8 +412,8 @@ function OpportunityDetailContent() {
                       <Input
                         id="tender_due_date"
                         type="date"
-                        value={editData.tender_due_date}
-                        onChange={(e) => setEditData({ ...editData, tender_due_date: e.target.value })}
+                        value={editFormData.tender_due_date}
+                        onChange={(e) => setEditFormData({ ...editFormData, tender_due_date: e.target.value })}
                         className="h-10 sm:h-11"
                       />
                     </div>
@@ -431,8 +423,8 @@ function OpportunityDetailContent() {
                       <Input
                         id="expected_start_date"
                         type="date"
-                        value={editData.expected_start_date}
-                        onChange={(e) => setEditData({ ...editData, expected_start_date: e.target.value })}
+                        value={editFormData.expected_start_date}
+                        onChange={(e) => setEditFormData({ ...editFormData, expected_start_date: e.target.value })}
                         className="h-10 sm:h-11"
                       />
                     </div>
@@ -442,8 +434,8 @@ function OpportunityDetailContent() {
                       <Input
                         id="expected_end_date"
                         type="date"
-                        value={editData.expected_end_date}
-                        onChange={(e) => setEditData({ ...editData, expected_end_date: e.target.value })}
+                        value={editFormData.expected_end_date}
+                        onChange={(e) => setEditFormData({ ...editFormData, expected_end_date: e.target.value })}
                         className="h-10 sm:h-11"
                       />
                     </div>
@@ -452,8 +444,8 @@ function OpportunityDetailContent() {
                   <div className="space-y-2">
                     <Label htmlFor="added_by_user_id" className="text-sm sm:text-base">Added by</Label>
                     <Select
-                      value={editData.added_by_user_id}
-                      onValueChange={(value) => setEditData({ ...editData, added_by_user_id: value })}
+                      value={editFormData.added_by_user_id}
+                      onValueChange={(value) => setEditFormData({ ...editFormData, added_by_user_id: value })}
                     >
                       <SelectTrigger className="h-10 sm:h-11">
                         <SelectValue placeholder="Select user (optional)" />
