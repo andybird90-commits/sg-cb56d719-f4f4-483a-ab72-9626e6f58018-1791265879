@@ -413,13 +413,13 @@ function DashboardContent() {
 
       // Fetch phasing data for opportunities
       const opportunityIds = opportunities?.map(o => o.id) || [];
-      const { data: opportunityPhasing } = await supabase
-        .from("opportunity_phasing")
+      const { data: opportunityPhasing } = await (supabase
+        .from("opportunity_phasing" as any)
         .select("opportunity_id, month, amount")
-        .in("opportunity_id", opportunityIds);
+        .in("opportunity_id", opportunityIds)) as any;
 
       const opportunityPhasingMap = new Map<string, Array<{ month: string; amount: number }>>();
-      opportunityPhasing?.forEach((phase) => {
+      opportunityPhasing?.forEach((phase: any) => {
         if (!opportunityPhasingMap.has(phase.opportunity_id)) {
           opportunityPhasingMap.set(phase.opportunity_id, []);
         }
@@ -431,13 +431,13 @@ function DashboardContent() {
 
       // Fetch phasing data for projects
       const projectIds = projects?.map(p => p.id) || [];
-      const { data: projectPhasing } = await supabase
-        .from("project_phasing")
+      const { data: projectPhasing } = await (supabase
+        .from("project_phasing" as any)
         .select("project_id, month, amount")
-        .in("project_id", projectIds);
+        .in("project_id", projectIds)) as any;
 
       const projectPhasingMap = new Map<string, Array<{ month: string; amount: number }>>();
-      projectPhasing?.forEach((phase) => {
+      projectPhasing?.forEach((phase: any) => {
         if (!projectPhasingMap.has(phase.project_id)) {
           projectPhasingMap.set(phase.project_id, []);
         }
