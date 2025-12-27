@@ -122,24 +122,17 @@ function OpportunityDetailContent() {
 
   const fetchOpportunity = async (oppId: string) => {
     try {
-      setLoading(true);
-      setError(null);
-
-      const { data, error: fetchError } = await supabase
+      const { data, error } = await supabase
         .from("opportunities")
         .select(`
           *,
-          companies (
-            name
-          ),
-          contacts (
-            name
-          ),
-          added_by_profile:profiles (
+          companies(name),
+          contacts(name),
+          added_by_profile:profiles!opportunities_added_by_user_id_fkey(
             full_name,
             email
           ),
-          projects!opportunities_linked_project_id_fkey (
+          projects!opportunities_linked_project_id_fkey(
             id,
             code,
             name
@@ -148,41 +141,30 @@ function OpportunityDetailContent() {
         .eq("id", oppId)
         .single();
 
-      if (fetchError) throw fetchError;
+      if (error) throw error;
       if (!data) throw new Error("Opportunity not found");
 
-      // Cast to any first to avoid complex type mismatch with joined tables and new fields
       const opportunityData = data as any;
       setOpportunity(opportunityData);
-      
-      setEditData({
-        name: opportunityData.name,
-        description: opportunityData.description || "",
-        stage: opportunityData.stage,
-        status: opportunityData.status,
-        tender_due_date: opportunityData.tender_due_date || "",
-        expected_start_date: opportunityData.expected_start_date || "",
-        expected_end_date: opportunityData.expected_end_date || "",
-        expected_fee_value: opportunityData.expected_fee_value?.toString() || "",
-        probability_percent: opportunityData.probability_percent?.toString() || "",
-        added_by_user_id: opportunityData.added_by_user_id || opportunityData.created_by_user_id || "",
-      });
       setEditFormData({
         name: opportunityData.name,
-        stage: opportunityData.stage as any, // Cast to any to avoid strict union type mismatch
+        stage: opportunityData.stage as any,
         expected_fee_value: opportunityData.expected_fee_value?.toString() || "",
+        expected_start_date: opportunityData.expected_start_date || "",
+        expected_end_date: opportunityData.expected_end_date || "",
         tender_due_date: opportunityData.tender_due_date || "",
         tender_received_date: opportunityData.tender_received_date || "",
         submitted_date: opportunityData.submitted_date || "",
-        expected_start_date: opportunityData.expected_start_date || "",
-        expected_end_date: opportunityData.expected_end_date || "",
         probability_percent: opportunityData.probability_percent || 0,
         project_reference: opportunityData.project_reference || "",
         description: opportunityData.description || "",
+        company_id: opportunityData.company_id || "",
+        contact_id: opportunityData.contact_id || "",
+        added_by_user_id: opportunityData.added_by_user_id || opportunityData.created_by_user_id || "",
       });
     } catch (err) {
-      console.error("Failed to load opportunity data", err);
-      setError("Failed to load opportunity details");
+      console.error("Error fetching opportunity:", err);
+      setError("Failed to load opportunity");
     } finally {
       setLoading(false);
     }
