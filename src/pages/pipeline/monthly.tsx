@@ -59,37 +59,17 @@ function PipelineMonthlyContent() {
         months.push(monthDate);
       }
 
-      // Fetch data
+      // Fetch data with explicit typing
       const { data: projectsData } = await supabase
         .from("projects")
-        .select(`
-          id,
-          code,
-          name,
-          start_date,
-          end_date,
-          agreed_fee_value,
-          companies!projects_client_company_id_fkey (
-            short_name
-          )
-        `)
+        .select("id, code, name, start_date, end_date, agreed_fee_value, companies!projects_client_company_id_fkey(short_name)")
         .eq("archived", false)
         .not("start_date", "is", null)
         .not("end_date", "is", null);
 
       const { data: oppsData } = await supabase
         .from("opportunities")
-        .select(`
-          id,
-          name,
-          expected_start_date,
-          expected_end_date,
-          expected_fee_value,
-          stage,
-          companies (
-            short_name
-          )
-        `)
+        .select("id, name, expected_start_date, expected_end_date, expected_fee_value, stage, companies(short_name)")
         .not("expected_start_date", "is", null)
         .not("expected_end_date", "is", null);
 
@@ -118,7 +98,7 @@ function PipelineMonthlyContent() {
 
         // Process projects
         if (projectsData) {
-          projectsData.forEach((project) => {
+          projectsData.forEach((project: any) => {
             const projectStart = new Date(project.start_date!);
             const projectEnd = new Date(project.end_date!);
 
@@ -131,7 +111,7 @@ function PipelineMonthlyContent() {
 
               monthProjects.push({
                 name: project.name,
-                company: (project.companies as any)?.short_name || "Unknown",
+                company: project.companies?.short_name || "Unknown",
                 value: monthlyValue,
                 stage: "Secured",
               });
@@ -142,7 +122,7 @@ function PipelineMonthlyContent() {
 
         // Process opportunities
         if (oppsData) {
-          oppsData.forEach((opp) => {
+          oppsData.forEach((opp: any) => {
             const oppStart = new Date(opp.expected_start_date!);
             const oppEnd = new Date(opp.expected_end_date!);
 
@@ -155,7 +135,7 @@ function PipelineMonthlyContent() {
 
               monthProjects.push({
                 name: opp.name,
-                company: (opp.companies as any)?.short_name || "Unknown",
+                company: opp.companies?.short_name || "Unknown",
                 value: monthlyValue,
                 stage: opp.stage === "secured" ? "Secured" : opp.stage === "high_potential" ? "High Potential" : "Bid",
               });
