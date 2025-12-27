@@ -360,6 +360,19 @@ function PipelineMonthlyContent() {
       }
 
       setMonthsData(months);
+
+      // Debug logging
+      console.log("=== MONTHLY VIEW DEBUG ===");
+      console.log("Total opportunities:", oppsData?.length || 0);
+      console.log("Total projects:", projectsData?.length || 0);
+      console.log("Months data:", months.map(m => ({
+        month: m.month.toLocaleDateString("en-GB", { month: "short", year: "numeric" }),
+        projects: m.projects.length,
+        total: m.totalTurnover
+      })));
+      console.log("Grand total:", months.reduce((sum, m) => sum + m.totalTurnover, 0));
+      console.log("=========================");
+
     } catch (err) {
       console.error("Failed to load monthly data", err);
       setError("Failed to load monthly data. Please try again.");
