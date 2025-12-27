@@ -60,18 +60,18 @@ function PipelineMonthlyContent() {
       }
 
       // Fetch data with explicit typing
-      const { data: projectsData } = await supabase
+      const { data: projectsData } = (await supabase
         .from("projects")
         .select("id, code, name, start_date, end_date, agreed_fee_value, companies!projects_client_company_id_fkey(short_name)")
         .eq("archived", false)
         .not("start_date", "is", null)
-        .not("end_date", "is", null) as any;
+        .not("end_date", "is", null)) as any;
 
-      const { data: oppsData } = await supabase
+      const { data: oppsData } = (await supabase
         .from("opportunities")
         .select("id, name, expected_start_date, expected_end_date, expected_fee_value, stage, companies(short_name)")
         .not("expected_start_date", "is", null)
-        .not("expected_end_date", "is", null) as any;
+        .not("expected_end_date", "is", null)) as any;
 
       // Process each month - one page per month
       months.forEach((month, monthIndex) => {
