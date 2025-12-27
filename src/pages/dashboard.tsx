@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Building2, Users, Target, Briefcase, TrendingUp, Calendar, AlertCircle, AlertTriangle, MessageSquare, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
 interface DashboardStats {
   companiesCount: number;
@@ -77,6 +78,7 @@ interface PipelineData {
   prospect: number;
   secured: number;
   budget: number;
+  budgetGap: number;
 }
 
 type SortField = "name" | "company" | "stage" | "value" | "due_date" | "start_date" | "end_date" | "probability" | "created_at";
@@ -375,6 +377,7 @@ function DashboardContent() {
           prospect: 0,
           secured: 0,
           budget: 0,
+          budgetGap: 0,
         });
       }
 
@@ -531,6 +534,10 @@ function DashboardContent() {
         if (budget) {
           months[i].budget = budget.budget_revenue;
         }
+        
+        // Calculate budget gap
+        const totalPipeline = months[i].secured + months[i].prospect + months[i].bid;
+        months[i].budgetGap = Math.max(0, months[i].budget - totalPipeline);
       }
 
       setPipelineData(months);
@@ -834,199 +841,130 @@ function DashboardContent() {
         )}
 
         {/* Pipeline Chart */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              12-Month Pipeline
-            </CardTitle>
-            <div className="flex gap-2">
-              <Link href="/pipeline/monthly">
-                <Button variant="outline" size="sm">
+        <Card className="col-span-full">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>12-Month Pipeline</span>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push("/pipeline/monthly")}
+                >
                   View Monthly
                 </Button>
-              </Link>
-              <Link href="/pipeline/gantt">
-                <Button variant="outline" size="sm">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push("/pipeline/gantt")}
+                >
                   View Gantt
                 </Button>
-              </Link>
-              <div className="mb-4 flex gap-2">
-                <Button
-                  variant={pipelineView === "all" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setPipelineView("all")}
-                >
-                  All
-                </Button>
-                <Button
-                  variant={pipelineView === "secured_prospects" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setPipelineView("secured_prospects")}
-                >
-                  Secured + Prospects
-                </Button>
-                <Button
-                  variant={pipelineView === "secured" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setPipelineView("secured")}
-                >
-                  Secured Only
-                </Button>
               </div>
-            </div>
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            {pipelineError ? (
-              <ErrorState message={pipelineError} />
-            ) : pipelineLoading ? (
-              <div className="flex items-center justify-center h-64 sm:h-80 text-slate-600">
-                Loading pipeline data...
+            {pipelineLoading ? (
+              <div className="h-96 flex items-center justify-center">
+                <p className="text-muted-foreground">Loading pipeline data...</p>
+              </div>
+            ) : pipelineError ? (
+              <div className="h-96 flex items-center justify-center">
+                <p className="text-destructive">{pipelineError}</p>
               </div>
             ) : (
               <>
-                <div className="overflow-x-auto -mx-2 px-2">
-                  <div className="min-w-[600px] h-64 sm:h-80 relative">
-                    {/* Stacked bar chart without Y-axis */}
-                    <div className="flex h-full">
-                      {/* Chart area */}
-                      <div className="flex-1 flex gap-1 items-end pl-2">
-                        {pipelineData.map((data, idx) => {
-                          let displayBid = 0;
-                          let displayProspect = 0;
-                          const displaySecured = data.secured;
-
-                          if (pipelineView === "all") {
-                            displayBid = data.bid;
-                            displayProspect = data.prospect;
-                          } else if (pipelineView === "secured_prospects") {
-                            displayProspect = data.prospect;
-                          }
-
-                          const total = displayBid + displayProspect + displaySecured;
-                          const budgetGap = data.budget > 0 ? Math.max(0, data.budget - total) : 0;
-                          const chartHeight = 256;
-                          const bidHeight = (displayBid / maxValue) * chartHeight;
-                          const prospectHeight = (displayProspect / maxValue) * chartHeight;
-                          const securedHeight = (displaySecured / maxValue) * chartHeight;
-                          const budgetGapHeight = (budgetGap / maxValue) * chartHeight;
-
-                          return (
-                            <div key={idx} className="flex-1 flex flex-col justify-end items-center gap-1">
-                              {/* Total label at top */}
-                              {total > 0 && (
-                                <div className="text-[10px] text-slate-900 font-semibold mb-1">
-                                  {total >= 1000 ? `£${(total / 1000).toFixed(0)}k` : `£${total.toFixed(0)}`}
-                                </div>
-                              )}
-                              
-                              <div className="w-full flex flex-col">
-                                {/* Budget gap bar (red) - top */}
-                                {budgetGap > 0 && (
-                                  <div
-                                    className="w-full bg-red-500 hover:bg-red-600 transition-colors relative flex items-center justify-center"
-                                    style={{
-                                      height: `${budgetGapHeight}px`,
-                                      minHeight: "2px",
-                                      borderTopLeftRadius: "4px",
-                                      borderTopRightRadius: "4px",
-                                    }}
-                                    title={`Budget Gap: ${formatCurrency(budgetGap)}`}
-                                  >
-                                    {budgetGapHeight > 20 && (
-                                      <span className="text-white text-[10px] font-medium">
-                                        Gap: {budgetGap >= 1000 ? `£${(budgetGap / 1000).toFixed(0)}k` : `£${budgetGap.toFixed(0)}`}
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-                                {/* Bid (yellow) - top of pipeline */}
-                                {displayBid > 0 && (
-                                  <div
-                                    className="w-full bg-yellow-500 hover:bg-yellow-600 transition-colors relative flex items-center justify-center"
-                                    style={{
-                                      height: `${bidHeight}px`,
-                                      minHeight: "2px",
-                                      borderTopLeftRadius: budgetGap === 0 ? "4px" : "0",
-                                      borderTopRightRadius: budgetGap === 0 ? "4px" : "0",
-                                    }}
-                                    title={`Bid: ${formatCurrency(displayBid)}`}
-                                  >
-                                    {bidHeight > 20 && (
-                                      <span className="text-white text-[10px] font-medium">
-                                        {displayBid >= 1000 ? `£${(displayBid / 1000).toFixed(0)}k` : `£${displayBid.toFixed(0)}`}
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-                                {/* Prospect (blue) - middle */}
-                                {displayProspect > 0 && (
-                                  <div
-                                    className="w-full bg-blue-500 hover:bg-blue-600 transition-colors relative flex items-center justify-center"
-                                    style={{
-                                      height: `${prospectHeight}px`,
-                                      minHeight: "2px",
-                                      borderTopLeftRadius: displayBid === 0 && budgetGap === 0 ? "4px" : "0",
-                                      borderTopRightRadius: displayBid === 0 && budgetGap === 0 ? "4px" : "0",
-                                    }}
-                                    title={`Prospect: ${formatCurrency(displayProspect)}`}
-                                  >
-                                    {prospectHeight > 20 && (
-                                      <span className="text-white text-[10px] font-medium">
-                                        {displayProspect >= 1000 ? `£${(displayProspect / 1000).toFixed(0)}k` : `£${displayProspect.toFixed(0)}`}
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-                                {/* Secured (green) - bottom foundation */}
-                                {displaySecured > 0 && (
-                                  <div
-                                    className="w-full bg-green-500 hover:bg-green-600 transition-colors relative flex items-center justify-center"
-                                    style={{
-                                      height: `${securedHeight}px`,
-                                      minHeight: "2px",
-                                      borderTopLeftRadius: displayProspect === 0 && displayBid === 0 && budgetGap === 0 ? "4px" : "0",
-                                      borderTopRightRadius: displayProspect === 0 && displayBid === 0 && budgetGap === 0 ? "4px" : "0",
-                                      borderBottomLeftRadius: "4px",
-                                      borderBottomRightRadius: "4px",
-                                    }}
-                                    title={`Secured: ${formatCurrency(displaySecured)}`}
-                                  >
-                                    {securedHeight > 20 && (
-                                      <span className="text-white text-[10px] font-medium">
-                                        {displaySecured >= 1000 ? `£${(displaySecured / 1000).toFixed(0)}k` : `£${displaySecured.toFixed(0)}`}
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                              <div className="text-[10px] sm:text-xs text-slate-600 text-center whitespace-nowrap">
-                                {data.month}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
+                {/* Chart with dynamic height */}
+                <div className="w-full" style={{ minHeight: "500px", height: "auto" }}>
+                  <ResponsiveContainer width="100%" height={500}>
+                    <BarChart data={pipelineData} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="month" 
+                        angle={-45}
+                        textAnchor="end"
+                        height={80}
+                        tick={{ fontSize: 12 }}
+                      />
+                      <YAxis 
+                        tickFormatter={(value) => `£${(value / 1000).toFixed(0)}k`}
+                        tick={{ fontSize: 12 }}
+                      />
+                      <Tooltip 
+                        formatter={(value: number) => `£${value.toLocaleString()}`}
+                        contentStyle={{ fontSize: 12 }}
+                      />
+                      <Legend 
+                        wrapperStyle={{ paddingTop: "20px" }}
+                        iconType="circle"
+                      />
+                      <Bar dataKey="secured" stackId="a" fill="#10b981" name="Secured + Projects" />
+                      <Bar dataKey="prospect" stackId="a" fill="#3b82f6" name="Prospect" />
+                      <Bar dataKey="bid" stackId="a" fill="#f59e0b" name="Bid" />
+                      <Bar dataKey="budgetGap" stackId="a" fill="#ef4444" name="Budget Gap" />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
 
-                <div className="mt-4 flex flex-wrap gap-4 text-xs sm:text-sm justify-center">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 sm:w-4 sm:h-4 bg-green-500 rounded"></div>
-                    <span className="text-slate-600">Secured</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 sm:w-4 sm:h-4 bg-blue-500 rounded"></div>
-                    <span className="text-slate-600">Prospect</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 sm:w-4 sm:h-4 bg-yellow-500 rounded"></div>
-                    <span className="text-slate-600">Bid</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 sm:w-4 sm:h-4 bg-red-500 rounded"></div>
-                    <span className="text-slate-600">Budget Gap</span>
+                {/* Monthly Totals Table - Always Visible */}
+                <div className="mt-8 border-t pt-6">
+                  <h3 className="text-lg font-semibold mb-4">Monthly Breakdown</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted">
+                        <tr>
+                          <th className="text-left p-3 font-semibold">Month</th>
+                          <th className="text-right p-3 font-semibold">Secured + Projects</th>
+                          <th className="text-right p-3 font-semibold">Prospect</th>
+                          <th className="text-right p-3 font-semibold">Bid</th>
+                          <th className="text-right p-3 font-semibold">Budget Gap</th>
+                          <th className="text-right p-3 font-semibold bg-primary/10">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pipelineData.map((monthData, index) => {
+                          const total = monthData.secured + monthData.prospect + monthData.bid;
+                          return (
+                            <tr key={monthData.month} className={index % 2 === 0 ? "bg-muted/50" : ""}>
+                              <td className="p-3 font-medium">{monthData.month}</td>
+                              <td className="text-right p-3 text-green-600">
+                                £{monthData.secured.toLocaleString()}
+                              </td>
+                              <td className="text-right p-3 text-blue-600">
+                                £{monthData.prospect.toLocaleString()}
+                              </td>
+                              <td className="text-right p-3 text-amber-600">
+                                £{monthData.bid.toLocaleString()}
+                              </td>
+                              <td className="text-right p-3 text-red-600">
+                                £{monthData.budgetGap.toLocaleString()}
+                              </td>
+                              <td className="text-right p-3 font-semibold bg-primary/10">
+                                £{total.toLocaleString()}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        <tr className="border-t-2 border-primary font-bold bg-primary/5">
+                          <td className="p-3">TOTAL</td>
+                          <td className="text-right p-3 text-green-600">
+                            £{pipelineData.reduce((sum, m) => sum + m.secured, 0).toLocaleString()}
+                          </td>
+                          <td className="text-right p-3 text-blue-600">
+                            £{pipelineData.reduce((sum, m) => sum + m.prospect, 0).toLocaleString()}
+                          </td>
+                          <td className="text-right p-3 text-amber-600">
+                            £{pipelineData.reduce((sum, m) => sum + m.bid, 0).toLocaleString()}
+                          </td>
+                          <td className="text-right p-3 text-red-600">
+                            £{pipelineData.reduce((sum, m) => sum + m.budgetGap, 0).toLocaleString()}
+                          </td>
+                          <td className="text-right p-3 bg-primary/20">
+                            £{pipelineData.reduce((sum, m) => sum + m.secured + m.prospect + m.bid, 0).toLocaleString()}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </>
