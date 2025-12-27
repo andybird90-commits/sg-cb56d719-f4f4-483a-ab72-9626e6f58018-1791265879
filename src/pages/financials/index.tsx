@@ -101,7 +101,11 @@ function FinancialsContent() {
       setBudgetRevenue(budgetData?.budget_revenue || null);
       setBudgetCost(budgetData?.budget_cost || null);
 
-      // Fetch all projects
+      // Define the target month date range
+      const startOfMonth = new Date(selectedYear, selectedMonth - 1, 1);
+      const endOfMonth = new Date(selectedYear, selectedMonth, 0);
+
+      // Fetch all LIVE projects
       const { data: projectsData, error: projectsError } = await supabase
         .from("projects")
         .select(`
@@ -117,36 +121,56 @@ function FinancialsContent() {
             name
           )
         `)
-        .in("status", ["live", "pipeline"]);
+        .eq("status", "live");
 
       if (projectsError) throw projectsError;
 
-      if (!projectsData) {
-        setLoading(false);
-        return;
-      }
+      // Fetch all SECURED opportunities (should also count as revenue)
+      const { data: opportunitiesData, error: opportunitiesError } = await supabase
+        .from("opportunities")
+        .select(`
+          id,
+          code,
+          name,
+          stage,
+          expected_start_date,
+          expected_end_date,
+          expected_fee_value,
+          client_company_id,
+          companies!opportunities_client_company_id_fkey (
+            name
+          )
+        `)
+        .eq("stage", "secured");
 
-      // Fetch all phasing data for these projects
-      const projectIds = projectsData.map(p => p.id);
-      const { data: phasingData, error: phasingError } = await supabase
-        .from("project_monthly_phasing")
-        .select("*")
-        .in("project_id", projectIds);
+      if (opportunitiesError) throw opportunitiesError;
 
-      if (phasingError) throw phasingError;
-
-      const phasingMap = new Map<string, PhasingRow[]>();
-      (phasingData || []).forEach((row) => {
-        const key = row.project_id;
-        if (!phasingMap.has(key)) {
-          phasingMap.set(key, []);
-        }
-        phasingMap.get(key)!.push(row as unknown as PhasingRow);
-      });
+      // Combine projects and secured opportunities
+      const allRevenueItems = [
+        ...(projectsData || []).map(p => ({
+          id: p.id,
+          code: p.code,
+          name: p.name,
+          client_name: p.companies?.name || "—",
+          start_date: p.start_date,
+          end_date: p.end_date,
+          total_value: p.agreed_fee_value || 0,
+          type: "project" as const
+        })),
+        ...(opportunitiesData || []).map(o => ({
+          id: o.id,
+          code: o.code,
+          name: o.name,
+          client_name: o.companies?.name || "—",
+          start_date: o.expected_start_date,
+          end_date: o.expected_end_date,
+          total_value: o.expected_fee_value || 0,
+          type: "opportunity" as const
+        }))
+      ];
 
       // Fetch timesheets for internal cost
-      const startOfMonth = new Date(selectedYear, selectedMonth - 1, 1);
-      const endOfMonth = new Date(selectedYear, selectedMonth, 0);
+      const projectIds = (projectsData || []).map(p => p.id);
 
       const { data: timesheetsData, error: timesheetsError } = await supabase
         .from("timesheets")
@@ -190,50 +214,42 @@ function FinancialsContent() {
         );
       });
 
-      // Calculate revenue for each project based on mode
+      // Calculate revenue for each item using date-based distribution
       const breakdown: ProjectFinancials[] = [];
       let totalRev = 0;
       let totalIntCost = 0;
       let totalSubCost = 0;
-      const toInvoice: ToInvoiceItem[] = [];
 
-      for (const project of projectsData) {
-        const phasingRows = phasingMap.get(project.id) || [];
-        const phasingRow = phasingRows.find(
-          (p) => p.year === selectedYear && p.month === selectedMonth
+      for (const item of allRevenueItems) {
+        if (!item.start_date || !item.end_date) continue;
+
+        const startDate = new Date(item.start_date);
+        const endDate = new Date(item.end_date);
+
+        // Check if this item overlaps with the selected month
+        if (endDate < startOfMonth || startDate > endOfMonth) continue;
+
+        // Calculate the monthly revenue using same logic as dashboard/pipeline
+        const durationMonths = Math.max(1,
+          (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+          (endDate.getMonth() - startDate.getMonth()) + 1
         );
 
-        let projectRevenue = 0;
+        const monthlyRevenue = item.total_value / durationMonths;
 
-        if (revenueMode === "forecast") {
-          // Forecast mode
-          if (phasingRow) {
-            projectRevenue = phasingRow.revenue_amount || 0;
-          } else {
-            // Fallback to automatic spread
-            projectRevenue = calculateAutoSpread(project, selectedYear, selectedMonth);
-          }
-        } else {
-          // Actual mode
-          if (phasingRow && phasingRow.actual_revenue !== null) {
-            projectRevenue = phasingRow.actual_revenue;
-          } else {
-            projectRevenue = 0;
-          }
-        }
-
-        const internalCost = timesheetsByProject.get(project.id) || 0;
-        const subcontractorCost = subcontractorByProject.get(project.id) || 0;
+        // Get costs (only for projects, not opportunities)
+        const internalCost = item.type === "project" ? (timesheetsByProject.get(item.id) || 0) : 0;
+        const subcontractorCost = item.type === "project" ? (subcontractorByProject.get(item.id) || 0) : 0;
         const totalCost = internalCost + subcontractorCost;
-        const margin = projectRevenue - totalCost;
-        const marginPercent = projectRevenue > 0 ? (margin / projectRevenue) * 100 : 0;
+        const margin = monthlyRevenue - totalCost;
+        const marginPercent = monthlyRevenue > 0 ? (margin / monthlyRevenue) * 100 : 0;
 
         breakdown.push({
-          project_id: project.id,
-          project_code: project.code,
-          project_name: project.name,
-          client_name: project.companies?.name || "—",
-          revenue: projectRevenue,
+          project_id: item.id,
+          project_code: item.code,
+          project_name: item.name,
+          client_name: item.client_name,
+          revenue: monthlyRevenue,
           internal_cost: internalCost,
           subcontractor_cost: subcontractorCost,
           total_cost: totalCost,
@@ -241,66 +257,22 @@ function FinancialsContent() {
           margin_percent: marginPercent,
         });
 
-        totalRev += projectRevenue;
+        totalRev += monthlyRevenue;
         totalIntCost += internalCost;
         totalSubCost += subcontractorCost;
-
-        // Check for to_invoice items
-        if (
-          phasingRow &&
-          phasingRow.actual_revenue !== null &&
-          phasingRow.actual_revenue > 0 &&
-          phasingRow.invoice_status === "to_invoice"
-        ) {
-          toInvoice.push({
-            project_id: project.id,
-            project_code: project.code,
-            project_name: project.name,
-            client_name: project.companies?.name || "—",
-            year: selectedYear,
-            month: selectedMonth,
-            actual_revenue: phasingRow.actual_revenue,
-            phasing_id: phasingRow.id,
-          });
-        }
       }
 
       setTotalRevenue(totalRev);
       setTotalInternalCost(totalIntCost);
       setTotalSubcontractorCost(totalSubCost);
       setProjectFinancials(breakdown);
-      setToInvoiceItems(toInvoice);
+      setToInvoiceItems([]);
     } catch (err) {
       console.error("Failed to load financials data", err);
       setError("Failed to load financial data. Please try again.");
     } finally {
       setLoading(false);
     }
-  };
-
-  const calculateAutoSpread = (project: any, year: number, month: number): number => {
-    if (!project.start_date || !project.end_date) return 0;
-
-    const startDate = new Date(project.start_date);
-    const endDate = new Date(project.end_date);
-    const targetMonth = new Date(year, month - 1, 1);
-    const targetMonthEnd = new Date(year, month, 0);
-
-    if (targetMonth > endDate || targetMonthEnd < startDate) return 0;
-
-    const totalDays = Math.ceil(
-      (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
-    ) + 1;
-
-    const monthStart = targetMonth < startDate ? startDate : targetMonth;
-    const monthEnd = targetMonthEnd > endDate ? endDate : targetMonthEnd;
-
-    const daysInMonth = Math.ceil(
-      (monthEnd.getTime() - monthStart.getTime()) / (1000 * 60 * 60 * 24)
-    ) + 1;
-
-    const totalFee = project.agreed_fee_value || 0;
-    return (totalFee / totalDays) * daysInMonth;
   };
 
   const handleMarkInvoiced = async (item?: ToInvoiceItem) => {

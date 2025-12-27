@@ -119,6 +119,10 @@ function DashboardContent() {
   const [opportunitiesTableError, setOpportunitiesTableError] = useState<string | null>(null);
   const [opportunitiesTable, setOpportunitiesTable] = useState<Opportunity[]>([]);
   
+  const [pipelineLoading, setPipelineLoading] = useState(true);
+  const [pipelineError, setPipelineError] = useState<string | null>(null);
+  const [pipelineData, setPipelineData] = useState<PipelineData[]>([]);
+
   // Sorting state
   const [sortField, setSortField] = useState<SortField>("created_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
