@@ -2,9 +2,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Layout } from "@/components/Layout";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar, BarChart3 } from "lucide-react";
+import Link from "next/link";
 
 export default function PipelinePage() {
   const { user, loading: authLoading } = useAuth();
@@ -37,45 +38,38 @@ export default function PipelinePage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Calendar className="h-6 w-6 text-blue-600" />
-                </div>
-                <CardTitle>Gantt Chart View</CardTitle>
-              </div>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Gantt Chart View
+              </CardTitle>
+              <CardDescription>
+                Visualize project timelines and dependencies in a traditional Gantt chart format
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-slate-600 text-sm mb-4">
-                Visualize your opportunities and projects on a timeline. See start dates, end dates, and status at a glance.
-              </p>
-              <Button 
-                onClick={() => router.push("/pipeline/gantt")}
-                className="w-full"
-              >
-                View Gantt Chart
+              <Button asChild className="w-full">
+                <Link href="/pipeline/gantt">
+                  View Gantt Chart
+                </Link>
               </Button>
             </CardContent>
           </Card>
 
           <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <BarChart3 className="h-6 w-6 text-green-600" />
-                </div>
-                <CardTitle>Monthly View</CardTitle>
-              </div>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Monthly View
+              </CardTitle>
+              <CardDescription>
+                View projects organized by month with turnover breakdown and stage indicators
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-slate-600 text-sm mb-4">
-                See projects organized by month with expected turnover values. Rolling 12-month view.
-              </p>
-              <Button 
-                onClick={() => router.push("/pipeline/monthly")}
-                className="w-full"
-                variant="default"
-              >
-                View Monthly
+              <Button asChild className="w-full" variant="secondary">
+                <Link href="/pipeline/monthly">
+                  View Monthly
+                </Link>
               </Button>
             </CardContent>
           </Card>

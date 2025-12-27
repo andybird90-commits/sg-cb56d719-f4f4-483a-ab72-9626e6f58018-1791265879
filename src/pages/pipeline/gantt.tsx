@@ -11,6 +11,7 @@ import html2canvas from "html2canvas";
 
 interface GanttItem {
   id: string;
+  code?: string;
   name: string;
   companyShortName: string;
   startDate: Date;
@@ -31,88 +32,217 @@ function PipelineGanttContent() {
   }, []);
 
   const exportToPDF = async () => {
+    setExporting(true);
     try {
-      setExporting(true);
-
-      // Create new PDF document (landscape for better fit)
       const pdf = new jsPDF({
         orientation: "landscape",
         unit: "mm",
         format: "a4",
       });
 
-      // Add title page
-      pdf.setFontSize(20);
-      pdf.text("Pipeline Report", 148, 20, { align: "center" });
+      // Title page
+      pdf.setFontSize(24);
+      pdf.text("Pipeline Report - Gantt View", 148, 20, { align: "center" });
       pdf.setFontSize(12);
-      pdf.text(new Date().toLocaleDateString("en-GB"), 148, 30, { align: "center" });
+      pdf.text(`Generated: ${new Date().toLocaleDateString("en-GB")}`, 148, 30, { align: "center" });
 
-      // Capture Gantt Chart
-      const ganttElement = document.getElementById("gantt-view");
-      if (ganttElement) {
-        const ganttCanvas = await html2canvas(ganttElement, {
-          scale: 2,
-          logging: false,
-          useCORS: true,
-        });
+      // Add Gantt chart data
+      pdf.addPage();
+      pdf.setFontSize(16);
+      pdf.text("Project Timeline", 10, 15);
+      
+      let yPos = 25;
+      const lineHeight = 7;
+      const pageHeight = 190;
 
-        const ganttImgData = ganttCanvas.toDataURL("image/png");
-        const ganttImgWidth = 277; // A4 landscape width in mm (minus margins)
-        const ganttImgHeight = (ganttCanvas.height * ganttImgWidth) / ganttCanvas.width;
-
-        pdf.addPage();
-        pdf.setFontSize(16);
-        pdf.text("Gantt Chart View", 148, 15, { align: "center" });
-        pdf.addImage(ganttImgData, "PNG", 10, 25, ganttImgWidth, Math.min(ganttImgHeight, 170));
-      }
-
-      // Fetch and capture Monthly View
-      const monthlyResponse = await fetch("/pipeline/monthly");
-      if (monthlyResponse.ok) {
-        // Open monthly view in hidden iframe to capture it
-        const iframe = document.createElement("iframe");
-        iframe.style.position = "absolute";
-        iframe.style.left = "-9999px";
-        iframe.style.width = "1200px";
-        iframe.style.height = "800px";
-        document.body.appendChild(iframe);
-
-        iframe.src = "/pipeline/monthly";
-
-        // Wait for iframe to load
-        await new Promise((resolve) => {
-          iframe.onload = resolve;
-        });
-
-        // Give it time to render
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-
-        const monthlyElement = iframe.contentDocument?.getElementById("monthly-view");
-        if (monthlyElement) {
-          const monthlyCanvas = await html2canvas(monthlyElement, {
-            scale: 2,
-            logging: false,
-            useCORS: true,
-          });
-
-          const monthlyImgData = monthlyCanvas.toDataURL("image/png");
-          const monthlyImgWidth = 277;
-          const monthlyImgHeight = (monthlyCanvas.height * monthlyImgWidth) / monthlyCanvas.width;
-
+      items.forEach((item, index) => {
+        if (yPos > pageHeight) {
           pdf.addPage();
-          pdf.setFontSize(16);
-          pdf.text("Monthly View", 148, 15, { align: "center" });
-          pdf.addImage(monthlyImgData, "PNG", 10, 25, monthlyImgWidth, Math.min(monthlyImgHeight, 170));
+          yPos = 15;
         }
 
-        document.body.removeChild(iframe);
+        pdf.setFontSize(10);
+        pdf.setFont("helvetica", "bold");
+        pdf.text(item.name, 10, yPos);
+        
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(9);
+        yPos += 5;
+        
+        const details = [
+          `Code: ${item.code || "-"}`,
+          `Company: ${item.companyShortName}`,
+          `Start: ${item.startDate.toLocaleDateString("en-GB")}`,
+          `End: ${item.endDate.toLocaleDateString("en-GB")}`,
+          `Status: ${item.status || item.stage || "-"}`,
+        ];
+        
+        details.forEach((detail) => {
+          if (yPos > pageHeight) {
+            pdf.addPage();
+            yPos = 15;
+          }
+          pdf.text(detail, 15, yPos);
+          yPos += 4;
+        });
+        
+        yPos += 3;
+      });
+
+      // Fetch monthly data
+      const { data: projectsData } = await supabase
+        .from("projects")
+        .select(`
+          id,
+          code,
+          name,
+          start_date,
+          end_date,
+          agreed_fee_value,
+          companies!projects_company_id_fkey (
+            short_name
+          )
+        `)
+        .eq("archived", false)
+        .not("start_date", "is", null)
+        .not("end_date", "is", null);
+
+      const { data: oppsData } = await supabase
+        .from("opportunities")
+        .select(`
+          id,
+          name,
+          expected_start_date,
+          expected_end_date,
+          expected_fee_value,
+          stage,
+          companies!opportunities_company_id_fkey (
+            short_name
+          )
+        `)
+        .not("expected_start_date", "is", null)
+        .not("expected_end_date", "is", null);
+
+      // Generate 12 months of data
+      const months: Date[] = [];
+      const currentDate = new Date();
+      for (let i = 0; i < 12; i++) {
+        const monthDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + i, 1);
+        months.push(monthDate);
       }
 
+      // Process each month
+      months.forEach((month) => {
+        pdf.addPage();
+        pdf.setFontSize(18);
+        const monthName = month.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+        pdf.text(`Monthly View - ${monthName}`, 148, 15, { align: "center" });
+
+        let yPos = 30;
+        let totalTurnover = 0;
+
+        const monthProjects: Array<{
+          name: string;
+          company: string;
+          value: number;
+          stage: string;
+        }> = [];
+
+        // Process projects
+        if (projectsData) {
+          projectsData.forEach((project) => {
+            const projectStart = new Date(project.start_date!);
+            const projectEnd = new Date(project.end_date!);
+
+            if (projectStart <= new Date(month.getFullYear(), month.getMonth() + 1, 0) &&
+                projectEnd >= month) {
+              const totalMonths = Math.ceil(
+                (projectEnd.getTime() - projectStart.getTime()) / (1000 * 60 * 60 * 24 * 30)
+              );
+              const monthlyValue = (project.agreed_fee_value || 0) / Math.max(totalMonths, 1);
+
+              monthProjects.push({
+                name: project.name,
+                company: (project.companies as any)?.short_name || "Unknown",
+                value: monthlyValue,
+                stage: "Secured",
+              });
+              totalTurnover += monthlyValue;
+            }
+          });
+        }
+
+        // Process opportunities
+        if (oppsData) {
+          oppsData.forEach((opp) => {
+            const oppStart = new Date(opp.expected_start_date!);
+            const oppEnd = new Date(opp.expected_end_date!);
+
+            if (oppStart <= new Date(month.getFullYear(), month.getMonth() + 1, 0) &&
+                oppEnd >= month) {
+              const totalMonths = Math.ceil(
+                (oppEnd.getTime() - oppStart.getTime()) / (1000 * 60 * 60 * 24 * 30)
+              );
+              const monthlyValue = (opp.expected_fee_value || 0) / Math.max(totalMonths, 1);
+
+              monthProjects.push({
+                name: opp.name,
+                company: (opp.companies as any)?.short_name || "Unknown",
+                value: monthlyValue,
+                stage: opp.stage === "secured" ? "Secured" : opp.stage === "high_potential" ? "High Potential" : "Bid",
+              });
+              totalTurnover += monthlyValue;
+            }
+          });
+        }
+
+        // Display total
+        pdf.setFontSize(12);
+        pdf.setFont("helvetica", "bold");
+        pdf.text(`Total Turnover: £${totalTurnover.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`, 148, 25, { align: "center" });
+
+        // Display projects
+        pdf.setFontSize(10);
+        monthProjects.forEach((project) => {
+          if (yPos > pageHeight) {
+            pdf.addPage();
+            pdf.setFontSize(18);
+            pdf.text(`${monthName} (continued)`, 148, 15, { align: "center" });
+            yPos = 30;
+          }
+
+          // Stage badge color
+          if (project.stage === "Secured") {
+            pdf.setTextColor(34, 197, 94); // green
+          } else if (project.stage === "High Potential") {
+            pdf.setTextColor(249, 115, 22); // orange
+          } else {
+            pdf.setTextColor(59, 130, 246); // blue
+          }
+
+          pdf.setFont("helvetica", "bold");
+          pdf.text(`[${project.stage}]`, 10, yPos);
+
+          pdf.setTextColor(0, 0, 0);
+          pdf.setFont("helvetica", "normal");
+          pdf.text(project.name, 45, yPos);
+          pdf.text(project.company, 150, yPos);
+          pdf.text(`£${project.value.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`, 220, yPos);
+
+          yPos += 7;
+        });
+
+        if (monthProjects.length === 0) {
+          pdf.setFontSize(10);
+          pdf.setTextColor(100, 100, 100);
+          pdf.text("No projects scheduled for this month", 148, yPos, { align: "center" });
+        }
+      });
+
       // Save PDF
-      const fileName = `pipeline-report-${new Date().toISOString().split("T")[0]}.pdf`;
-      pdf.save(fileName);
-    } catch (err) {
-      console.error("Failed to export PDF", err);
+      pdf.save(`pipeline-report-${new Date().toISOString().split("T")[0]}.pdf`);
+    } catch (error) {
+      console.error("PDF export error:", error);
       alert("Failed to export PDF. Please try again.");
     } finally {
       setExporting(false);
@@ -170,6 +300,7 @@ function PipelineGanttContent() {
         .from("projects")
         .select(`
           id,
+          code,
           name,
           status,
           start_date,
@@ -192,6 +323,7 @@ function PipelineGanttContent() {
           if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
             ganttItems.push({
               id: proj.id,
+              code: proj.code,
               name: proj.name,
               companyShortName: proj.companies?.short_name || proj.companies?.name || "",
               startDate,
