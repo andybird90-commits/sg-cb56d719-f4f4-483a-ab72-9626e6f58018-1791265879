@@ -37,25 +37,25 @@ function PipelineMonthlyContent() {
   }, []);
 
   useEffect(() => {
-    const topScroll = document.getElementById("top-scroll");
-    const bottomScroll = document.getElementById("bottom-scroll");
+    const topScrollContainer = document.getElementById("top-scroll-container");
+    const bottomScrollContainer = document.getElementById("bottom-scroll-container");
 
-    if (!topScroll || !bottomScroll) return;
+    if (!topScrollContainer || !bottomScrollContainer) return;
 
     const syncTopToBottom = () => {
-      bottomScroll.scrollLeft = topScroll.scrollLeft;
+      bottomScrollContainer.scrollLeft = topScrollContainer.scrollLeft;
     };
 
     const syncBottomToTop = () => {
-      topScroll.scrollLeft = bottomScroll.scrollLeft;
+      topScrollContainer.scrollLeft = bottomScrollContainer.scrollLeft;
     };
 
-    topScroll.addEventListener("scroll", syncTopToBottom);
-    bottomScroll.addEventListener("scroll", syncBottomToTop);
+    topScrollContainer.addEventListener("scroll", syncTopToBottom);
+    bottomScrollContainer.addEventListener("scroll", syncBottomToTop);
 
     return () => {
-      topScroll.removeEventListener("scroll", syncTopToBottom);
-      bottomScroll.removeEventListener("scroll", syncBottomToTop);
+      topScrollContainer.removeEventListener("scroll", syncTopToBottom);
+      bottomScrollContainer.removeEventListener("scroll", syncBottomToTop);
     };
   }, [monthsData]);
 
@@ -464,8 +464,23 @@ function PipelineMonthlyContent() {
               </div>
             ) : (
               <div className="space-y-4">
+                {/* Top Scrollbar */}
+                <div 
+                  id="top-scroll-container"
+                  className="overflow-x-auto border border-gray-300 rounded bg-gray-100 mb-2"
+                  style={{ height: "20px" }}
+                >
+                  <div 
+                    id="top-scroll-spacer"
+                    style={{ 
+                      width: `${monthsData.length * 280}px`,
+                      height: "1px"
+                    }}
+                  />
+                </div>
+
                 {/* Scrollable Monthly Columns Container */}
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto" id="bottom-scroll-container">
                   <div className="flex gap-4 pb-4" style={{ minWidth: "max-content" }}>
                     {monthsData.map((monthData, idx) => (
                       <div key={idx} className="flex-shrink-0" style={{ width: "280px" }}>
@@ -517,51 +532,57 @@ function PipelineMonthlyContent() {
                   </div>
                 </div>
 
-                {/* Legend */}
-                <div className="pt-4 border-t border-slate-200">
-                  <div className="text-sm font-medium text-slate-600 mb-3">Legend:</div>
-                  <div className="flex flex-wrap gap-4 text-xs">
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 bg-green-100 border border-green-200 rounded"></div>
-                      <span className="text-slate-700">Secured</span>
+                {/* Monthly Columns with dual scrollbars */}
+                <div>
+                  {/* Main Content with bottom scrollbar */}
+                  <div className="space-y-4">
+                    {/* Legend */}
+                    <div className="pt-4 border-t border-slate-200">
+                      <div className="text-sm font-medium text-slate-600 mb-3">Legend:</div>
+                      <div className="flex flex-wrap gap-4 text-xs">
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 bg-green-100 border border-green-200 rounded"></div>
+                          <span className="text-slate-700">Secured</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 bg-orange-100 border border-orange-200 rounded"></div>
+                          <span className="text-slate-700">High Potential</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 bg-blue-100 border border-blue-200 rounded"></div>
+                          <span className="text-slate-700">Bid</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 bg-orange-100 border border-orange-200 rounded"></div>
-                      <span className="text-slate-700">High Potential</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 bg-blue-100 border border-blue-200 rounded"></div>
-                      <span className="text-slate-700">Bid</span>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Summary Stats */}
-                <div className="pt-4 border-t border-slate-200">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="bg-slate-50 rounded-lg p-4">
-                      <div className="text-2xl font-bold text-slate-900">
-                        {monthsData.reduce((sum, m) => sum + m.totalTurnover, 0) > 0
-                          ? formatCurrency(monthsData.reduce((sum, m) => sum + m.totalTurnover, 0))
-                          : "£0"}
+                    {/* Summary Stats */}
+                    <div className="pt-4 border-t border-slate-200">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="bg-slate-50 rounded-lg p-4">
+                          <div className="text-2xl font-bold text-slate-900">
+                            {monthsData.reduce((sum, m) => sum + m.totalTurnover, 0) > 0
+                              ? formatCurrency(monthsData.reduce((sum, m) => sum + m.totalTurnover, 0))
+                              : "£0"}
+                          </div>
+                          <div className="text-xs text-slate-600 mt-1">Total 12 Months</div>
+                        </div>
+                        <div className="bg-slate-50 rounded-lg p-4">
+                          <div className="text-2xl font-bold text-slate-900">
+                            {formatCurrency(
+                              monthsData.reduce((sum, m) => sum + m.totalTurnover, 0) / 12
+                            )}
+                          </div>
+                          <div className="text-xs text-slate-600 mt-1">Average/Month</div>
+                        </div>
+                        <div className="bg-slate-50 rounded-lg p-4">
+                          <div className="text-2xl font-bold text-slate-900">
+                            {Math.max(...monthsData.map(m => m.totalTurnover)) > 0
+                              ? formatCurrency(Math.max(...monthsData.map(m => m.totalTurnover)))
+                              : "£0"}
+                          </div>
+                          <div className="text-xs text-slate-600 mt-1">Peak Month</div>
+                        </div>
                       </div>
-                      <div className="text-xs text-slate-600 mt-1">Total 12 Months</div>
-                    </div>
-                    <div className="bg-slate-50 rounded-lg p-4">
-                      <div className="text-2xl font-bold text-slate-900">
-                        {formatCurrency(
-                          monthsData.reduce((sum, m) => sum + m.totalTurnover, 0) / 12
-                        )}
-                      </div>
-                      <div className="text-xs text-slate-600 mt-1">Average/Month</div>
-                    </div>
-                    <div className="bg-slate-50 rounded-lg p-4">
-                      <div className="text-2xl font-bold text-slate-900">
-                        {Math.max(...monthsData.map(m => m.totalTurnover)) > 0
-                          ? formatCurrency(Math.max(...monthsData.map(m => m.totalTurnover)))
-                          : "£0"}
-                      </div>
-                      <div className="text-xs text-slate-600 mt-1">Peak Month</div>
                     </div>
                   </div>
                 </div>
