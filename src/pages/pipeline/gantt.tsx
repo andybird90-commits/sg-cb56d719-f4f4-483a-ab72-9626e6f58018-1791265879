@@ -99,7 +99,7 @@ function PipelineGanttContent() {
           start_date,
           end_date,
           agreed_fee_value,
-          companies!projects_company_id_fkey (
+          companies!projects_client_company_id_fkey (
             short_name
           )
         `)
@@ -116,7 +116,7 @@ function PipelineGanttContent() {
           expected_end_date,
           expected_fee_value,
           stage,
-          companies!opportunities_company_id_fkey (
+          companies (
             short_name
           )
         `)
