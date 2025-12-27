@@ -156,7 +156,11 @@ function PipelineMonthlyContent() {
             pdf.addPage();
             pdf.setFontSize(18);
             pdf.text(`${monthName} (continued)`, 148, 15, { align: "center" });
-            yPos = 30;
+            pdf.setFontSize(12);
+            pdf.setFont("helvetica", "bold");
+            pdf.text(`Total Turnover: £${totalTurnover.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`, 148, 25, { align: "center" });
+            yPos = 35;
+            pdf.setFontSize(10);
           }
 
           // Stage badge color
@@ -173,7 +177,7 @@ function PipelineMonthlyContent() {
 
           pdf.setTextColor(0, 0, 0);
           pdf.setFont("helvetica", "normal");
-          pdf.text(project.name, 45, yPos);
+          pdf.text(project.name, 55, yPos);
           pdf.text(project.company, 150, yPos);
           pdf.text(`£${project.value.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`, 220, yPos);
 
