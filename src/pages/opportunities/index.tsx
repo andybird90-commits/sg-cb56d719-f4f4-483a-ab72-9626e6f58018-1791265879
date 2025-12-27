@@ -6,10 +6,10 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Plus, ChevronRight, Building2, AlertTriangle, Search } from "lucide-react";
+import { Plus, ChevronRight, Building2, AlertTriangle, Search, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 
 interface Opportunity {
@@ -18,7 +18,15 @@ interface Opportunity {
   stage: string;
   status: string;
   expected_fee_value: number | null;
-  added_by_user_id: string | null;
+  tender_due_date: string | null;
+  tender_received_date: string | null;
+  submitted_date: string | null;
+  expected_start_date: string | null;
+  expected_end_date: string | null;
+  probability_percent: number | null;
+  project_reference: string | null;
+  created_at: string;
+  added_by_user_id?: string;
   companies?: {
     name: string;
   };
@@ -54,21 +62,17 @@ function OpportunitiesContent() {
       setLoading(true);
       setError(null);
 
-      const { data, error: fetchError } = await supabase
+      const { data, error } = await supabase
         .from("opportunities")
         .select(`
           *,
           companies (
             name
-          ),
-          added_by_profile:profiles (
-            full_name,
-            email
           )
         `)
         .order("created_at", { ascending: false });
 
-      if (fetchError) throw fetchError;
+      if (error) throw error;
       setOpportunities((data as unknown as Opportunity[]) || []);
       setFilteredOpportunities((data as unknown as Opportunity[]) || []);
     } catch (err) {
@@ -98,6 +102,15 @@ function OpportunitiesContent() {
     setFilteredOpportunities(filtered);
   };
 
+  const formatDate = (date: string | null) => {
+    if (!date) return "—";
+    return new Date(date).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
   const getStageColor = (stage: string) => {
     switch (stage) {
       case "secured":
@@ -119,6 +132,63 @@ function OpportunitiesContent() {
       minimumFractionDigits: 0,
     }).format(value);
   };
+
+  const OpportunityCard = ({ opportunity }: { opportunity: Opportunity }) => (
+    <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push(`/opportunities/${opportunity.id}`)}>
+      <CardHeader>
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <CardTitle className="text-lg mb-1 truncate">{opportunity.name}</CardTitle>
+            {opportunity.project_reference && (
+              <div className="text-sm text-slate-600 font-mono mb-2">
+                Ref: {opportunity.project_reference}
+              </div>
+            )}
+            <p className="text-sm text-slate-600">{opportunity.companies?.name}</p>
+          </div>
+          <Badge className={getStageColor(opportunity.stage)}>
+            {opportunity.stage === "high_potential" ? "High Potential" : opportunity.stage}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-slate-600">Value:</span>
+          <span className="font-semibold">
+            {opportunity.expected_fee_value ? formatCurrency(opportunity.expected_fee_value) : "—"}
+          </span>
+        </div>
+        
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-slate-600">Probability:</span>
+          <span className="font-semibold">{opportunity.probability_percent || 0}%</span>
+        </div>
+
+        {opportunity.submitted_date && (
+          <div className="flex items-center gap-2 text-sm bg-green-50 border border-green-200 rounded px-2 py-1">
+            <CheckCircle2 className="w-4 h-4 text-green-600" />
+            <span className="text-green-700 font-medium">
+              Submitted: {formatDate(opportunity.submitted_date)}
+            </span>
+          </div>
+        )}
+
+        {opportunity.tender_due_date && (
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-slate-600">Due:</span>
+            <span>{formatDate(opportunity.tender_due_date)}</span>
+          </div>
+        )}
+
+        {opportunity.tender_received_date && (
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-slate-600">Received:</span>
+            <span>{formatDate(opportunity.tender_received_date)}</span>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 
   return (
     <Layout>

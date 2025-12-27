@@ -320,9 +320,12 @@ export type Database = {
           linked_project_id: string | null
           name: string
           probability_percent: number | null
+          project_reference: string | null
           stage: string
           status: string
+          submitted_date: string | null
           tender_due_date: string | null
+          tender_received_date: string | null
           updated_at: string
         }
         Insert: {
@@ -338,9 +341,12 @@ export type Database = {
           linked_project_id?: string | null
           name: string
           probability_percent?: number | null
+          project_reference?: string | null
           stage: string
           status?: string
+          submitted_date?: string | null
           tender_due_date?: string | null
+          tender_received_date?: string | null
           updated_at?: string
         }
         Update: {
@@ -356,9 +362,12 @@ export type Database = {
           linked_project_id?: string | null
           name?: string
           probability_percent?: number | null
+          project_reference?: string | null
           stage?: string
           status?: string
+          submitted_date?: string | null
           tender_due_date?: string | null
+          tender_received_date?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -503,6 +512,95 @@ export type Database = {
             columns: ["opportunity_id"]
             isOneToOne: false
             referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      planner_items: {
+        Row: {
+          created_at: string | null
+          due_date: string | null
+          end_datetime: string | null
+          ics_last_generated_at: string | null
+          ics_uid: string | null
+          id: string
+          location: string | null
+          next_step: string | null
+          notes: string | null
+          owner_user_id: string
+          pinned: boolean | null
+          start_datetime: string | null
+          status: string
+          title: string
+          type: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          due_date?: string | null
+          end_datetime?: string | null
+          ics_last_generated_at?: string | null
+          ics_uid?: string | null
+          id?: string
+          location?: string | null
+          next_step?: string | null
+          notes?: string | null
+          owner_user_id: string
+          pinned?: boolean | null
+          start_datetime?: string | null
+          status?: string
+          title: string
+          type: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          due_date?: string | null
+          end_datetime?: string | null
+          ics_last_generated_at?: string | null
+          ics_uid?: string | null
+          id?: string
+          location?: string | null
+          next_step?: string | null
+          notes?: string | null
+          owner_user_id?: string
+          pinned?: boolean | null
+          start_datetime?: string | null
+          status?: string
+          title?: string
+          type?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      planner_links: {
+        Row: {
+          created_at: string | null
+          id: string
+          link_id: string
+          link_type: string
+          planner_item_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          link_id: string
+          link_type: string
+          planner_item_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          link_id?: string
+          link_type?: string
+          planner_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planner_links_planner_item_id_fkey"
+            columns: ["planner_item_id"]
+            isOneToOne: false
+            referencedRelation: "planner_items"
             referencedColumns: ["id"]
           },
         ]

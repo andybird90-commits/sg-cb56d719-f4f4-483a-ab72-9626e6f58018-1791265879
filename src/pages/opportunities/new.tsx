@@ -39,17 +39,21 @@ function NewOpportunityContent() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [formData, setFormData] = useState({
+    name: "",
     company_id: "",
     contact_id: "",
-    name: "",
-    description: "",
-    stage: "bid",
-    status: "open",
+    stage: "lead" as "lead" | "bid" | "high_potential" | "secured" | "lost",
+    status: "active" as "active" | "on_hold" | "closed",
+    expected_fee_value: "",
     tender_due_date: "",
+    tender_received_date: "",
+    submitted_date: "",
     expected_start_date: "",
     expected_end_date: "",
-    expected_fee_value: "",
-    probability_percent: "",
+    probability_percent: 10,
+    project_reference: "",
+    description: "",
+    key_contacts: [] as string[],
     added_by_user_id: "",
   });
 
@@ -94,31 +98,44 @@ function NewOpportunityContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError("");
+    
+    // Get current user if profile is not enough or use profile.id
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
 
-    const { error: insertError } = await supabase.from("opportunities").insert({
-      company_id: formData.company_id,
-      contact_id: formData.contact_id || null,
-      name: formData.name,
-      description: formData.description || null,
-      stage: formData.stage as "secured" | "high_potential" | "bid",
-      status: formData.status as "open" | "closed_won" | "closed_lost",
-      tender_due_date: formData.tender_due_date || null,
-      expected_start_date: formData.expected_start_date || null,
-      expected_end_date: formData.expected_end_date || null,
-      expected_fee_value: formData.expected_fee_value ? parseFloat(formData.expected_fee_value) : null,
-      probability_percent: formData.probability_percent ? parseInt(formData.probability_percent) : null,
-      added_by_user_id: formData.added_by_user_id || null,
-    });
+    try {
+      setLoading(true);
 
-    if (insertError) {
-      setError(insertError.message);
+      const opportunityData = {
+        name: formData.name,
+        company_id: formData.company_id,
+        stage: formData.stage,
+        status: formData.status,
+        expected_fee_value: formData.expected_fee_value ? parseFloat(formData.expected_fee_value) : null,
+        tender_due_date: formData.tender_due_date || null,
+        tender_received_date: formData.tender_received_date || null,
+        submitted_date: formData.submitted_date || null,
+        expected_start_date: formData.expected_start_date || null,
+        expected_end_date: formData.expected_end_date || null,
+        probability_percent: formData.probability_percent,
+        project_reference: formData.project_reference || null,
+        description: formData.description || null,
+        created_by_user_id: formData.added_by_user_id || user.id,
+      };
+
+      const { error: insertError } = await supabase.from("opportunities").insert([opportunityData as any]);
+
+      if (insertError) {
+        setError(insertError.message);
+        setLoading(false);
+        return;
+      }
+
+      router.push("/opportunities");
+    } catch (error) {
+      setError((error as any).message);
       setLoading(false);
-      return;
     }
-
-    router.push("/opportunities");
   };
 
   return (
@@ -213,19 +230,28 @@ function NewOpportunityContent() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="stage">Stage</Label>
+                  <Label htmlFor="stage">Stage *</Label>
                   <Select
                     value={formData.stage}
-                    onValueChange={(value) => setFormData({ ...formData, stage: value })}
+                    onValueChange={(value) => {
+                      const probability = 
+                        value === "lead" ? 10 :
+                        value === "bid" ? 25 :
+                        value === "high_potential" ? 50 :
+                        value === "secured" ? 100 :
+                        value === "lost" ? 0 : 10;
+                      
+                      setFormData({ ...formData, stage: value, probability_percent: probability });
+                    }}
                   >
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Select stage" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="lead">Lead</SelectItem>
-                      <SelectItem value="bid">In Bid</SelectItem>
+                      <SelectItem value="bid">Bid</SelectItem>
                       <SelectItem value="high_potential">High Potential</SelectItem>
-                      <SelectItem value="secured">Won</SelectItem>
+                      <SelectItem value="secured">Secured</SelectItem>
                       <SelectItem value="lost">Lost</SelectItem>
                     </SelectContent>
                   </Select>
@@ -297,16 +323,38 @@ function NewOpportunityContent() {
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="tender_due_date" className="text-sm sm:text-base">Tender Due Date</Label>
+                  <Label htmlFor="tender_due_date">Tender Due Date</Label>
                   <Input
                     id="tender_due_date"
                     type="date"
                     value={formData.tender_due_date}
                     onChange={(e) => setFormData({ ...formData, tender_due_date: e.target.value })}
-                    className="h-10 sm:h-11"
                   />
                 </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor="tender_received_date">Tender Received</Label>
+                  <Input
+                    id="tender_received_date"
+                    type="date"
+                    value={formData.tender_received_date}
+                    onChange={(e) => setFormData({ ...formData, tender_received_date: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="project_reference">Project Reference</Label>
+                  <Input
+                    id="project_reference"
+                    type="text"
+                    value={formData.project_reference}
+                    onChange={(e) => setFormData({ ...formData, project_reference: e.target.value })}
+                    placeholder="e.g., PRJ-2025-001"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="expected_start_date" className="text-sm sm:text-base">Expected Start Date</Label>
                   <Input

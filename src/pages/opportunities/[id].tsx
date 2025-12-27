@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowLeft, Edit, AlertTriangle, Trash2 } from "lucide-react";
+import { ArrowLeft, Edit, AlertTriangle, Trash2, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { OpportunityCalendar } from "@/components/OpportunityCalendar";
 import { OpportunityTimeline } from "@/components/OpportunityTimeline";
@@ -20,19 +20,24 @@ import { OpportunityTimeline } from "@/components/OpportunityTimeline";
 interface Opportunity {
   id: string;
   name: string;
-  description: string | null;
+  company_id: string;
   stage: string;
   status: string;
-  company_id: string;
-  contact_id: string | null;
+  expected_fee_value: number | null;
   tender_due_date: string | null;
+  tender_received_date: string | null;
+  submitted_date: string | null;
   expected_start_date: string | null;
   expected_end_date: string | null;
-  expected_fee_value: number | null;
   probability_percent: number | null;
-  added_by_user_id: string | null;
+  project_reference: string | null;
+  description: string | null;
+  created_at: string;
+  created_by_user_id: string;
+  added_by_user_id?: string;
   linked_project_id: string | null;
   companies?: {
+    id: string;
     name: string;
   };
   contacts?: {
@@ -46,7 +51,7 @@ interface Opportunity {
     id: string;
     code: string;
     name: string;
-  } | null;
+  };
 }
 
 interface User {
@@ -75,6 +80,20 @@ function OpportunityDetailContent() {
     expected_fee_value: "",
     probability_percent: "",
     added_by_user_id: "",
+  });
+  const [editFormData, setEditFormData] = useState({
+    name: "",
+    stage: "",
+    status: "",
+    expected_fee_value: "",
+    tender_due_date: "",
+    tender_received_date: "",
+    submitted_date: "",
+    expected_start_date: "",
+    expected_end_date: "",
+    probability_percent: 0,
+    project_reference: "",
+    description: "",
   });
 
   // Everyone can edit, only directors/admins can delete
@@ -133,8 +152,10 @@ function OpportunityDetailContent() {
       if (fetchError) throw fetchError;
       if (!data) throw new Error("Opportunity not found");
 
-      const opportunityData = data as unknown as Opportunity;
+      // Cast to any first to avoid complex type mismatch with joined tables
+      const opportunityData = data as any;
       setOpportunity(opportunityData);
+      
       setEditData({
         name: opportunityData.name,
         description: opportunityData.description || "",
@@ -145,7 +166,21 @@ function OpportunityDetailContent() {
         expected_end_date: opportunityData.expected_end_date || "",
         expected_fee_value: opportunityData.expected_fee_value?.toString() || "",
         probability_percent: opportunityData.probability_percent?.toString() || "",
-        added_by_user_id: opportunityData.added_by_user_id || "",
+        added_by_user_id: opportunityData.added_by_user_id || opportunityData.created_by_user_id || "",
+      });
+      setEditFormData({
+        name: data.name,
+        stage: data.stage,
+        status: data.status,
+        expected_fee_value: data.expected_fee_value?.toString() || "",
+        tender_due_date: data.tender_due_date || "",
+        tender_received_date: data.tender_received_date || "",
+        submitted_date: data.submitted_date || "",
+        expected_start_date: data.expected_start_date || "",
+        expected_end_date: data.expected_end_date || "",
+        probability_percent: data.probability_percent || 0,
+        project_reference: data.project_reference || "",
+        description: data.description || "",
       });
     } catch (err) {
       console.error("Failed to load opportunity data", err);
@@ -202,6 +237,38 @@ function OpportunityDetailContent() {
     } catch (err) {
       console.error("Failed to delete opportunity", err);
       alert("Failed to delete opportunity");
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      const probability = 
+        editFormData.stage === "lead" ? 10 :
+        editFormData.stage === "bid" ? 25 :
+        editFormData.stage === "high_potential" ? 50 :
+        editFormData.stage === "secured" ? 100 :
+        editFormData.stage === "lost" ? 0 : editFormData.probability_percent;
+
+      const { error } = await supabase
+        .from("opportunities")
+        .update({
+          name: editFormData.name,
+          stage: editFormData.stage,
+          status: editFormData.status,
+          expected_fee_value: editFormData.expected_fee_value ? parseFloat(editFormData.expected_fee_value) : null,
+          tender_due_date: editFormData.tender_due_date || null,
+          tender_received_date: editFormData.tender_received_date || null,
+          submitted_date: editFormData.submitted_date || null,
+          expected_start_date: editFormData.expected_start_date || null,
+          expected_end_date: editFormData.expected_end_date || null,
+          probability_percent: probability,
+          project_reference: editFormData.project_reference || null,
+          description: editFormData.description || null,
+        })
+        .eq("id", id);
+    } catch (err) {
+      console.error("Failed to save opportunity", err);
+      alert("Failed to save opportunity");
     }
   };
 
@@ -468,23 +535,47 @@ function OpportunityDetailContent() {
                     </div>
                   )}
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                      <div className="text-sm font-medium text-slate-500">Expected Value</div>
-                      <div className="text-slate-900 font-semibold text-sm sm:text-base">{formatCurrency(opportunity.expected_fee_value)}</div>
-                    </div>
-                    
-                    {opportunity.probability_percent !== null && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {opportunity.project_reference && (
                       <div>
-                        <div className="text-sm font-medium text-slate-500">Probability</div>
-                        <div className="text-slate-900 text-sm sm:text-base">{opportunity.probability_percent}%</div>
+                        <div className="text-sm text-slate-600">Project Reference</div>
+                        <div className="font-medium font-mono">{opportunity.project_reference}</div>
+                      </div>
+                    )}
+                    
+                    <div>
+                      <div className="text-sm text-slate-600">Expected Value</div>
+                      <div className="font-medium">
+                        {opportunity.expected_fee_value ? formatCurrency(opportunity.expected_fee_value) : "—"}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-sm text-slate-600">Probability</div>
+                      <div className="font-medium">{opportunity.probability_percent || 0}%</div>
+                    </div>
+
+                    {opportunity.tender_received_date && (
+                      <div>
+                        <div className="text-sm text-slate-600">Tender Received</div>
+                        <div className="font-medium">{formatDate(opportunity.tender_received_date)}</div>
                       </div>
                     )}
 
                     {opportunity.tender_due_date && (
                       <div>
-                        <div className="text-sm font-medium text-slate-500">Tender Due</div>
-                        <div className="text-slate-900 text-sm sm:text-base">{formatDate(opportunity.tender_due_date)}</div>
+                        <div className="text-sm text-slate-600">Tender Due Date</div>
+                        <div className="font-medium">{formatDate(opportunity.tender_due_date)}</div>
+                      </div>
+                    )}
+
+                    {opportunity.submitted_date && (
+                      <div>
+                        <div className="text-sm text-slate-600">Submitted Date</div>
+                        <div className="font-medium text-green-700 flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4" />
+                          {formatDate(opportunity.submitted_date)}
+                        </div>
                       </div>
                     )}
                   </div>
