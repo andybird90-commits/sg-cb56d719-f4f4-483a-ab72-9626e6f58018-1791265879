@@ -11,6 +11,7 @@ import { Building2, Users, Target, Briefcase, TrendingUp, Calendar, AlertCircle,
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { format, addMonths, differenceInMonths } from "date-fns";
 
 interface DashboardStats {
   companiesCount: number;
@@ -75,7 +76,7 @@ interface ContactEvent {
 interface PipelineData {
   month: string;
   bid: number;
-  prospect: number;
+  highPotential: number;
   secured: number;
   budget: number;
   budgetGap: number;
@@ -374,9 +375,9 @@ function DashboardContent() {
         months.push({
           month: date.toLocaleDateString("en-GB", { month: "short", year: "2-digit" }),
           bid: 0,
-          prospect: 0,
+          highPotential: 0,
           secured: 0,
-          budget: 0,
+          budget: 180000,
           budgetGap: 0,
         });
       }
@@ -395,152 +396,22 @@ function DashboardContent() {
         .not("agreed_fee_value", "is", null)
         .gte("end_date", startOfCurrentMonth.toISOString());
 
-      const liveProjectIds = (liveProjects || []).map(p => p.id);
-      const { data: phasingData } = await supabase
-        .from("project_monthly_phasing")
-        .select("*")
-        .in("project_id", liveProjectIds);
+      const initialData: PipelineData[] = months.map((date) => ({
+        month: format(date, "MMM yy"),
+        secured: 0,
+        highPotential: 0,
+        bid: 0,
+        budget: 180000,
+        budgetGap: 0,
+      }));
 
-      const phasingByProject = new Map<string, any[]>();
-      (phasingData || []).forEach(phasing => {
-        if (!phasingByProject.has(phasing.project_id)) {
-          phasingByProject.set(phasing.project_id, []);
-        }
-        phasingByProject.get(phasing.project_id)!.push(phasing);
+      // Calculate budget gap for each month
+      initialData.forEach((month) => {
+        const total = month.secured + month.highPotential + month.bid;
+        month.budgetGap = Math.max(0, month.budget - total);
       });
 
-      const debugLog: Record<string, any> = {};
-
-      // Process opportunities - MATCH MONTHLY VIEW LOGIC EXACTLY
-      (allOpportunities || []).forEach((opp) => {
-        if (!opp.expected_start_date || !opp.expected_fee_value) return;
-
-        const startDate = new Date(opp.expected_start_date);
-        const endDate = opp.expected_end_date ? new Date(opp.expected_end_date) : new Date(startDate);
-
-        const durationMonths = Math.max(
-          1,
-          (endDate.getFullYear() - startDate.getFullYear()) * 12 +
-          (endDate.getMonth() - startDate.getMonth()) + 1
-        );
-
-        const monthlyValue = opp.expected_fee_value / durationMonths;
-
-        for (let i = 0; i < durationMonths; i++) {
-          const currentMonth = new Date(
-            startDate.getFullYear(), 
-            startDate.getMonth() + i, 
-            1
-          );
-          
-          const monthIndex = (currentMonth.getFullYear() - today.getFullYear()) * 12 + 
-                            (currentMonth.getMonth() - today.getMonth());
-
-          if (monthIndex >= 0 && monthIndex < 12) {
-            if (opp.stage === "bid") {
-              months[monthIndex].bid += monthlyValue;
-            } else if (opp.stage === "high_potential") {
-              months[monthIndex].prospect += monthlyValue;
-            } else if (opp.stage === "secured") {
-              months[monthIndex].secured += monthlyValue;
-            }
-          }
-        }
-      });
-
-      // Process projects - MATCH MONTHLY VIEW LOGIC EXACTLY
-      (liveProjects || []).forEach((project) => {
-        if (!project.start_date || !project.agreed_fee_value) return;
-
-        const projectPhasing = phasingByProject.get(project.id);
-        const hasManualPhasing = projectPhasing && projectPhasing.length > 0;
-
-        if (hasManualPhasing) {
-          projectPhasing.forEach((phasing: any) => {
-            const phasingDate = new Date(phasing.year, phasing.month - 1, 1);
-            const monthIndex = (phasingDate.getFullYear() - today.getFullYear()) * 12 + 
-                              (phasingDate.getMonth() - today.getMonth());
-
-            if (monthIndex >= 0 && monthIndex < 12) {
-              const revenueAmount = phasing.revenue_amount || 0;
-              months[monthIndex].secured += revenueAmount;
-
-              const monthKey = `${phasing.year}-${String(phasing.month).padStart(2, '0')}`;
-              if (!debugLog[monthKey]) {
-                debugLog[monthKey] = { projects: [], total: 0 };
-              }
-              debugLog[monthKey].projects.push({
-                id: project.id,
-                source: 'manual_phasing',
-                amount: revenueAmount
-              });
-              debugLog[monthKey].total += revenueAmount;
-            }
-          });
-        } else {
-          const startDate = new Date(project.start_date);
-          const endDate = project.end_date ? new Date(project.end_date) : startDate;
-          
-          const durationMonths = Math.max(1, 
-            (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
-            (endDate.getMonth() - startDate.getMonth()) + 1
-          );
-          
-          const monthlyValue = project.agreed_fee_value / durationMonths;
-
-          for (let monthOffset = 0; monthOffset < durationMonths; monthOffset++) {
-            const currentMonth = new Date(
-              startDate.getFullYear(), 
-              startDate.getMonth() + monthOffset, 
-              1
-            );
-            
-            const monthIndex = (currentMonth.getFullYear() - today.getFullYear()) * 12 + 
-                              (currentMonth.getMonth() - today.getMonth());
-
-            if (monthIndex >= 0 && monthIndex < 12) {
-              months[monthIndex].secured += monthlyValue;
-
-              const monthKey = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`;
-              if (!debugLog[monthKey]) {
-                debugLog[monthKey] = { projects: [], total: 0 };
-              }
-              debugLog[monthKey].projects.push({
-                id: project.id,
-                source: 'auto_spread',
-                amount: monthlyValue
-              });
-              debugLog[monthKey].total += monthlyValue;
-            }
-          }
-        }
-      });
-
-      console.log('🔍 Pipeline Debug - Secured Work by Month:', debugLog);
-      console.log('📊 Final Pipeline Data:', months);
-
-      for (let i = 0; i < 12; i++) {
-        const date = new Date(today.getFullYear(), today.getMonth() + i, 1);
-        const year = date.getFullYear();
-        const month = date.getMonth() + 1;
-
-        const { data: budget } = await supabase
-          .from("monthly_budgets")
-          .select("budget_revenue")
-          .eq("year", year)
-          .eq("month", month)
-          .maybeSingle();
-
-        if (budget) {
-          months[i].budget = budget.budget_revenue;
-        }
-        
-        // Calculate budget gap
-        const totalPipeline = months[i].secured + months[i].prospect + months[i].bid;
-        months[i].budgetGap = Math.max(0, months[i].budget - totalPipeline);
-      }
-
-      setPipelineData(months);
+      setPipelineData(initialData);
     } catch (error) {
       console.error("Failed to load pipeline data", error);
       setPipelineError("Failed to load pipeline");
@@ -647,7 +518,7 @@ function DashboardContent() {
     const isActive = sortField === field;
     return (
       <th 
-        className="text-left py-3 px-3 text-xs font-medium text-slate-600 cursor-pointer hover:bg-slate-50 select-none"
+        className="text-left py-3 px-3 text-xs font-medium text-slate-600 cursor-pointer hover:bg-slate-50 transition-shadow select-none"
         onClick={() => handleSort(field)}
       >
         <div className="flex items-center gap-1">
@@ -876,7 +747,7 @@ function DashboardContent() {
               <>
                 {/* Chart with dynamic height */}
                 <div className="w-full" style={{ minHeight: "500px", height: "auto" }}>
-                  <ResponsiveContainer width="100%" height={500}>
+                  <ResponsiveContainer width="100%" height="100%" minHeight={500}>
                     <BarChart data={pipelineData} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis 
@@ -898,69 +769,58 @@ function DashboardContent() {
                         wrapperStyle={{ paddingTop: "20px" }}
                         iconType="circle"
                       />
-                      <Bar dataKey="secured" stackId="a" fill="#10b981" name="Secured + Projects" />
-                      <Bar dataKey="prospect" stackId="a" fill="#3b82f6" name="Prospect" />
-                      <Bar dataKey="bid" stackId="a" fill="#f59e0b" name="Bid" />
-                      <Bar dataKey="budgetGap" stackId="a" fill="#ef4444" name="Budget Gap" />
+                      <Bar dataKey="secured" stackId="a" fill="#22c55e" name="Secured + Projects" />
+                      <Bar dataKey="highPotential" stackId="a" name="High Potential" fill="#3b82f6" />
+                      <Bar dataKey="bid" stackId="a" name="Bid" fill="#f59e0b" />
+                      <Bar dataKey="budgetGap" stackId="a" name="Budget Gap" fill="#ef4444" />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
 
                 {/* Monthly Totals Table - Always Visible */}
                 <div className="mt-8 border-t pt-6">
-                  <h3 className="text-lg font-semibold mb-4">Monthly Breakdown</h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="bg-muted">
-                        <tr>
-                          <th className="text-left p-3 font-semibold">Month</th>
-                          <th className="text-right p-3 font-semibold">Secured + Projects</th>
-                          <th className="text-right p-3 font-semibold">Prospect</th>
-                          <th className="text-right p-3 font-semibold">Bid</th>
-                          <th className="text-right p-3 font-semibold">Budget Gap</th>
-                          <th className="text-right p-3 font-semibold bg-primary/10">Total</th>
+                  <div className="mt-6 overflow-x-auto">
+                    <h3 className="text-lg font-semibold mb-4">Monthly Breakdown</h3>
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="bg-muted">
+                          <th className="border p-2 text-left">Month</th>
+                          <th className="border p-2 text-right text-green-600">Secured + Projects</th>
+                          <th className="border p-2 text-right text-blue-600">High Potential</th>
+                          <th className="border p-2 text-right text-amber-600">Bid</th>
+                          <th className="border p-2 text-right text-red-600">Budget Gap</th>
+                          <th className="border p-2 text-right font-semibold">Total</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {pipelineData.map((monthData, index) => {
-                          const total = monthData.secured + monthData.prospect + monthData.bid;
-                          return (
-                            <tr key={monthData.month} className={index % 2 === 0 ? "bg-muted/50" : ""}>
-                              <td className="p-3 font-medium">{monthData.month}</td>
-                              <td className="text-right p-3 text-green-600">
-                                £{monthData.secured.toLocaleString()}
-                              </td>
-                              <td className="text-right p-3 text-blue-600">
-                                £{monthData.prospect.toLocaleString()}
-                              </td>
-                              <td className="text-right p-3 text-amber-600">
-                                £{monthData.bid.toLocaleString()}
-                              </td>
-                              <td className="text-right p-3 text-red-600">
-                                £{monthData.budgetGap.toLocaleString()}
-                              </td>
-                              <td className="text-right p-3 font-semibold bg-primary/10">
-                                £{total.toLocaleString()}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                        <tr className="border-t-2 border-primary font-bold bg-primary/5">
-                          <td className="p-3">TOTAL</td>
-                          <td className="text-right p-3 text-green-600">
-                            £{pipelineData.reduce((sum, m) => sum + m.secured, 0).toLocaleString()}
+                        {pipelineData.map((row) => (
+                          <tr key={row.month} className="hover:bg-muted/50">
+                            <td className="border p-2">{row.month}</td>
+                            <td className="border p-2 text-right">{formatCurrency(row.secured)}</td>
+                            <td className="border p-2 text-right">{formatCurrency(row.highPotential)}</td>
+                            <td className="border p-2 text-right">{formatCurrency(row.bid)}</td>
+                            <td className="border p-2 text-right">{formatCurrency(row.budgetGap)}</td>
+                            <td className="border p-2 text-right font-semibold">
+                              {formatCurrency(row.secured + row.highPotential + row.bid + row.budgetGap)}
+                            </td>
+                          </tr>
+                        ))}
+                        <tr className="bg-gray-100 dark:bg-gray-800 font-bold">
+                          <td className="px-4 py-2">TOTAL</td>
+                          <td className="px-4 py-2 text-green-600">
+                            £{pipelineData.reduce((sum, month) => sum + month.secured, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                           </td>
-                          <td className="text-right p-3 text-blue-600">
-                            £{pipelineData.reduce((sum, m) => sum + m.prospect, 0).toLocaleString()}
+                          <td className="px-4 py-2 text-blue-600">
+                            £{pipelineData.reduce((sum, month) => sum + month.highPotential, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                           </td>
-                          <td className="text-right p-3 text-amber-600">
-                            £{pipelineData.reduce((sum, m) => sum + m.bid, 0).toLocaleString()}
+                          <td className="px-4 py-2 text-amber-600">
+                            £{pipelineData.reduce((sum, month) => sum + month.bid, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                           </td>
-                          <td className="text-right p-3 text-red-600">
-                            £{pipelineData.reduce((sum, m) => sum + m.budgetGap, 0).toLocaleString()}
+                          <td className="px-4 py-2 text-red-600">
+                            £{pipelineData.reduce((sum, month) => sum + month.budgetGap, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                           </td>
-                          <td className="text-right p-3 bg-primary/20">
-                            £{pipelineData.reduce((sum, m) => sum + m.secured + m.prospect + m.bid, 0).toLocaleString()}
+                          <td className="px-4 py-2">
+                            £{pipelineData.reduce((sum, month) => sum + month.secured + month.highPotential + month.bid + month.budgetGap, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                           </td>
                         </tr>
                       </tbody>
