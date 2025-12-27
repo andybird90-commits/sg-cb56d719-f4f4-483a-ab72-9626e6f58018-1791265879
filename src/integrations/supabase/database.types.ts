@@ -477,6 +477,44 @@ export type Database = {
           },
         ]
       }
+      opportunity_monthly_phasing: {
+        Row: {
+          created_at: string | null
+          id: string
+          month: number
+          opportunity_id: string
+          revenue_amount: number
+          updated_at: string | null
+          year: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          month: number
+          opportunity_id: string
+          revenue_amount?: number
+          updated_at?: string | null
+          year: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          month?: number
+          opportunity_id?: string
+          revenue_amount?: number
+          updated_at?: string | null
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_monthly_phasing_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       opportunity_timeline: {
         Row: {
           content: string
