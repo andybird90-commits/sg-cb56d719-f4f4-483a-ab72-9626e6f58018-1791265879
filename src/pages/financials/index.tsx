@@ -116,8 +116,8 @@ function FinancialsContent() {
           start_date,
           end_date,
           agreed_fee_value,
-          company_id,
-          companies!projects_company_id_fkey (
+          client_company_id,
+          companies!projects_client_company_id_fkey (
             name
           )
         `)
