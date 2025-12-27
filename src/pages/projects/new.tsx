@@ -41,6 +41,7 @@ function NewProjectContent() {
     status: "live",
     agreed_fee_value: "",
     notes: "",
+    project_reference: "",
   });
 
   useEffect(() => {
@@ -48,6 +49,12 @@ function NewProjectContent() {
       router.push("/projects");
     }
     fetchData();
+    
+    // If coming from an opportunity, pre-populate the project reference
+    const opportunityId = router.query.opportunity_id as string;
+    if (opportunityId) {
+      fetchOpportunityData(opportunityId);
+    }
   }, [profile, router]);
 
   const fetchData = async () => {
@@ -66,6 +73,24 @@ function NewProjectContent() {
     if (opportunitiesData) setOpportunities(opportunitiesData);
   };
 
+  const fetchOpportunityData = async (opportunityId: string) => {
+    const { data } = await supabase
+      .from("opportunities")
+      .select("name, project_reference, client_company_id")
+      .eq("id", opportunityId)
+      .single();
+    
+    if (data) {
+      setFormData(prev => ({
+        ...prev,
+        opportunity_id: opportunityId,
+        name: data.name,
+        project_reference: data.project_reference || "",
+        client_company_id: data.client_company_id || "",
+      }));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -82,6 +107,7 @@ function NewProjectContent() {
         end_date: formData.end_date || null,
         agreed_fee_value: formData.agreed_fee_value ? parseFloat(formData.agreed_fee_value) : null,
         notes: formData.notes || null,
+        project_reference: formData.project_reference || null,
       };
 
       const { data, error: insertError } = await supabase
@@ -200,6 +226,17 @@ function NewProjectContent() {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
+                  className="h-10 sm:h-11"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="project_reference" className="text-sm sm:text-base">Project Reference</Label>
+                <Input
+                  id="project_reference"
+                  value={formData.project_reference}
+                  onChange={(e) => setFormData({ ...formData, project_reference: e.target.value })}
+                  placeholder="e.g., PRJ-2025-001"
                   className="h-10 sm:h-11"
                 />
               </div>

@@ -241,6 +241,8 @@ function OpportunityDetailContent() {
   };
 
   const handleSave = async () => {
+    if (!id || typeof id !== "string") return;
+    
     try {
       const probability = 
         editFormData.stage === "lead" ? 10 :
@@ -266,6 +268,11 @@ function OpportunityDetailContent() {
           description: editFormData.description || null,
         })
         .eq("id", id);
+
+      if (error) throw error;
+      
+      await fetchOpportunity(id);
+      setIsEditing(false);
     } catch (err) {
       console.error("Failed to save opportunity", err);
       alert("Failed to save opportunity");
