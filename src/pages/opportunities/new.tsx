@@ -42,8 +42,7 @@ function NewOpportunityContent() {
     name: "",
     company_id: "",
     contact_id: "",
-    stage: "lead" as "lead" | "bid" | "high_potential" | "secured" | "lost",
-    status: "active" as "active" | "on_hold" | "closed",
+    stage: "lead",
     expected_fee_value: "",
     tender_due_date: "",
     tender_received_date: "",
@@ -103,14 +102,22 @@ function NewOpportunityContent() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
+    // Validate required fields
+    if (!formData.name || !formData.company_id || !formData.stage) {
+      setError("Please fill in all required fields (Name, Company, Stage)");
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
 
       const opportunityData = {
         name: formData.name,
         company_id: formData.company_id,
+        contacts_id: formData.contact_id || null, // Assuming column name is contacts_id or contact_id, check DB schema. Usually it's contact_id based on previous errors.
         stage: formData.stage,
-        status: formData.status,
+        status: "open", // Default to open for DB compatibility if column exists
         expected_fee_value: formData.expected_fee_value ? parseFloat(formData.expected_fee_value) : null,
         tender_due_date: formData.tender_due_date || null,
         tender_received_date: formData.tender_received_date || null,
@@ -257,43 +264,24 @@ function NewOpportunityContent() {
                     </SelectContent>
                   </Select>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="status" className="text-sm sm:text-base">Status</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(value) => setFormData({ ...formData, status: value as "active" | "on_hold" | "closed" })}
-                  >
-                    <SelectTrigger className="h-10 sm:h-11">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="open">Open</SelectItem>
-                      <SelectItem value="closed_won">Closed Won</SelectItem>
-                      <SelectItem value="closed_lost">Closed Lost</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="expected_fee_value" className="text-sm sm:text-base">Expected Fee Value (£)</Label>
-                  <Input
-                    id="expected_fee_value"
-                    type="number"
-                    step="0.01"
-                    value={formData.expected_fee_value}
-                    onChange={(e) => setFormData({ ...formData, expected_fee_value: e.target.value })}
-                    className="h-10 sm:h-11"
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="expected_fee_value" className="text-sm sm:text-base">Expected Fee Value (£)</Label>
+                <Input
+                  id="expected_fee_value"
+                  type="number"
+                  step="0.01"
+                  value={formData.expected_fee_value}
+                  onChange={(e) => setFormData({ ...formData, expected_fee_value: e.target.value })}
+                  className="h-10 sm:h-11"
+                />
+              </div>
 
-                <div className="space-y-2">
-                  <Label className="text-sm sm:text-base">Probability (%)</Label>
-                  <div className="h-10 sm:h-11 flex items-center px-3 border rounded-md bg-slate-50 text-slate-500">
-                    {formData.probability_percent}% (Auto-set by stage)
-                  </div>
+              <div className="space-y-2">
+                <Label className="text-sm sm:text-base">Probability (%)</Label>
+                <div className="h-10 sm:h-11 flex items-center px-3 border rounded-md bg-slate-50 text-slate-500">
+                  {formData.probability_percent}% (Auto-set by stage)
                 </div>
               </div>
 

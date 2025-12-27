@@ -74,19 +74,20 @@ function NewProjectContent() {
   };
 
   const fetchOpportunityData = async (opportunityId: string) => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("opportunities")
       .select("name, project_reference, client_company_id")
       .eq("id", opportunityId)
       .single();
     
     if (data) {
+      const oppData = data as any;
       setFormData(prev => ({
         ...prev,
         opportunity_id: opportunityId,
-        name: data.name,
-        project_reference: data.project_reference || "",
-        client_company_id: data.client_company_id || "",
+        name: oppData.name,
+        project_reference: oppData.project_reference || "",
+        client_company_id: oppData.client_company_id || "",
       }));
     }
   };

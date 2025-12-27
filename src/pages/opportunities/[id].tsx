@@ -84,7 +84,6 @@ function OpportunityDetailContent() {
   const [editFormData, setEditFormData] = useState({
     name: "",
     stage: "",
-    status: "",
     expected_fee_value: "",
     tender_due_date: "",
     tender_received_date: "",
@@ -170,8 +169,7 @@ function OpportunityDetailContent() {
       });
       setEditFormData({
         name: opportunityData.name,
-        stage: opportunityData.stage,
-        status: opportunityData.status,
+        stage: opportunityData.stage as any, // Cast to any to avoid strict union type mismatch
         expected_fee_value: opportunityData.expected_fee_value?.toString() || "",
         tender_due_date: opportunityData.tender_due_date || "",
         tender_received_date: opportunityData.tender_received_date || "",
@@ -201,7 +199,6 @@ function OpportunityDetailContent() {
           name: editData.name,
           description: editData.description || null,
           stage: editData.stage as any,
-          status: editData.status as any,
           tender_due_date: editData.tender_due_date || null,
           expected_start_date: editData.expected_start_date || null,
           expected_end_date: editData.expected_end_date || null,
@@ -256,7 +253,6 @@ function OpportunityDetailContent() {
         .update({
           name: editFormData.name,
           stage: editFormData.stage,
-          status: editFormData.status,
           expected_fee_value: editFormData.expected_fee_value ? parseFloat(editFormData.expected_fee_value) : null,
           tender_due_date: editFormData.tender_due_date || null,
           tender_received_date: editFormData.tender_received_date || null,
@@ -348,7 +344,6 @@ function OpportunityDetailContent() {
                 <Badge className={getStageColor(opportunity.stage)}>
                   {opportunity.stage.replace("_", " ")}
                 </Badge>
-                <Badge variant="outline">{opportunity.status}</Badge>
               </div>
               <div className="flex items-center gap-2">
                 {canEdit && !isEditing && (
@@ -395,7 +390,7 @@ function OpportunityDetailContent() {
                       <Label htmlFor="edit-stage">Stage</Label>
                       <Select
                         value={editData.stage}
-                        onValueChange={(value) => setEditData({ ...editData, stage: value })}
+                        onValueChange={(value) => setEditData({ ...editData, stage: value as any })}
                       >
                         <SelectTrigger id="edit-stage">
                           <SelectValue />
@@ -406,26 +401,6 @@ function OpportunityDetailContent() {
                           <SelectItem value="high_potential">High Potential</SelectItem>
                           <SelectItem value="secured">Won</SelectItem>
                           <SelectItem value="lost">Lost</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="status" className="text-sm sm:text-base">Status</Label>
-                      <Select
-                        value={editData.status}
-                        onValueChange={(value) => setEditData({ ...editData, status: value })}
-                      >
-                        <SelectTrigger className="h-10 sm:h-11">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="on_hold">On Hold</SelectItem>
-                          <SelectItem value="closed">Closed</SelectItem>
-                          <SelectItem value="open">Open</SelectItem>
-                          <SelectItem value="closed_won">Closed Won</SelectItem>
-                          <SelectItem value="closed_lost">Closed Lost</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

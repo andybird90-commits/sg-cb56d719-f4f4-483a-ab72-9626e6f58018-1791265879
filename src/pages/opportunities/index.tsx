@@ -94,8 +94,7 @@ function OpportunitiesContent() {
       return (
         opp.name.toLowerCase().includes(searchLower) ||
         opp.companies?.name.toLowerCase().includes(searchLower) ||
-        opp.stage.toLowerCase().includes(searchLower) ||
-        opp.status.toLowerCase().includes(searchLower)
+        opp.stage.toLowerCase().includes(searchLower)
       );
     });
 
@@ -147,7 +146,7 @@ function OpportunitiesContent() {
             <p className="text-sm text-slate-600">{opportunity.companies?.name}</p>
           </div>
           <Badge className={getStageColor(opportunity.stage)}>
-            {opportunity.stage === "high_potential" ? "High Potential" : opportunity.stage}
+            {opportunity.stage.replace("_", " ")}
           </Badge>
         </div>
       </CardHeader>
