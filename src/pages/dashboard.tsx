@@ -21,6 +21,15 @@ interface DashboardStats {
   liveProjectsCount: number;
 }
 
+interface PipelineData {
+  month: string;
+  bid: number;
+  highPotential: number;
+  secured: number;
+  budget: number;
+  budgetGap: number;
+}
+
 interface Opportunity {
   id: string;
   name: string;
@@ -73,23 +82,6 @@ interface ContactEvent {
   };
 }
 
-interface PipelineData {
-  month: string;
-  bid: number;
-  highPotential: number;
-  secured: number;
-  budget: number;
-  budgetGap: number;
-}
-
-interface PhasingData {
-  opportunity_id?: string;
-  project_id?: string;
-  year: number;
-  month: number;
-  revenue_amount: number;
-}
-
 type SortField = "name" | "company" | "stage" | "value" | "due_date" | "start_date" | "end_date" | "probability" | "created_at";
 type SortDirection = "asc" | "desc";
 
@@ -122,11 +114,6 @@ function DashboardContent() {
   const [latestOpportunitiesLoading, setLatestOpportunitiesLoading] = useState(true);
   const [latestOpportunitiesError, setLatestOpportunitiesError] = useState<string | null>(null);
   const [latestOpportunities, setLatestOpportunities] = useState<LatestOpportunity[]>([]);
-
-  const [pipelineLoading, setPipelineLoading] = useState(true);
-  const [pipelineError, setPipelineError] = useState<string | null>(null);
-  const [pipelineData, setPipelineData] = useState<PipelineData[]>([]);
-  const [pipelineView, setPipelineView] = useState<"all" | "secured_prospects" | "secured">("all");
 
   const [opportunitiesTableLoading, setOpportunitiesTableLoading] = useState(true);
   const [opportunitiesTableError, setOpportunitiesTableError] = useState<string | null>(null);
@@ -419,55 +406,8 @@ function DashboardContent() {
         projects: projects?.length || 0,
       });
 
-      // Fetch phasing data for opportunities
-      const opportunityIds = opportunities?.map((o) => o.id) || [];
-      const { data: opportunityPhasingData } = await supabase
-        .from("opportunity_monthly_phasing" as any)
-        .select("opportunity_id, year, month, revenue_amount")
-        .in("opportunity_id", opportunityIds);
-      
-      const opportunityPhasing = opportunityPhasingData as unknown as PhasingData[];
-
-      // Create phasing maps
-      const oppPhasingMap = new Map<string, Array<{ year: number; month: number; revenue_amount: number }>>();
-      opportunityPhasing?.forEach((phase) => {
-        if (phase.opportunity_id && !oppPhasingMap.has(phase.opportunity_id)) {
-          oppPhasingMap.set(phase.opportunity_id, []);
-        }
-        if (phase.opportunity_id) {
-          oppPhasingMap.get(phase.opportunity_id)?.push({
-            year: phase.year,
-            month: phase.month,
-            revenue_amount: phase.revenue_amount,
-          });
-        }
-      });
-
-      // Fetch phasing data for projects
-      const projectIds = projects?.map((p) => p.id) || [];
-      const { data: projectPhasingData } = await supabase
-        .from("project_monthly_phasing" as any)
-        .select("project_id, year, month, revenue_amount")
-        .in("project_id", projectIds);
-        
-      const projectPhasing = projectPhasingData as unknown as PhasingData[];
-
-      const projPhasingMap = new Map<string, Array<{ year: number; month: number; revenue_amount: number }>>();
-      projectPhasing?.forEach((phase) => {
-        if (phase.project_id && !projPhasingMap.has(phase.project_id)) {
-          projPhasingMap.set(phase.project_id, []);
-        }
-        if (phase.project_id) {
-          projPhasingMap.get(phase.project_id)?.push({
-            year: phase.year,
-            month: phase.month,
-            revenue_amount: phase.revenue_amount,
-          });
-        }
-      });
-
-      // Process opportunities
-      opportunities.forEach((opp) => {
+      // Process opportunities - EXACT SAME LOGIC AS MONTHLY VIEW
+      opportunities?.forEach((opp) => {
         if (!opp.expected_start_date || !opp.expected_end_date || !opp.expected_fee_value) {
           return;
         }
@@ -477,55 +417,34 @@ function DashboardContent() {
         const totalValue = opp.expected_fee_value;
         const stage = opp.stage;
 
-        // Check if this opportunity has phasing data
-        const phasingData = oppPhasingMap.get(opp.id);
+        // MATCH MONTHLY VIEW: Use same duration calculation
+        const durationMonths = Math.max(1, 
+          (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
+          (endDate.getMonth() - startDate.getMonth()) + 1
+        );
 
-        if (phasingData && phasingData.length > 0) {
-          // Use manual phasing data
-          phasingData.forEach((phase) => {
-            const monthIndex = differenceInMonths(
-              new Date(phase.year, phase.month - 1),
-              startOfCurrentMonth
-            );
+        const monthlyValue = totalValue / durationMonths;
 
-            if (monthIndex >= 0 && monthIndex < initialData.length) {
-              const monthData = initialData[monthIndex];
-              const amount = phase.revenue_amount;
+        // Add to each relevant month
+        monthDates.forEach((monthDate, idx) => {
+          const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+          const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
 
-              if (stage === "secured") {
-                monthData.secured += amount;
-              } else if (stage === "high_potential") {
-                monthData.highPotential += amount;
-              } else if (stage === "bid") {
-                monthData.bid += amount;
-              }
-            }
-          });
-        } else {
-          // Fall back to even distribution based on dates (no phasing data)
-          const monthsDuration = differenceInMonths(endDate, startDate) + 1;
-          const monthlyValue = totalValue / monthsDuration;
+          if (startDate <= monthEnd && endDate >= monthStart) {
+            const monthData = initialData[idx];
 
-          for (let i = 0; i < monthsDuration; i++) {
-            const currentMonth = addMonths(startDate, i);
-            const monthIndex = differenceInMonths(currentMonth, startOfCurrentMonth);
-
-            if (monthIndex >= 0 && monthIndex < initialData.length) {
-              const monthData = initialData[monthIndex];
-
-              if (stage === "secured") {
-                monthData.secured += monthlyValue;
-              } else if (stage === "high_potential") {
-                monthData.highPotential += monthlyValue;
-              } else if (stage === "bid") {
-                monthData.bid += monthlyValue;
-              }
+            if (stage === "secured") {
+              monthData.secured += monthlyValue;
+            } else if (stage === "high_potential") {
+              monthData.highPotential += monthlyValue;
+            } else if (stage === "bid") {
+              monthData.bid += monthlyValue;
             }
           }
-        }
+        });
       });
 
-      // Process projects with phasing fallback
+      // Process projects - EXACT SAME LOGIC AS MONTHLY VIEW
       projects?.forEach((proj) => {
         if (!proj.start_date || !proj.end_date || !proj.agreed_fee_value) {
           return;
@@ -535,38 +454,23 @@ function DashboardContent() {
         const endDate = new Date(proj.end_date);
         const totalValue = proj.agreed_fee_value;
 
-        // Check if this project has phasing data
-        const phasingData = projPhasingMap.get(proj.id);
+        // MATCH MONTHLY VIEW: Use same duration calculation
+        const durationMonths = Math.max(1, 
+          (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
+          (endDate.getMonth() - startDate.getMonth()) + 1
+        );
 
-        if (phasingData && phasingData.length > 0) {
-          // Use manual phasing data
-          phasingData.forEach((phase) => {
-            const monthIndex = differenceInMonths(
-              new Date(phase.year, phase.month - 1),
-              startOfCurrentMonth
-            );
+        const monthlyValue = totalValue / durationMonths;
 
-            if (monthIndex >= 0 && monthIndex < initialData.length) {
-              const amount = phase.revenue_amount;
-              if (amount > 0) {
-                initialData[monthIndex].secured += amount;
-              }
-            }
-          });
-        } else {
-          // Fall back to even distribution based on dates (no phasing data)
-          const monthsDuration = differenceInMonths(endDate, startDate) + 1;
-          const monthlyValue = totalValue / monthsDuration;
+        // Add to each relevant month
+        monthDates.forEach((monthDate, idx) => {
+          const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+          const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
 
-          for (let i = 0; i < monthsDuration; i++) {
-            const currentMonth = addMonths(startDate, i);
-            const monthIndex = differenceInMonths(currentMonth, startOfCurrentMonth);
-
-            if (monthIndex >= 0 && monthIndex < initialData.length) {
-              initialData[monthIndex].secured += monthlyValue;
-            }
+          if (startDate <= monthEnd && endDate >= monthStart) {
+            initialData[idx].secured += monthlyValue;
           }
-        }
+        });
       });
 
       // Calculate budget gap for each month
