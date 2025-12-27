@@ -57,6 +57,31 @@ export default function PipelinePage() {
             </CardContent>
           </Card>
 
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <BarChart3 className="h-6 w-6 text-green-600" />
+                </div>
+                <CardTitle>Monthly View</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-slate-600 text-sm mb-4">
+                See projects organized by month with expected turnover values. Rolling 12-month view.
+              </p>
+              <Button 
+                onClick={() => router.push("/pipeline/monthly")}
+                className="w-full"
+                variant="default"
+              >
+                View Monthly
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card className="hover:shadow-lg transition-shadow opacity-60">
             <CardHeader>
               <div className="flex items-center gap-3">
