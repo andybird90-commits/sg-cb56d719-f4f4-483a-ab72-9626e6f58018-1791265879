@@ -4,6 +4,10 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { FileDown } from "lucide-react";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 interface GanttItem {
   id: string;
@@ -20,10 +24,100 @@ function PipelineGanttContent() {
   const [items, setItems] = useState<GanttItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     fetchGanttData();
   }, []);
+
+  const exportToPDF = async () => {
+    try {
+      setExporting(true);
+
+      // Create new PDF document (landscape for better fit)
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: "a4",
+      });
+
+      // Add title page
+      pdf.setFontSize(20);
+      pdf.text("Pipeline Report", 148, 20, { align: "center" });
+      pdf.setFontSize(12);
+      pdf.text(new Date().toLocaleDateString("en-GB"), 148, 30, { align: "center" });
+
+      // Capture Gantt Chart
+      const ganttElement = document.getElementById("gantt-view");
+      if (ganttElement) {
+        const ganttCanvas = await html2canvas(ganttElement, {
+          scale: 2,
+          logging: false,
+          useCORS: true,
+        });
+
+        const ganttImgData = ganttCanvas.toDataURL("image/png");
+        const ganttImgWidth = 277; // A4 landscape width in mm (minus margins)
+        const ganttImgHeight = (ganttCanvas.height * ganttImgWidth) / ganttCanvas.width;
+
+        pdf.addPage();
+        pdf.setFontSize(16);
+        pdf.text("Gantt Chart View", 148, 15, { align: "center" });
+        pdf.addImage(ganttImgData, "PNG", 10, 25, ganttImgWidth, Math.min(ganttImgHeight, 170));
+      }
+
+      // Fetch and capture Monthly View
+      const monthlyResponse = await fetch("/pipeline/monthly");
+      if (monthlyResponse.ok) {
+        // Open monthly view in hidden iframe to capture it
+        const iframe = document.createElement("iframe");
+        iframe.style.position = "absolute";
+        iframe.style.left = "-9999px";
+        iframe.style.width = "1200px";
+        iframe.style.height = "800px";
+        document.body.appendChild(iframe);
+
+        iframe.src = "/pipeline/monthly";
+
+        // Wait for iframe to load
+        await new Promise((resolve) => {
+          iframe.onload = resolve;
+        });
+
+        // Give it time to render
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        const monthlyElement = iframe.contentDocument?.getElementById("monthly-view");
+        if (monthlyElement) {
+          const monthlyCanvas = await html2canvas(monthlyElement, {
+            scale: 2,
+            logging: false,
+            useCORS: true,
+          });
+
+          const monthlyImgData = monthlyCanvas.toDataURL("image/png");
+          const monthlyImgWidth = 277;
+          const monthlyImgHeight = (monthlyCanvas.height * monthlyImgWidth) / monthlyCanvas.width;
+
+          pdf.addPage();
+          pdf.setFontSize(16);
+          pdf.text("Monthly View", 148, 15, { align: "center" });
+          pdf.addImage(monthlyImgData, "PNG", 10, 25, monthlyImgWidth, Math.min(monthlyImgHeight, 170));
+        }
+
+        document.body.removeChild(iframe);
+      }
+
+      // Save PDF
+      const fileName = `pipeline-report-${new Date().toISOString().split("T")[0]}.pdf`;
+      pdf.save(fileName);
+    } catch (err) {
+      console.error("Failed to export PDF", err);
+      alert("Failed to export PDF. Please try again.");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const fetchGanttData = async () => {
     try {
@@ -195,16 +289,27 @@ function PipelineGanttContent() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Pipeline Gantt</h1>
-          <p className="text-slate-600 mt-1">Visual timeline of opportunities and projects</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900">Pipeline Gantt</h1>
+            <p className="text-slate-600 mt-1">Visual timeline of opportunities and projects</p>
+          </div>
+          <Button 
+            onClick={exportToPDF}
+            disabled={exporting || loading}
+            variant="outline"
+            className="gap-2"
+          >
+            <FileDown className="h-4 w-4" />
+            {exporting ? "Exporting..." : "Export to PDF"}
+          </Button>
         </div>
 
         <Card>
           <CardHeader>
             <CardTitle>Timeline View</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent id="gantt-view">
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="text-slate-600">Loading timeline...</div>
