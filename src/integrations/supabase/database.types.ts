@@ -322,7 +322,7 @@ export type Database = {
           id: string
           linked_project_id: string | null
           name: string
-          probability_percent: number | null
+          probability_percent: number
           project_reference: string | null
           stage: string
           status: string
@@ -346,7 +346,7 @@ export type Database = {
           id?: string
           linked_project_id?: string | null
           name: string
-          probability_percent?: number | null
+          probability_percent?: number
           project_reference?: string | null
           stage: string
           status?: string
@@ -370,7 +370,7 @@ export type Database = {
           id?: string
           linked_project_id?: string | null
           name?: string
-          probability_percent?: number | null
+          probability_percent?: number
           project_reference?: string | null
           stage?: string
           status?: string

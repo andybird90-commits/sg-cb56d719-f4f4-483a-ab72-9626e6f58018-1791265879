@@ -112,28 +112,29 @@ function NewOpportunityContent() {
     try {
       setLoading(true);
 
-      const opportunityData = {
-        name: formData.name,
-        company_id: formData.company_id,
-        contacts_id: formData.contact_id || null, // Assuming column name is contacts_id or contact_id, check DB schema. Usually it's contact_id based on previous errors.
-        stage: formData.stage,
-        status: "open", // Default to open for DB compatibility if column exists
-        expected_fee_value: formData.expected_fee_value ? parseFloat(formData.expected_fee_value) : null,
-        tender_due_date: formData.tender_due_date || null,
-        tender_received_date: formData.tender_received_date || null,
-        submitted_date: formData.submitted_date || null,
-        expected_start_date: formData.expected_start_date || null,
-        expected_end_date: formData.expected_end_date || null,
-        probability_percent: formData.probability_percent,
-        project_reference: formData.project_reference || null,
-        description: formData.description || null,
-        created_by_user_id: formData.added_by_user_id || user.id,
-      };
+      const { data, error } = await supabase
+        .from("opportunities" as any)
+        .insert({
+          name: formData.name,
+          company_id: formData.company_id,
+          contact_id: formData.contact_id, // Fixed: was 'contacts_id', should be 'contact_id'
+          stage: formData.stage,
+          expected_fee_value: formData.expected_fee_value ? parseFloat(formData.expected_fee_value) : null,
+          tender_due_date: formData.tender_due_date || null,
+          tender_received_date: formData.tender_received_date || null,
+          submitted_date: formData.submitted_date || null,
+          expected_start_date: formData.expected_start_date || null,
+          expected_end_date: formData.expected_end_date || null,
+          project_reference: formData.project_reference || null,
+          description: formData.description || null,
+          created_by_user_id: user?.id,
+          added_by_user_id: user?.id,
+        })
+        .select()
+        .single();
 
-      const { error: insertError } = await supabase.from("opportunities").insert([opportunityData as any]);
-
-      if (insertError) {
-        setError(insertError.message);
+      if (error) {
+        setError(error.message);
         setLoading(false);
         return;
       }

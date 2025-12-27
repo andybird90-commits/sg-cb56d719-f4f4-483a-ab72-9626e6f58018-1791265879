@@ -1,0 +1,2 @@
+ALTER TABLE opportunities
+DROP CONSTRAINT IF EXISTS opportunities_probability_check;

@@ -85,14 +85,14 @@ function OpportunityDetailContent() {
     name: "",
     stage: "",
     expected_fee_value: "",
+    expected_start_date: "",
+    expected_end_date: "",
     tender_due_date: "",
     tender_received_date: "",
     submitted_date: "",
-    expected_start_date: "",
-    expected_end_date: "",
-    probability_percent: 0,
     project_reference: "",
     description: "",
+    added_by_user_id: "",
   });
 
   // Everyone can edit, only directors/admins can delete
@@ -155,11 +155,8 @@ function OpportunityDetailContent() {
         tender_due_date: opportunityData.tender_due_date || "",
         tender_received_date: opportunityData.tender_received_date || "",
         submitted_date: opportunityData.submitted_date || "",
-        probability_percent: opportunityData.probability_percent || 0,
         project_reference: opportunityData.project_reference || "",
         description: opportunityData.description || "",
-        company_id: opportunityData.company_id || "",
-        contact_id: opportunityData.contact_id || "",
         added_by_user_id: opportunityData.added_by_user_id || opportunityData.created_by_user_id || "",
       });
     } catch (err) {
@@ -221,39 +218,41 @@ function OpportunityDetailContent() {
 
   const handleSave = async () => {
     if (!id || typeof id !== "string") return;
-    
+
     try {
+      // Calculate probability based on stage - ALWAYS enforce the rules
       const probability = 
-        editFormData.stage === "lead" ? 10 :
-        editFormData.stage === "bid" ? 25 :
-        editFormData.stage === "high_potential" ? 50 :
-        editFormData.stage === "secured" ? 100 :
-        editFormData.stage === "lost" ? 0 : editFormData.probability_percent;
+        editFormData.stage === 'lead' ? 10 :
+        editFormData.stage === 'in_bid' ? 25 :
+        editFormData.stage === 'bid' ? 25 :
+        editFormData.stage === 'high_potential' ? 50 :
+        editFormData.stage === 'won' ? 100 :
+        editFormData.stage === 'secured' ? 100 :
+        editFormData.stage === 'lost' ? 0 : 50;
 
       const { error } = await supabase
-        .from("opportunities")
+        .from("opportunities" as any)
         .update({
           name: editFormData.name,
           stage: editFormData.stage as any,
+          probability_percent: probability,
           expected_fee_value: editFormData.expected_fee_value ? parseFloat(editFormData.expected_fee_value) : null,
+          expected_start_date: editFormData.expected_start_date || null,
+          expected_end_date: editFormData.expected_end_date || null,
           tender_due_date: editFormData.tender_due_date || null,
           tender_received_date: editFormData.tender_received_date || null,
           submitted_date: editFormData.submitted_date || null,
-          expected_start_date: editFormData.expected_start_date || null,
-          expected_end_date: editFormData.expected_end_date || null,
-          probability_percent: probability,
           project_reference: editFormData.project_reference || null,
           description: editFormData.description || null,
         })
         .eq("id", id);
 
       if (error) throw error;
-      
-      await fetchOpportunity(id);
+
       setIsEditing(false);
-    } catch (err) {
-      console.error("Failed to save opportunity", err);
-      alert("Failed to save opportunity");
+      fetchOpportunity(id);
+    } catch (error) {
+      console.error("Error saving opportunity:", error);
     }
   };
 
@@ -519,7 +518,7 @@ function OpportunityDetailContent() {
 
                     <div>
                       <div className="text-sm text-slate-600">Probability</div>
-                      <div className="font-medium">{opportunity.probability_percent || 0}%</div>
+                      <div className="font-medium">{opportunity.probability_percent}%</div>
                     </div>
 
                     {opportunity.tender_received_date && (

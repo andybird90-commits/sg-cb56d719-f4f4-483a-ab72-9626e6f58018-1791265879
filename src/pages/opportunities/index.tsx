@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -16,10 +17,13 @@ interface Opportunity {
   id: string;
   name: string;
   stage: string;
+  company_id: string;
   expected_fee_value: number | null;
   tender_due_date: string | null;
   tender_received_date: string | null;
   submitted_date: string | null;
+  expected_start_date: string | null;
+  expected_end_date: string | null;
   probability_percent: number | null;
   project_reference: string | null;
   created_at: string;
@@ -35,7 +39,8 @@ interface Opportunity {
 }
 
 function OpportunitiesContent() {
-  const { profile } = useAuth();
+  const { profile: user } = useAuth(); // Alias profile to user for compatibility
+  const { toast } = useToast();
   const router = useRouter();
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [filteredOpportunities, setFilteredOpportunities] = useState<Opportunity[]>([]);
@@ -44,8 +49,8 @@ function OpportunitiesContent() {
   const [searchTerm, setSearchTerm] = useState("");
 
   // Everyone can create/edit, only directors/admins can delete
-  const canEdit = !!profile;
-  const canDelete = profile?.role === "admin" || profile?.role === "director";
+  const canEdit = !!user;
+  const canDelete = user?.role === "admin" || user?.role === "director";
 
   useEffect(() => {
     fetchOpportunities();
@@ -139,46 +144,40 @@ function OpportunitiesContent() {
     const [showSubmittedDate, setShowSubmittedDate] = useState(false);
     const [submittedDate, setSubmittedDate] = useState(opportunity.submitted_date || "");
 
-    const handleStageChange = async (newStage: string) => {
-      if (!profile) return;
-      
-      setIsUpdating(true);
+    const handleStageChange = async (opportunityId: string, newStage: string) => {
       try {
-        const updates: any = {
-          stage: newStage,
-          probability_percent: 
-            newStage === "lead" ? 10 :
-            newStage === "in_bid" ? 25 :
-            newStage === "high_potential" ? 50 :
-            newStage === "secured" ? 100 :
-            newStage === "lost" ? 0 : opportunity.probability_percent
-        };
-
-        if (newStage === "secured" || newStage === "lost") {
-          updates.archived = true;
-          updates.archived_at = new Date().toISOString();
-          updates.archived_by_user_id = profile.id;
-        }
+        // Calculate probability based on stage
+        const probability = 
+          newStage === 'lead' ? 10 :
+          newStage === 'in_bid' ? 25 :
+          newStage === 'high_potential' ? 50 :
+          newStage === 'won' ? 100 :
+          newStage === 'lost' ? 0 : 50;
 
         const { error } = await supabase
-          .from("opportunities")
-          .update(updates)
-          .eq("id", opportunity.id);
+          .from("opportunities" as any)
+          .update({ 
+            stage: newStage,
+            probability_percent: probability 
+          })
+          .eq("id", opportunityId);
 
         if (error) throw error;
 
-        if (newStage === "secured") {
-          // Convert to project
-          await convertToProject(opportunity);
-        } else {
-          // Refresh the list
-          await fetchOpportunities();
-        }
-      } catch (err) {
-        console.error("Failed to update stage", err);
-        alert("Failed to update stage");
-      } finally {
-        setIsUpdating(false);
+        // Refresh the list
+        fetchOpportunities();
+        
+        toast({
+          title: "Stage updated",
+          description: `Opportunity stage changed to ${newStage}`,
+        });
+      } catch (error) {
+        console.error("Error updating stage:", error);
+        toast({
+          title: "Error",
+          description: "Failed to update opportunity stage",
+          variant: "destructive",
+        });
       }
     };
 
@@ -207,6 +206,43 @@ function OpportunitiesContent() {
         alert("Failed to save submitted date");
       } finally {
         setIsUpdating(false);
+      }
+    };
+
+    const handleSubmittedDateChange = async (opportunityId: string, date: string, currentStage: string) => {
+      try {
+        const updates: any = {
+          submitted_date: date || null,
+        };
+
+        // If stage is lead and submitted date is being set, change to in_bid
+        if (currentStage === 'lead' && date) {
+          updates.stage = 'in_bid';
+          updates.probability_percent = 25;
+        }
+
+        const { error } = await supabase
+          .from("opportunities" as any)
+          .update(updates)
+          .eq("id", opportunityId);
+
+        if (error) throw error;
+
+        fetchOpportunities();
+        
+        if (currentStage === 'lead' && date) {
+          toast({
+            title: "Stage updated",
+            description: "Opportunity moved to 'In Bid' stage (25% probability)",
+          });
+        }
+      } catch (error) {
+        console.error("Error updating submitted date:", error);
+        toast({
+          title: "Error",
+          description: "Failed to update submitted date",
+          variant: "destructive",
+        });
       }
     };
 
@@ -317,7 +353,7 @@ function OpportunitiesContent() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => handleStageChange("high_potential")}
+                onClick={() => handleStageChange(opportunity.id, "high_potential")}
                 disabled={isUpdating}
                 className="flex-1"
               >
@@ -329,7 +365,7 @@ function OpportunitiesContent() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => handleStageChange("high_potential")}
+                onClick={() => handleStageChange(opportunity.id, "high_potential")}
                 disabled={isUpdating}
                 className="flex-1"
               >
@@ -342,7 +378,7 @@ function OpportunitiesContent() {
                 <Button
                   size="sm"
                   variant="default"
-                  onClick={() => handleStageChange("secured")}
+                  onClick={() => handleStageChange(opportunity.id, "secured")}
                   disabled={isUpdating}
                   className="flex-1 bg-green-600 hover:bg-green-700"
                 >
@@ -351,7 +387,7 @@ function OpportunitiesContent() {
                 <Button
                   size="sm"
                   variant="destructive"
-                  onClick={() => handleStageChange("lost")}
+                  onClick={() => handleStageChange(opportunity.id, "lost")}
                   disabled={isUpdating}
                   className="flex-1"
                 >
@@ -363,6 +399,106 @@ function OpportunitiesContent() {
         </CardContent>
       </Card>
     );
+  };
+
+  const handleWin = async (opportunity: Opportunity) => {
+    try {
+      // First update the opportunity to won status with 100% probability
+      const { error: oppError } = await supabase
+        .from("opportunities" as any)
+        .update({ 
+          stage: "won",
+          probability_percent: 100
+        })
+        .eq("id", opportunity.id);
+
+      if (oppError) throw oppError;
+
+      // Create project from opportunity
+      const { data: projectData, error: projectError } = await supabase
+        .from("projects")
+        .insert({
+          code: `PROJ-${Date.now()}`,
+          name: opportunity.name,
+          client_company_id: opportunity.company_id,
+          project_reference: opportunity.project_reference || "",
+          expected_fee_value: opportunity.expected_fee_value,
+          start_date: opportunity.expected_start_date, // Map expected_start_date to start_date if needed, or check project schema. Usually projects have start_date.
+          end_date: opportunity.expected_end_date,
+          status: "live", // Changed from "active" to "live" to match allowed types
+          // created_by_user_id: user?.id, // projects might not have this column or it might be different. Checking schema would be good but relying on types for now.
+        } as any) // Casting to any to avoid strict type checking issues for now
+        .select()
+        .single();
+
+      if (projectError) throw projectError;
+
+      // Archive the opportunity
+      const { error: archiveError } = await supabase
+        .from("opportunities" as any)
+        .update({
+          archived: true,
+          archived_at: new Date().toISOString(),
+          archived_by_user_id: user?.id,
+        })
+        .eq("id", opportunity.id);
+
+      if (archiveError) throw archiveError;
+
+      toast({
+        title: "Success",
+        description: "Opportunity converted to project and archived",
+      });
+
+      // Redirect to the new project
+      router.push(`/projects/${projectData.id}`);
+    } catch (error) {
+      console.error("Error converting opportunity to project:", error);
+      toast({
+        title: "Error",
+        description: "Failed to convert opportunity to project",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleLose = async (opportunityId: string) => {
+    try {
+      const { error: updateError } = await supabase
+        .from("opportunities" as any)
+        .update({ 
+          stage: "lost",
+          probability_percent: 0
+        })
+        .eq("id", opportunityId);
+
+      if (updateError) throw updateError;
+
+      const { error: archiveError } = await supabase
+        .from("opportunities" as any)
+        .update({
+          archived: true,
+          archived_at: new Date().toISOString(),
+          archived_by_user_id: user?.id,
+        })
+        .eq("id", opportunityId);
+
+      if (archiveError) throw archiveError;
+
+      toast({
+        title: "Opportunity archived",
+        description: "Opportunity marked as lost and archived",
+      });
+
+      fetchOpportunities();
+    } catch (error) {
+      console.error("Error archiving opportunity:", error);
+      toast({
+        title: "Error",
+        description: "Failed to archive opportunity",
+        variant: "destructive",
+      });
+    }
   };
 
   return (

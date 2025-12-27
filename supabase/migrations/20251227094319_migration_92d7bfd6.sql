@@ -1,0 +1,1 @@
+DROP TRIGGER IF EXISTS set_opportunity_probability ON opportunities;
