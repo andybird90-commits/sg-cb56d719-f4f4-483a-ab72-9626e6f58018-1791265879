@@ -36,6 +36,29 @@ function PipelineMonthlyContent() {
     fetchMonthlyData();
   }, []);
 
+  useEffect(() => {
+    const topScroll = document.getElementById("top-scroll");
+    const bottomScroll = document.getElementById("bottom-scroll");
+
+    if (!topScroll || !bottomScroll) return;
+
+    const syncTopToBottom = () => {
+      bottomScroll.scrollLeft = topScroll.scrollLeft;
+    };
+
+    const syncBottomToTop = () => {
+      topScroll.scrollLeft = bottomScroll.scrollLeft;
+    };
+
+    topScroll.addEventListener("scroll", syncTopToBottom);
+    bottomScroll.addEventListener("scroll", syncBottomToTop);
+
+    return () => {
+      topScroll.removeEventListener("scroll", syncTopToBottom);
+      bottomScroll.removeEventListener("scroll", syncBottomToTop);
+    };
+  }, [monthsData]);
+
   const exportToPDF = async () => {
     setExporting(true);
     try {
@@ -539,12 +562,6 @@ function PipelineMonthlyContent() {
                           : "£0"}
                       </div>
                       <div className="text-xs text-slate-600 mt-1">Peak Month</div>
-                    </div>
-                    <div className="bg-slate-50 rounded-lg p-4">
-                      <div className="text-2xl font-bold text-slate-900">
-                        {monthsData.reduce((sum, m) => sum + m.projects.length, 0)}
-                      </div>
-                      <div className="text-xs text-slate-600 mt-1">Total Projects</div>
                     </div>
                   </div>
                 </div>
