@@ -1143,174 +1143,171 @@ function DashboardContent() {
           </CardContent>
         </Card>
 
-        {/* Three Column Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-          {/* Upcoming Tenders */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <AlertCircle className="w-5 h-5 text-orange-600" />
-                <CardTitle className="text-base sm:text-lg">Upcoming Tenders</CardTitle>
+        {/* Upcoming Tenders */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-orange-600" />
+              <CardTitle className="text-base sm:text-lg">Upcoming Tenders</CardTitle>
+            </div>
+            <p className="text-xs sm:text-sm text-slate-600">Next 30 days</p>
+          </CardHeader>
+          <CardContent>
+            {tendersError ? (
+              <ErrorState message={tendersError} />
+            ) : tendersLoading ? (
+              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
+                Loading tenders...
               </div>
-              <p className="text-xs sm:text-sm text-slate-600">Next 30 days</p>
-            </CardHeader>
-            <CardContent>
-              {tendersError ? (
-                <ErrorState message={tendersError} />
-              ) : tendersLoading ? (
-                <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
-                  Loading tenders...
-                </div>
-              ) : upcomingTenders.length === 0 ? (
-                <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
-                  No tenders due in the next 30 days
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {upcomingTenders.map((opp) => (
-                    <div
-                      key={opp.id}
-                      className="p-3 border rounded-lg hover:bg-slate-50 transition-colors"
-                    >
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <div 
-                          className="font-medium text-sm text-slate-900 line-clamp-2 cursor-pointer hover:text-blue-600"
-                          onClick={() => router.push(`/opportunities/${opp.id}`)}
-                        >
-                          {opp.name}
-                        </div>
-                        <Badge className={`${getStageColor(opp.stage)} flex-shrink-0 text-xs`}>
-                          {opp.stage.replace("_", " ")}
-                        </Badge>
+            ) : upcomingTenders.length === 0 ? (
+              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
+                No tenders due in the next 30 days
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {upcomingTenders.map((opp) => (
+                  <div
+                    key={opp.id}
+                    className="p-3 border rounded-lg hover:bg-slate-50 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div 
+                        className="font-medium text-sm text-slate-900 line-clamp-2 cursor-pointer hover:text-blue-600"
+                        onClick={() => router.push(`/opportunities/${opp.id}`)}
+                      >
+                        {opp.name}
                       </div>
-                      <div className="text-xs text-slate-600 mb-1">
-                        {opp.companies?.name}
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        Due: {formatDate(opp.tender_due_date)}
-                      </div>
+                      <Badge className={`${getStageColor(opp.stage)} flex-shrink-0 text-xs`}>
+                        {opp.stage.replace("_", " ")}
+                      </Badge>
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Latest Activity */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-purple-600" />
-                <CardTitle className="text-base sm:text-lg">Latest Activity</CardTitle>
+                    <div className="text-xs text-slate-600 mb-1">
+                      {opp.companies?.name}
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      Due: {formatDate(opp.tender_due_date)}
+                    </div>
+                  </div>
+                ))}
               </div>
-              <p className="text-xs sm:text-sm text-slate-600">Recent updates</p>
-            </CardHeader>
-            <CardContent>
-              {activityError ? (
-                <ErrorState message={activityError} />
-              ) : activityLoading ? (
-                <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
-                  Loading activity...
-                </div>
-              ) : latestActivity.length === 0 ? (
-                <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
-                  No recent activity
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {latestActivity.map((activity) => (
-                    <div
-                      key={`${activity.source}-${activity.id}`}
-                      className="p-3 border rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
-                      onClick={() => {
-                        const path = activity.source === "contact" 
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Latest Activity */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-purple-600" />
+              <CardTitle className="text-base sm:text-lg">Latest Activity</CardTitle>
+            </div>
+            <p className="text-xs sm:text-sm text-slate-600">Recent updates</p>
+          </CardHeader>
+          <CardContent>
+            {activityError ? (
+              <ErrorState message={activityError} />
+            ) : activityLoading ? (
+              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
+                Loading activity...
+              </div>
+            ) : latestActivity.length === 0 ? (
+              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
+                No recent activity
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {latestActivity.map((activity) => (
+                  <div
+                    key={`${activity.source}-${activity.id}`}
+                    className="p-3 border rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                    onClick={() => {
+                      const path = activity.source === "contact" 
                           ? `/contacts/${activity.source_id}`
                           : `/opportunities/${activity.source_id}`;
-                        router.push(path);
-                      }}
-                    >
-                      <div className="flex items-start gap-2 mb-2">
-                        <span className="text-sm">{getActivitySourceIcon(activity.source)}</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1 flex-wrap">
-                            <span className="text-xs font-medium text-slate-900 truncate">
-                              {activity.source_name}
-                            </span>
-                            <Badge variant="outline" className={`text-xs ${getActivityPostTypeColor(activity.post_type)}`}>
-                              {activity.post_type}
-                            </Badge>
-                          </div>
-                          <p className="text-xs text-slate-700 line-clamp-2 mb-1">
-                            {activity.content}
-                          </p>
-                          <div className="flex items-center gap-2 text-xs text-slate-500">
-                            <span>{activity.author_name}</span>
-                            <span>•</span>
-                            <span>{formatActivityDate(activity.created_at)}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Latest Opportunities */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Target className="w-5 h-5 text-orange-600" />
-                <CardTitle className="text-base sm:text-lg">Latest Opportunities</CardTitle>
-              </div>
-              <p className="text-xs sm:text-sm text-slate-600">Recently added</p>
-            </CardHeader>
-            <CardContent>
-              {latestOpportunitiesError ? (
-                <ErrorState message={latestOpportunitiesError} />
-              ) : latestOpportunitiesLoading ? (
-                <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
-                  Loading opportunities...
-                </div>
-              ) : latestOpportunities.length === 0 ? (
-                <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
-                  No opportunities yet
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {latestOpportunities.map((opp) => (
-                    <div
-                      key={opp.id}
-                      className="p-3 border rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
-                      onClick={() => router.push(`/opportunities/${opp.id}`)}
-                    >
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <div className="font-medium text-sm text-slate-900 line-clamp-2">
-                          {opp.name}
-                        </div>
-                        <Badge className={`${getStageColor(opp.stage)} flex-shrink-0 text-xs`}>
-                          {opp.stage.replace("_", " ")}
-                        </Badge>
-                      </div>
-                      <div className="text-xs text-slate-600 mb-1">
-                        {opp.companies?.name}
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-slate-500">
-                        <span>{formatDate(opp.created_at)}</span>
-                        {opp.expected_fee_value && (
-                          <span className="font-medium text-slate-700">
-                            {formatCurrency(opp.expected_fee_value)}
+                      router.push(path);
+                    }}
+                  >
+                    <div className="flex items-start gap-2 mb-2">
+                      <span className="text-sm">{getActivitySourceIcon(activity.source)}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <span className="text-xs font-medium text-slate-900 truncate">
+                            {activity.source_name}
                           </span>
-                        )}
+                          <Badge variant="outline" className={`text-xs ${getActivityPostTypeColor(activity.post_type)}`}>
+                            {activity.post_type}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-slate-700 line-clamp-2 mb-1">
+                          {activity.content}
+                        </p>
+                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                          <span>{activity.author_name}</span>
+                          <span>•</span>
+                          <span>{formatActivityDate(activity.created_at)}</span>
+                        </div>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Latest Opportunities */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Target className="w-5 h-5 text-orange-600" />
+              <CardTitle className="text-base sm:text-lg">Latest Opportunities</CardTitle>
+            </div>
+            <p className="text-xs sm:text-sm text-slate-600">Recently added</p>
+          </CardHeader>
+          <CardContent>
+            {latestOpportunitiesError ? (
+              <ErrorState message={latestOpportunitiesError} />
+            ) : latestOpportunitiesLoading ? (
+              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
+                Loading opportunities...
+              </div>
+            ) : latestOpportunities.length === 0 ? (
+              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
+                No opportunities yet
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {latestOpportunities.map((opp) => (
+                  <div
+                    key={opp.id}
+                    className="p-3 border rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                    onClick={() => router.push(`/opportunities/${opp.id}`)}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="font-medium text-sm text-slate-900 line-clamp-2">
+                        {opp.name}
+                      </div>
+                      <Badge className={`${getStageColor(opp.stage)} flex-shrink-0 text-xs`}>
+                        {opp.stage.replace("_", " ")}
+                      </Badge>
+                    </div>
+                    <div className="text-xs text-slate-600 mb-1">
+                      {opp.companies?.name}
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-slate-500">
+                      <span>{formatDate(opp.created_at)}</span>
+                      {opp.expected_fee_value && (
+                        <span className="font-medium text-slate-700">
+                          {formatCurrency(opp.expected_fee_value)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Client Visits & Functions - Full Width */}
         <Card>
