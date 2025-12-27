@@ -19,6 +19,7 @@ interface GanttItem {
   type: "opportunity" | "project";
   stage?: string;
   status?: string;
+  value?: number;
 }
 
 function PipelineGanttContent() {
@@ -37,121 +38,123 @@ function PipelineGanttContent() {
     setError(null);
 
     try {
-      // Calculate 12-month rolling window (same as monthly view)
-      const startOfCurrentMonth = new Date();
-      startOfCurrentMonth.setDate(1);
-      startOfCurrentMonth.setHours(0, 0, 0, 0);
+      const today = new Date();
+      const startOfCurrentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const endOfTwelfthMonth = new Date(today.getFullYear(), today.getMonth() + 12, 0);
+      endOfTwelfthMonth.setHours(23, 59, 59, 999);
 
-      const endOf12Months = new Date(startOfCurrentMonth);
-      endOf12Months.setMonth(endOf12Months.getMonth() + 12);
-      endOf12Months.setDate(0); // Last day of the 12th month
-      endOf12Months.setHours(23, 59, 59, 999);
-
-      const ganttItems: GanttItem[] = [];
-
-      // Fetch opportunities (Correct column names matching monthly view)
-      const { data: opportunities, error: oppError } = await supabase
+      // MATCH MONTHLY VIEW: Fetch all opportunities with fee values
+      const { data: opportunities, error: oppsError } = await supabase
         .from("opportunities")
         .select(`
           id,
           name,
-          expected_fee_value,
-          probability_percent,
           stage,
           expected_start_date,
           expected_end_date,
           tender_due_date,
-          companies (name, short_name)
+          expected_fee_value,
+          companies (
+            name,
+            short_name
+          )
         `)
-        .not("expected_end_date", "is", null)
-        .gte("expected_end_date", startOfCurrentMonth.toISOString()) // Filter: Ends after current month start
+        .not("expected_fee_value", "is", null)
+        .gte("expected_end_date", startOfCurrentMonth.toISOString())
         .order("expected_start_date");
 
-      if (oppError) throw oppError;
+      if (oppsError) throw oppsError;
 
-      if (opportunities) {
-        opportunities.forEach((opp) => {
-          // Use expected_start_date, fallback to tender_due_date if needed (logic from monthly view)
-          const startDateStr = opp.expected_start_date || opp.tender_due_date;
-          const endDateStr = opp.expected_end_date;
-          
-          if (!startDateStr || !endDateStr) return;
-
-          const startDate = new Date(startDateStr);
-          const endDate = new Date(endDateStr);
-
-          if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-            ganttItems.push({
-              id: opp.id,
-              name: opp.name,
-              companyShortName: opp.companies?.short_name || opp.companies?.name || "",
-              startDate,
-              endDate,
-              type: "opportunity",
-              stage: opp.stage,
-            });
-          }
-        });
-      }
-
-      // Fetch projects (Correct column names matching monthly view)
+      // MATCH MONTHLY VIEW: Fetch all projects with agreed fee values
       const { data: projects, error: projError } = await supabase
         .from("projects")
         .select(`
           id,
           code,
           name,
-          agreed_fee_value,
+          status,
           start_date,
           end_date,
-          status,
-          companies!projects_client_company_id_fkey (name, short_name)
+          agreed_fee_value,
+          companies!projects_client_company_id_fkey (
+            name,
+            short_name
+          )
         `)
-        .not("start_date", "is", null)
-        .not("end_date", "is", null)
-        .gte("end_date", startOfCurrentMonth.toISOString()) // Filter: Ends after current month start
+        .not("agreed_fee_value", "is", null)
+        .gte("end_date", startOfCurrentMonth.toISOString())
         .order("start_date");
 
       if (projError) throw projError;
 
-      if (projects) {
-        projects.forEach((proj) => {
-          const startDate = new Date(proj.start_date || "");
-          const endDate = new Date(proj.end_date || "");
+      console.log("=== GANTT VIEW DEBUG ===");
+      console.log("Date range:", {
+        start: startOfCurrentMonth.toISOString(),
+        end: endOfTwelfthMonth.toISOString()
+      });
+      console.log("Total opportunities loaded:", opportunities?.length || 0);
+      console.log("Total projects loaded:", projects?.length || 0);
 
-          if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-            ganttItems.push({
-              id: proj.id,
-              code: proj.code,
-              name: proj.name,
-              companyShortName: proj.companies?.short_name || proj.companies?.name || "",
-              startDate,
-              endDate,
-              type: "project",
-              status: proj.status,
-            });
-          }
-        });
-      }
+      const ganttItems: GanttItem[] = [];
+
+      // Process opportunities
+      (opportunities || []).forEach((opp) => {
+        const startDate = opp.expected_start_date 
+          ? new Date(opp.expected_start_date)
+          : opp.tender_due_date
+          ? new Date(opp.tender_due_date)
+          : null;
+
+        const endDate = opp.expected_end_date 
+          ? new Date(opp.expected_end_date)
+          : startDate;
+
+        if (startDate && endDate) {
+          ganttItems.push({
+            id: opp.id,
+            name: opp.name,
+            type: "opportunity",
+            stage: opp.stage,
+            startDate,
+            endDate,
+            value: opp.expected_fee_value || 0,
+            companyShortName: opp.companies?.short_name || opp.companies?.name || "Unknown",
+          });
+        }
+      });
+
+      // Process projects
+      (projects || []).forEach((project) => {
+        if (project.start_date && project.end_date) {
+          ganttItems.push({
+            id: project.id,
+            name: project.name,
+            type: "project",
+            status: project.status,
+            startDate: new Date(project.start_date),
+            endDate: new Date(project.end_date),
+            value: project.agreed_fee_value || 0,
+            companyShortName: project.companies?.short_name || project.companies?.name || "Unknown",
+            code: project.code || undefined,
+          });
+        }
+      });
 
       // Sort by start date
       ganttItems.sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
 
-      setItems(ganttItems);
-
-      // Debug logging
-      console.log("=== GANTT VIEW DEBUG ===");
-      console.log("Date range:", {
-        start: startOfCurrentMonth.toISOString(),
-        end: endOf12Months.toISOString()
-      });
-      console.log("Total opportunities loaded:", opportunities?.length || 0);
-      console.log("Total projects loaded:", projects?.length || 0);
       console.log("Total gantt items after filtering:", ganttItems.length);
+      console.log("Sample items:", ganttItems.slice(0, 3).map(item => ({
+        name: item.name,
+        type: item.type,
+        start: item.startDate.toISOString(),
+        end: item.endDate.toISOString()
+      })));
       console.log("=========================");
 
+      setGanttData(ganttItems);
     } catch (err) {
-      console.error("Failed to load gantt data", err);
+      console.error("Failed to load timeline data:", err);
       setError("Failed to load timeline data. Please try again.");
     } finally {
       setLoading(false);
