@@ -51,13 +51,13 @@ function PipelineMonthlyContent() {
           expected_start_date,
           expected_end_date,
           tender_due_date,
-          expected_value,
+          expected_fee_value,
           companies (
             short_name,
             name
           )
         `)
-        .not("expected_value", "is", null)
+        .not("expected_fee_value", "is", null)
         .gte("expected_end_date", startOfCurrentMonth.toISOString());
 
       if (oppsError) throw oppsError;
@@ -72,13 +72,13 @@ function PipelineMonthlyContent() {
           status,
           start_date,
           end_date,
-          contract_value,
+          agreed_fee_value,
           companies!projects_client_company_id_fkey (
             short_name,
             name
           )
         `)
-        .not("contract_value", "is", null)
+        .not("agreed_fee_value", "is", null)
         .gte("end_date", startOfCurrentMonth.toISOString());
 
       if (projectsError) throw projectsError;
@@ -106,7 +106,7 @@ function PipelineMonthlyContent() {
               (endDate.getMonth() - startDate.getMonth()) + 1
             );
 
-            const monthlyTurnover = (opp.expected_value || 0) / durationMonths;
+            const monthlyTurnover = (opp.expected_fee_value || 0) / durationMonths;
 
             // Add to each relevant month
             months.forEach((monthData) => {
@@ -142,7 +142,7 @@ function PipelineMonthlyContent() {
               (endDate.getMonth() - startDate.getMonth()) + 1
             );
 
-            const monthlyTurnover = (proj.contract_value || 0) / durationMonths;
+            const monthlyTurnover = (proj.agreed_fee_value || 0) / durationMonths;
 
             // Add to each relevant month
             months.forEach((monthData) => {
