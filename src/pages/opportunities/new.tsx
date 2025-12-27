@@ -127,7 +127,6 @@ function NewOpportunityContent() {
           expected_end_date: formData.expected_end_date || null,
           project_reference: formData.project_reference || null,
           description: formData.description || null,
-          created_by_user_id: user?.id,
           added_by_user_id: user?.id,
         })
         .select()
