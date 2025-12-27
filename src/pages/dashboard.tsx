@@ -836,7 +836,7 @@ function DashboardContent() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
+              <TrendingUp className="h-5 w-5" />
               12-Month Pipeline
             </CardTitle>
             <div className="flex gap-2">
@@ -850,6 +850,29 @@ function DashboardContent() {
                   View Gantt
                 </Button>
               </Link>
+              <div className="mb-4 flex gap-2">
+                <Button
+                  variant={pipelineView === "all" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setPipelineView("all")}
+                >
+                  All
+                </Button>
+                <Button
+                  variant={pipelineView === "secured_prospects" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setPipelineView("secured_prospects")}
+                >
+                  Secured + Prospects
+                </Button>
+                <Button
+                  variant={pipelineView === "secured" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setPipelineView("secured")}
+                >
+                  Secured Only
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
