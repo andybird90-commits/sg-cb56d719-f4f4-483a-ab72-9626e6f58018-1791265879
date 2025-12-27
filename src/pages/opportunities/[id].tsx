@@ -252,7 +252,7 @@ function OpportunityDetailContent() {
         .from("opportunities")
         .update({
           name: editFormData.name,
-          stage: editFormData.stage,
+          stage: editFormData.stage as any,
           expected_fee_value: editFormData.expected_fee_value ? parseFloat(editFormData.expected_fee_value) : null,
           tender_due_date: editFormData.tender_due_date || null,
           tender_received_date: editFormData.tender_received_date || null,
