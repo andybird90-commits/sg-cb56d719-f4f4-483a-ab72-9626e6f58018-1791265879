@@ -123,7 +123,7 @@ function NewOpportunityContent() {
         created_by_user_id: formData.added_by_user_id || user.id,
       };
 
-      const { error: insertError } = await supabase.from("opportunities").insert([opportunityData]);
+      const { error: insertError } = await supabase.from("opportunities").insert([opportunityData as any]);
 
       if (insertError) {
         setError(insertError.message);
@@ -234,14 +234,15 @@ function NewOpportunityContent() {
                   <Select
                     value={formData.stage}
                     onValueChange={(value) => {
+                      const stageValue = value as "lead" | "bid" | "high_potential" | "secured" | "lost";
                       const probability = 
-                        value === "lead" ? 10 :
-                        value === "bid" ? 25 :
-                        value === "high_potential" ? 50 :
-                        value === "secured" ? 100 :
-                        value === "lost" ? 0 : 10;
+                        stageValue === "lead" ? 10 :
+                        stageValue === "bid" ? 25 :
+                        stageValue === "high_potential" ? 50 :
+                        stageValue === "secured" ? 100 :
+                        stageValue === "lost" ? 0 : 10;
                       
-                      setFormData({ ...formData, stage: value, probability_percent: probability });
+                      setFormData({ ...formData, stage: stageValue, probability_percent: probability });
                     }}
                   >
                     <SelectTrigger>
@@ -261,7 +262,7 @@ function NewOpportunityContent() {
                   <Label htmlFor="status" className="text-sm sm:text-base">Status</Label>
                   <Select
                     value={formData.status}
-                    onValueChange={(value) => setFormData({ ...formData, status: value })}
+                    onValueChange={(value) => setFormData({ ...formData, status: value as "active" | "on_hold" | "closed" })}
                   >
                     <SelectTrigger className="h-10 sm:h-11">
                       <SelectValue />

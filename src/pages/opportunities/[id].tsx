@@ -413,6 +413,9 @@ function OpportunityDetailContent() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="on_hold">On Hold</SelectItem>
+                          <SelectItem value="closed">Closed</SelectItem>
                           <SelectItem value="open">Open</SelectItem>
                           <SelectItem value="closed_won">Closed Won</SelectItem>
                           <SelectItem value="closed_lost">Closed Lost</SelectItem>
