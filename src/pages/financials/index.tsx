@@ -130,7 +130,6 @@ function FinancialsContent() {
         .from("opportunities")
         .select(`
           id,
-          code,
           name,
           stage,
           expected_start_date,
@@ -159,7 +158,7 @@ function FinancialsContent() {
         })),
         ...(opportunitiesData || []).map(o => ({
           id: o.id,
-          code: o.code,
+          code: "OPP", // Placeholder since opportunities don't have codes
           name: o.name,
           client_name: o.companies?.name || "—",
           start_date: o.expected_start_date,
