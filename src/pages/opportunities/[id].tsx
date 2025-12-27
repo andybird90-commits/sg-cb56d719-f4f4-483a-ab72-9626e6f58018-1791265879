@@ -152,7 +152,7 @@ function OpportunityDetailContent() {
       if (fetchError) throw fetchError;
       if (!data) throw new Error("Opportunity not found");
 
-      // Cast to any first to avoid complex type mismatch with joined tables
+      // Cast to any first to avoid complex type mismatch with joined tables and new fields
       const opportunityData = data as any;
       setOpportunity(opportunityData);
       
@@ -169,18 +169,18 @@ function OpportunityDetailContent() {
         added_by_user_id: opportunityData.added_by_user_id || opportunityData.created_by_user_id || "",
       });
       setEditFormData({
-        name: data.name,
-        stage: data.stage,
-        status: data.status,
-        expected_fee_value: data.expected_fee_value?.toString() || "",
-        tender_due_date: data.tender_due_date || "",
-        tender_received_date: data.tender_received_date || "",
-        submitted_date: data.submitted_date || "",
-        expected_start_date: data.expected_start_date || "",
-        expected_end_date: data.expected_end_date || "",
-        probability_percent: data.probability_percent || 0,
-        project_reference: data.project_reference || "",
-        description: data.description || "",
+        name: opportunityData.name,
+        stage: opportunityData.stage,
+        status: opportunityData.status,
+        expected_fee_value: opportunityData.expected_fee_value?.toString() || "",
+        tender_due_date: opportunityData.tender_due_date || "",
+        tender_received_date: opportunityData.tender_received_date || "",
+        submitted_date: opportunityData.submitted_date || "",
+        expected_start_date: opportunityData.expected_start_date || "",
+        expected_end_date: opportunityData.expected_end_date || "",
+        probability_percent: opportunityData.probability_percent || 0,
+        project_reference: opportunityData.project_reference || "",
+        description: opportunityData.description || "",
       });
     } catch (err) {
       console.error("Failed to load opportunity data", err);
@@ -200,13 +200,13 @@ function OpportunityDetailContent() {
         .update({
           name: editData.name,
           description: editData.description || null,
-          stage: editData.stage as "secured" | "high_potential" | "bid",
-          status: editData.status as "open" | "closed_won" | "closed_lost",
+          stage: editData.stage as any,
+          status: editData.status as any,
           tender_due_date: editData.tender_due_date || null,
           expected_start_date: editData.expected_start_date || null,
           expected_end_date: editData.expected_end_date || null,
           expected_fee_value: editData.expected_fee_value ? parseFloat(editData.expected_fee_value) : null,
-          probability_percent: editData.probability_percent ? parseInt(editData.probability_percent) : null,
+          probability_percent: editData.probability_percent ? parseInt(editData.probability_percent as string) : null,
           added_by_user_id: editData.added_by_user_id || null,
         })
         .eq("id", id);

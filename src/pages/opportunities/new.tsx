@@ -123,7 +123,7 @@ function NewOpportunityContent() {
         created_by_user_id: formData.added_by_user_id || user.id,
       };
 
-      const { error: insertError } = await supabase.from("opportunities").insert([opportunityData as any]);
+      const { error: insertError } = await supabase.from("opportunities").insert([opportunityData]);
 
       if (insertError) {
         setError(insertError.message);
@@ -289,16 +289,10 @@ function NewOpportunityContent() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="probability_percent" className="text-sm sm:text-base">Probability (%)</Label>
-                  <Input
-                    id="probability_percent"
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={formData.probability_percent}
-                    onChange={(e) => setFormData({ ...formData, probability_percent: e.target.value })}
-                    className="h-10 sm:h-11"
-                  />
+                  <Label className="text-sm sm:text-base">Probability (%)</Label>
+                  <div className="h-10 sm:h-11 flex items-center px-3 border rounded-md bg-slate-50 text-slate-500">
+                    {formData.probability_percent}% (Auto-set by stage)
+                  </div>
                 </div>
               </div>
 
