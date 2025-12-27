@@ -468,46 +468,30 @@ function DashboardContent() {
 
       // Process opportunities
       opportunities.forEach((opp) => {
-        if (!opp.expected_start_date || !opp.expected_end_date) return;
+        if (!opp.expected_start_date || !opp.expected_end_date || !opp.expected_fee_value) {
+          return;
+        }
 
         const startDate = new Date(opp.expected_start_date);
         const endDate = new Date(opp.expected_end_date);
-        const stage = opp.stage?.toLowerCase();
+        const totalValue = opp.expected_fee_value;
+        const stage = opp.stage;
 
-        // Get phasing data for this opportunity
-        const phasingData = oppPhasingMap.get(opp.id) || [];
+        // Check if this opportunity has phasing data
+        const phasingData = oppPhasingMap.get(opp.id);
 
-        // Determine which field to update based on stage
-        for (let d = new Date(startDate); d <= endDate; d = addMonths(d, 1)) {
-          const monthsDiff = differenceInMonths(d, startOfCurrentMonth);
-          const monthIndex = monthsDiff;
+        if (phasingData && phasingData.length > 0) {
+          // Use manual phasing data
+          phasingData.forEach((phase) => {
+            const monthIndex = differenceInMonths(
+              new Date(phase.year, phase.month - 1),
+              startOfCurrentMonth
+            );
 
-          if (monthIndex >= 0 && monthIndex < 12) {
-            const monthData = initialData[monthIndex];
-            const year = d.getFullYear();
-            const month = d.getMonth() + 1; // JavaScript months are 0-based
+            if (monthIndex >= 0 && monthIndex < initialData.length) {
+              const monthData = initialData[monthIndex];
+              const amount = phase.revenue_amount;
 
-            // Find phasing amount for this specific month
-            const phaseEntry = phasingData.find(p => p.year === year && p.month === month);
-            // If phasing entry exists, use it. Otherwise, default to 0 (don't auto-spread here to match logic)
-            // Or if you want to fallback to even spread if no phasing exists, we can add that logic.
-            // For now, let's assume if phasing table exists, we use it, otherwise 0?
-            // User said: "when we add an opportunity it spreads evenly... but when secured we manually spread"
-            // So for non-secured, we might need auto-spread logic if no phasing data?
-            // Actually, if phasing data is empty, it means no manual phasing.
-            // But wait, the user said "when we add an opportunity it spreads evenly".
-            // If the backend/frontend logic for "add opportunity" actually INSERTS into phasing table, then we are good.
-            // If it only does it in UI state but not DB, then we need auto-calculation here.
-            // Given the table was missing, it likely wasn't inserting into DB.
-            // But now I created the table.
-            
-            // Let's implement robust logic: Use phasing data if exists.
-            // If NO phasing data found for this ID, fallback to even spread?
-            // The prompt implies "project phasing in app" exists.
-            
-            const amount = phaseEntry ? Number(phaseEntry.revenue_amount) : 0;
-
-            if (amount > 0) {
               if (stage === "secured") {
                 monthData.secured += amount;
               } else if (stage === "high_potential") {
@@ -516,35 +500,70 @@ function DashboardContent() {
                 monthData.bid += amount;
               }
             }
+          });
+        } else {
+          // Fall back to even distribution based on dates (no phasing data)
+          const monthsDuration = differenceInMonths(endDate, startDate) + 1;
+          const monthlyValue = totalValue / monthsDuration;
+
+          for (let i = 0; i < monthsDuration; i++) {
+            const currentMonth = addMonths(startDate, i);
+            const monthIndex = differenceInMonths(currentMonth, startOfCurrentMonth);
+
+            if (monthIndex >= 0 && monthIndex < initialData.length) {
+              const monthData = initialData[monthIndex];
+
+              if (stage === "secured") {
+                monthData.secured += monthlyValue;
+              } else if (stage === "high_potential") {
+                monthData.highPotential += monthlyValue;
+              } else if (stage === "bid") {
+                monthData.bid += monthlyValue;
+              }
+            }
           }
         }
       });
 
-      // Process projects - add to "secured" since they are already won
-      projects.forEach((proj) => {
-        if (!proj.start_date || !proj.end_date) return;
+      // Process projects with phasing fallback
+      projects?.forEach((proj) => {
+        if (!proj.start_date || !proj.end_date || !proj.agreed_fee_value) {
+          return;
+        }
 
         const startDate = new Date(proj.start_date);
         const endDate = new Date(proj.end_date);
+        const totalValue = proj.agreed_fee_value;
 
-        // Get phasing data for this project
-        const phasingData = projPhasingMap.get(proj.id) || [];
+        // Check if this project has phasing data
+        const phasingData = projPhasingMap.get(proj.id);
 
-        for (let d = new Date(startDate); d <= endDate; d = addMonths(d, 1)) {
-          const monthsDiff = differenceInMonths(d, startOfCurrentMonth);
-          const monthIndex = monthsDiff;
+        if (phasingData && phasingData.length > 0) {
+          // Use manual phasing data
+          phasingData.forEach((phase) => {
+            const monthIndex = differenceInMonths(
+              new Date(phase.year, phase.month - 1),
+              startOfCurrentMonth
+            );
 
-          if (monthIndex >= 0 && monthIndex < 12) {
-            const monthData = initialData[monthIndex];
-            const year = d.getFullYear();
-            const month = d.getMonth() + 1;
+            if (monthIndex >= 0 && monthIndex < initialData.length) {
+              const amount = phase.revenue_amount;
+              if (amount > 0) {
+                initialData[monthIndex].secured += amount;
+              }
+            }
+          });
+        } else {
+          // Fall back to even distribution based on dates (no phasing data)
+          const monthsDuration = differenceInMonths(endDate, startDate) + 1;
+          const monthlyValue = totalValue / monthsDuration;
 
-            // Find phasing amount for this specific month
-            const phaseEntry = phasingData.find(p => p.year === year && p.month === month);
-            const amount = phaseEntry ? Number(phaseEntry.revenue_amount) : 0;
+          for (let i = 0; i < monthsDuration; i++) {
+            const currentMonth = addMonths(startDate, i);
+            const monthIndex = differenceInMonths(currentMonth, startOfCurrentMonth);
 
-            if (amount > 0) {
-              monthData.secured += amount;
+            if (monthIndex >= 0 && monthIndex < initialData.length) {
+              initialData[monthIndex].secured += monthlyValue;
             }
           }
         }
