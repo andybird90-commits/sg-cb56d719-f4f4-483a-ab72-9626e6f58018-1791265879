@@ -364,6 +364,7 @@ function DashboardContent() {
       setPipelineError(null);
 
       const today = new Date();
+      const startOfCurrentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
       const months: PipelineData[] = [];
 
       for (let i = 0; i < 12; i++) {
@@ -377,16 +378,19 @@ function DashboardContent() {
         });
       }
 
+      // MATCH MONTHLY VIEW: Fetch all opportunities with fee values, no stage filter
       const { data: allOpportunities } = await supabase
         .from("opportunities")
         .select("id, stage, expected_fee_value, expected_start_date, expected_end_date, linked_project_id")
-        .in("stage", ["bid", "high_potential", "secured"])
-        .is("linked_project_id", null);
+        .not("expected_fee_value", "is", null)
+        .gte("expected_end_date", startOfCurrentMonth.toISOString());
 
+      // MATCH MONTHLY VIEW: Fetch all projects with fee values, no status filter
       const { data: liveProjects } = await supabase
         .from("projects")
         .select("id, status, agreed_fee_value, start_date, end_date")
-        .eq("status", "live");
+        .not("agreed_fee_value", "is", null)
+        .gte("end_date", startOfCurrentMonth.toISOString());
 
       const liveProjectIds = (liveProjects || []).map(p => p.id);
       const { data: phasingData } = await supabase
@@ -404,12 +408,12 @@ function DashboardContent() {
 
       const debugLog: Record<string, any> = {};
 
+      // Process opportunities - MATCH MONTHLY VIEW LOGIC EXACTLY
       (allOpportunities || []).forEach((opp) => {
         if (!opp.expected_start_date || !opp.expected_fee_value) return;
 
         const startDate = new Date(opp.expected_start_date);
         const endDate = opp.expected_end_date ? new Date(opp.expected_end_date) : new Date(startDate);
-        endDate.setMonth(endDate.getMonth() + 3);
 
         const durationMonths = Math.max(
           1,
@@ -417,8 +421,7 @@ function DashboardContent() {
           (endDate.getMonth() - startDate.getMonth()) + 1
         );
 
-        const baseMonthlyValue = Math.floor((opp.expected_fee_value / durationMonths) * 100) / 100;
-        const remainder = Number((opp.expected_fee_value - (baseMonthlyValue * durationMonths)).toFixed(2));
+        const monthlyValue = opp.expected_fee_value / durationMonths;
 
         for (let i = 0; i < durationMonths; i++) {
           const currentMonth = new Date(
@@ -431,9 +434,6 @@ function DashboardContent() {
                             (currentMonth.getMonth() - today.getMonth());
 
           if (monthIndex >= 0 && monthIndex < 12) {
-            // Add base value, plus remainder if it's the last month
-            const monthlyValue = i === durationMonths - 1 ? baseMonthlyValue + remainder : baseMonthlyValue;
-
             if (opp.stage === "bid") {
               months[monthIndex].bid += monthlyValue;
             } else if (opp.stage === "high_potential") {
@@ -445,6 +445,7 @@ function DashboardContent() {
         }
       });
 
+      // Process projects - MATCH MONTHLY VIEW LOGIC EXACTLY
       (liveProjects || []).forEach((project) => {
         if (!project.start_date || !project.agreed_fee_value) return;
 
