@@ -834,50 +834,22 @@ function DashboardContent() {
 
         {/* Pipeline Chart */}
         <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-slate-600" />
-                <CardTitle className="text-base sm:text-lg">12-Month Pipeline</CardTitle>
-              </div>
-              <div className="flex items-center gap-2">
-                {/* Pipeline View Toggle */}
-                <div className="flex rounded-lg border border-slate-200 overflow-hidden">
-                  <button
-                    onClick={() => setPipelineView("all")}
-                    className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                      pipelineView === "all"
-                        ? "bg-slate-900 text-white"
-                        : "bg-white text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    All
-                  </button>
-                  <button
-                    onClick={() => setPipelineView("secured_prospects")}
-                    className={`px-3 py-1.5 text-xs font-medium transition-colors border-x border-slate-200 ${
-                      pipelineView === "secured_prospects"
-                        ? "bg-slate-900 text-white"
-                        : "bg-white text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    Secured + Prospects
-                  </button>
-                  <button
-                    onClick={() => setPipelineView("secured")}
-                    className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                      pipelineView === "secured"
-                        ? "bg-slate-900 text-white"
-                        : "bg-white text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    Secured Only
-                  </button>
-                </div>
-                <Link href="/pipeline/gantt">
-                  <Button variant="outline" size="sm">View Gantt</Button>
-                </Link>
-              </div>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              12-Month Pipeline
+            </CardTitle>
+            <div className="flex gap-2">
+              <Link href="/pipeline/monthly">
+                <Button variant="outline" size="sm">
+                  View Monthly
+                </Button>
+              </Link>
+              <Link href="/pipeline/gantt">
+                <Button variant="outline" size="sm">
+                  View Gantt
+                </Button>
+              </Link>
             </div>
           </CardHeader>
           <CardContent>
