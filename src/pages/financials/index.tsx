@@ -158,7 +158,7 @@ function FinancialsContent() {
         })),
         ...(opportunitiesData || []).map(o => ({
           id: o.id,
-          code: "OPP", // Placeholder since opportunities don't have codes
+          code: "OPP",
           name: o.name,
           client_name: o.companies?.name || "—",
           start_date: o.expected_start_date,
@@ -167,6 +167,14 @@ function FinancialsContent() {
           type: "opportunity" as const
         }))
       ];
+
+      console.log("=== FINANCIALS DEBUG ===");
+      console.log("Selected Month:", selectedMonth, "Selected Year:", selectedYear);
+      console.log("Start of Month:", startOfMonth);
+      console.log("End of Month:", endOfMonth);
+      console.log("Projects Data:", projectsData);
+      console.log("Opportunities Data:", opportunitiesData);
+      console.log("All Revenue Items:", allRevenueItems);
 
       // Fetch timesheets for internal cost
       const projectIds = (projectsData || []).map(p => p.id);
@@ -225,8 +233,15 @@ function FinancialsContent() {
         const startDate = new Date(item.start_date);
         const endDate = new Date(item.end_date);
 
+        console.log("Processing item:", item.name);
+        console.log("  Start:", startDate, "End:", endDate);
+        console.log("  Overlap check: endDate < startOfMonth?", endDate < startOfMonth);
+        console.log("  Overlap check: startDate > endOfMonth?", startDate > endOfMonth);
+
         // Check if this item overlaps with the selected month
         if (endDate < startOfMonth || startDate > endOfMonth) continue;
+
+        console.log("  ✓ Item overlaps selected month!");
 
         // Calculate the monthly revenue using same logic as dashboard/pipeline
         const durationMonths = Math.max(1,
@@ -235,6 +250,10 @@ function FinancialsContent() {
         );
 
         const monthlyRevenue = item.total_value / durationMonths;
+
+        console.log("  Duration months:", durationMonths);
+        console.log("  Total value:", item.total_value);
+        console.log("  Monthly revenue:", monthlyRevenue);
 
         // Get costs (only for projects, not opportunities)
         const internalCost = item.type === "project" ? (timesheetsByProject.get(item.id) || 0) : 0;
@@ -260,6 +279,12 @@ function FinancialsContent() {
         totalIntCost += internalCost;
         totalSubCost += subcontractorCost;
       }
+
+      console.log("=== FINAL TOTALS ===");
+      console.log("Total Revenue:", totalRev);
+      console.log("Total Internal Cost:", totalIntCost);
+      console.log("Total Subcontractor Cost:", totalSubCost);
+      console.log("Project Financials breakdown:", breakdown);
 
       setTotalRevenue(totalRev);
       setTotalInternalCost(totalIntCost);
