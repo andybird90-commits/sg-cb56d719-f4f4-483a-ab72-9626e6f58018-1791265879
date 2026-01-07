@@ -98,37 +98,79 @@ function NewOpportunityContent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    const {
+      name,
+      company_id,
+      contact_id,
+      stage,
+      expected_fee_value,
+      tender_due_date,
+      tender_received_date,
+      submitted_date,
+      expected_start_date,
+      expected_end_date,
+      project_reference,
+      description,
+      probability_percent,
+    } = formData;
+
     // Get current user if profile is not enough or use profile.id
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setError("You must be signed in to create an opportunity.");
+      return;
+    }
 
     // Validate required fields
-    if (!formData.name || !formData.company_id || !formData.stage) {
+    if (!name || !company_id || !stage) {
       setError("Please fill in all required fields (Name, Company, Stage)");
       setLoading(false);
       return;
     }
 
+    // Map UI stage values to DB enum values
+    type UiStage = "lead" | "bid" | "high_potential" | "secured" | "lost";
+    type DbStage = "secured" | "high_potential" | "bid";
+
+    const mapStageToDb = (s: UiStage): DbStage => {
+      if (s === "secured") return "secured";
+      if (s === "high_potential") return "high_potential";
+      // Treat lead and lost as bid for now
+      return "bid";
+    };
+
+    const dbStage = mapStageToDb(stage as UiStage);
+
     try {
       setLoading(true);
+      setError("");
+
+      // Build payload, normalising optional UUID fields and nullable fields
+      const payload = {
+        name,
+        company_id, // required and already validated
+        contact_id: contact_id || null, // allow empty when no contact exists
+        description: description || null,
+        stage: dbStage,
+        status: "open" as const,
+        expected_fee_value: expected_fee_value ? parseFloat(expected_fee_value) : null,
+        tender_due_date: tender_due_date || null,
+        tender_received_date: tender_received_date || null,
+        submitted_date: submitted_date || null,
+        expected_start_date: expected_start_date || null,
+        expected_end_date: expected_end_date || null,
+        probability_percent,
+        project_reference: project_reference || null,
+        // If you later add linked_project_id or other optional UUIDs, normalise same way:
+        // linked_project_id: linked_project_id || null,
+        // Note: added_by_user_id is not part of current opportunities schema, so we don't send it.
+      };
 
       const { data, error } = await supabase
-        .from("opportunities" as any)
-        .insert({
-          name: formData.name,
-          company_id: formData.company_id,
-          contact_id: formData.contact_id, // Fixed: was 'contacts_id', should be 'contact_id'
-          stage: formData.stage,
-          expected_fee_value: formData.expected_fee_value ? parseFloat(formData.expected_fee_value) : null,
-          tender_due_date: formData.tender_due_date || null,
-          tender_received_date: formData.tender_received_date || null,
-          submitted_date: formData.submitted_date || null,
-          expected_start_date: formData.expected_start_date || null,
-          expected_end_date: formData.expected_end_date || null,
-          project_reference: formData.project_reference || null,
-          description: formData.description || null,
-          added_by_user_id: user?.id,
-        })
+        .from("opportunities")
+        .insert(payload)
         .select()
         .single();
 
@@ -140,7 +182,7 @@ function NewOpportunityContent() {
 
       router.push("/opportunities");
     } catch (error) {
-      setError((error as any).message);
+      setError((error as Error).message);
       setLoading(false);
     }
   };
