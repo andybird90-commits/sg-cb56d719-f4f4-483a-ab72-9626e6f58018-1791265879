@@ -56,6 +56,17 @@ function NewOpportunityContent() {
     added_by_user_id: "",
   });
 
+  // Map UI stage values to DB enum
+  type UiStage = "lead" | "bid" | "high_potential" | "secured" | "lost";
+  type DbStage = "secured" | "high_potential" | "bid";
+
+  const mapStageToDb = (s: UiStage): DbStage => {
+    if (s === "secured") return "secured";
+    if (s === "high_potential") return "high_potential";
+    // Treat lead and lost as bid for now
+    return "bid";
+  };
+
   useEffect(() => {
     if (profile && profile.role !== "admin" && profile.role !== "director") {
       router.push("/opportunities");
@@ -67,6 +78,9 @@ function NewOpportunityContent() {
   useEffect(() => {
     if (formData.company_id) {
       fetchContacts(formData.company_id);
+    } else {
+      setContacts([]);
+      setFormData((prev) => ({ ...prev, contact_id: "" }));
     }
   }, [formData.company_id]);
 
@@ -114,7 +128,6 @@ function NewOpportunityContent() {
       probability_percent,
     } = formData;
 
-    // Get current user if profile is not enough or use profile.id
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -123,23 +136,11 @@ function NewOpportunityContent() {
       return;
     }
 
-    // Validate required fields
     if (!name || !company_id || !stage) {
       setError("Please fill in all required fields (Name, Company, Stage)");
       setLoading(false);
       return;
     }
-
-    // Map UI stage values to DB enum values
-    type UiStage = "lead" | "bid" | "high_potential" | "secured" | "lost";
-    type DbStage = "secured" | "high_potential" | "bid";
-
-    const mapStageToDb = (s: UiStage): DbStage => {
-      if (s === "secured") return "secured";
-      if (s === "high_potential") return "high_potential";
-      // Treat lead and lost as bid for now
-      return "bid";
-    };
 
     const dbStage = mapStageToDb(stage as UiStage);
 
@@ -147,11 +148,10 @@ function NewOpportunityContent() {
       setLoading(true);
       setError("");
 
-      // Build payload, normalising optional UUID fields and nullable fields
       const payload = {
         name,
-        company_id, // required and already validated
-        contact_id: contact_id || null, // allow empty when no contact exists
+        company_id,
+        contact_id: contact_id || null,
         description: description || null,
         stage: dbStage,
         status: "open" as const,
@@ -163,9 +163,6 @@ function NewOpportunityContent() {
         expected_end_date: expected_end_date || null,
         probability_percent,
         project_reference: project_reference || null,
-        // If you later add linked_project_id or other optional UUIDs, normalise same way:
-        // linked_project_id: linked_project_id || null,
-        // Note: added_by_user_id is not part of current opportunities schema, so we don't send it.
       };
 
       const { data, error } = await supabase
@@ -230,7 +227,9 @@ function NewOpportunityContent() {
                 <Label htmlFor="company_id" className="text-sm sm:text-base">Client Company *</Label>
                 <Select
                   value={formData.company_id}
-                  onValueChange={(value) => setFormData({ ...formData, company_id: value, contact_id: "" })}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, company_id: value, contact_id: "" })
+                  }
                 >
                   <SelectTrigger className="h-10 sm:h-11">
                     <SelectValue placeholder="Select a company" />
@@ -247,10 +246,12 @@ function NewOpportunityContent() {
 
               {formData.company_id && contacts.length > 0 && (
                 <div className="space-y-2">
-                  <Label htmlFor="contact_id" className="text-sm sm:text-base">Contact</Label>
+                  <Label htmlFor="contact_id" className="text-sm sm:text-base">Contact (optional)</Label>
                   <Select
                     value={formData.contact_id}
-                    onValueChange={(value) => setFormData({ ...formData, contact_id: value })}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, contact_id: value })
+                    }
                   >
                     <SelectTrigger className="h-10 sm:h-11">
                       <SelectValue placeholder="Select a contact (optional)" />
@@ -263,6 +264,9 @@ function NewOpportunityContent() {
                       ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-slate-500">
+                    You can leave this blank if there is no main contact yet.
+                  </p>
                 </div>
               )}
 
