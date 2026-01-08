@@ -812,12 +812,12 @@ function DashboardContent() {
                   {showSecuredOnly ? (
                     <>
                       <EyeOff className="w-4 h-4 mr-1" />
-                      Secured Only
+                      Show All
                     </>
                   ) : (
                     <>
                       <Eye className="w-4 h-4 mr-1" />
-                      Show All
+                      Secured Only
                     </>
                   )}
                 </Button>
