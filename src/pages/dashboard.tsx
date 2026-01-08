@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Building2, Users, Target, Briefcase, TrendingUp, Calendar, AlertCircle, AlertTriangle, MessageSquare, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Building2, Users, Target, Briefcase, TrendingUp, Calendar, AlertCircle, AlertTriangle, MessageSquare, ArrowUpDown, ArrowUp, ArrowDown, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
@@ -122,6 +122,9 @@ function DashboardContent() {
   const [pipelineLoading, setPipelineLoading] = useState(true);
   const [pipelineError, setPipelineError] = useState<string | null>(null);
   const [pipelineData, setPipelineData] = useState<PipelineData[]>([]);
+  
+  // Filter state for secured-only view
+  const [showSecuredOnly, setShowSecuredOnly] = useState(false);
 
   // Sorting state
   const [sortField, setSortField] = useState<SortField>("created_at");
@@ -706,6 +709,16 @@ function DashboardContent() {
 
 
   const sortedOpportunities = getSortedOpportunities();
+  
+  // Filter pipeline data based on secured-only toggle
+  const filteredPipelineData = showSecuredOnly
+    ? pipelineData.map(month => ({
+        ...month,
+        highPotential: 0,
+        bid: 0,
+        budgetGap: month.budget - month.secured
+      }))
+    : pipelineData;
 
   return (
     <Layout>
@@ -792,6 +805,23 @@ function DashboardContent() {
               <span>12-Month Pipeline</span>
               <div className="flex gap-2">
                 <Button
+                  variant={showSecuredOnly ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setShowSecuredOnly(!showSecuredOnly)}
+                >
+                  {showSecuredOnly ? (
+                    <>
+                      <EyeOff className="w-4 h-4 mr-1" />
+                      Secured Only
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="w-4 h-4 mr-1" />
+                      Show All
+                    </>
+                  )}
+                </Button>
+                <Button
                   variant="outline"
                   size="sm"
                   onClick={() => router.push("/pipeline/monthly")}>
@@ -822,7 +852,7 @@ function DashboardContent() {
                 {/* Chart with dynamic height */}
                 <div className="w-full" style={{ minHeight: "500px", height: "auto" }}>
                   <ResponsiveContainer width="100%" height="100%" minHeight={500}>
-                    <BarChart data={pipelineData} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
+                    <BarChart data={filteredPipelineData} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis
                       dataKey="month"
@@ -844,8 +874,12 @@ function DashboardContent() {
                       iconType="circle" />
 
                       <Bar dataKey="secured" stackId="a" fill="#22c55e" name="Secured + Projects" />
-                      <Bar dataKey="highPotential" stackId="a" name="High Potential" fill="#3b82f6" />
-                      <Bar dataKey="bid" stackId="a" name="Bid" fill="#f59e0b" />
+                      {!showSecuredOnly && (
+                        <>
+                          <Bar dataKey="highPotential" stackId="a" name="High Potential" fill="#3b82f6" />
+                          <Bar dataKey="bid" stackId="a" name="Bid" fill="#f59e0b" />
+                        </>
+                      )}
                       <Bar dataKey="budgetGap" stackId="a" name="Budget Gap" fill="#ef4444" />
                     </BarChart>
                   </ResponsiveContainer>
@@ -860,19 +894,27 @@ function DashboardContent() {
                         <tr className="bg-muted">
                           <th className="border p-2 text-left">Month</th>
                           <th className="border p-2 text-right text-green-600">Secured + Projects</th>
-                          <th className="border p-2 text-right text-blue-600">High Potential</th>
-                          <th className="border p-2 text-right text-amber-600">Bid</th>
+                          {!showSecuredOnly && (
+                            <>
+                              <th className="border p-2 text-right text-blue-600">High Potential</th>
+                              <th className="border p-2 text-right text-amber-600">Bid</th>
+                            </>
+                          )}
                           <th className="border p-2 text-right text-red-600">Budget Gap</th>
                           <th className="border p-2 text-right font-semibold">Total</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {pipelineData.map((row) =>
+                        {filteredPipelineData.map((row) =>
                       <tr key={row.month} className="hover:bg-muted/50">
                             <td className="border p-2">{row.month}</td>
                             <td className="border p-2 text-right">{formatCurrency(row.secured)}</td>
-                            <td className="border p-2 text-right">{formatCurrency(row.highPotential)}</td>
-                            <td className="border p-2 text-right">{formatCurrency(row.bid)}</td>
+                            {!showSecuredOnly && (
+                              <>
+                                <td className="border p-2 text-right">{formatCurrency(row.highPotential)}</td>
+                                <td className="border p-2 text-right">{formatCurrency(row.bid)}</td>
+                              </>
+                            )}
                             <td className="border p-2 text-right">{formatCurrency(row.budgetGap)}</td>
                             <td className="border p-2 text-right font-semibold">
                               {formatCurrency(row.secured + row.highPotential + row.bid + row.budgetGap)}
@@ -882,19 +924,23 @@ function DashboardContent() {
                         <tr className="bg-gray-100 dark:bg-gray-800 font-bold">
                           <td className="px-4 py-2">TOTAL</td>
                           <td className="px-4 py-2 text-green-600" style={{ textAlign: "right" }}>
-                            £{pipelineData.reduce((sum, month) => sum + month.secured, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                            £{filteredPipelineData.reduce((sum, month) => sum + month.secured, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                           </td>
-                          <td className="px-4 py-2 text-blue-600" style={{ textAlign: "right" }}>
-                            £{pipelineData.reduce((sum, month) => sum + month.highPotential, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                          </td>
-                          <td className="px-4 py-2 text-amber-600" style={{ textAlign: "right" }}>
-                            £{pipelineData.reduce((sum, month) => sum + month.bid, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                          </td>
+                          {!showSecuredOnly && (
+                            <>
+                              <td className="px-4 py-2 text-blue-600" style={{ textAlign: "right" }}>
+                                £{filteredPipelineData.reduce((sum, month) => sum + month.highPotential, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                              </td>
+                              <td className="px-4 py-2 text-amber-600" style={{ textAlign: "right" }}>
+                                £{filteredPipelineData.reduce((sum, month) => sum + month.bid, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                              </td>
+                            </>
+                          )}
                           <td className="px-4 py-2 text-red-600" style={{ textAlign: "right" }}>
-                            £{pipelineData.reduce((sum, month) => sum + month.budgetGap, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                            £{filteredPipelineData.reduce((sum, month) => sum + month.budgetGap, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                           </td>
                           <td className="px-4 py-2" style={{ textAlign: "right" }}>
-                            £{pipelineData.reduce((sum, month) => sum + month.secured + month.highPotential + month.bid + month.budgetGap, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                            £{filteredPipelineData.reduce((sum, month) => sum + month.secured + month.highPotential + month.bid + month.budgetGap, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                           </td>
                         </tr>
                       </tbody>
