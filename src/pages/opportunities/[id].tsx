@@ -72,6 +72,7 @@ function OpportunityDetailContent() {
   const [editFormData, setEditFormData] = useState({
     name: "",
     stage: "",
+    status: "",
     expected_fee_value: "",
     expected_start_date: "",
     expected_end_date: "",
@@ -137,7 +138,8 @@ function OpportunityDetailContent() {
       setOpportunity(opportunityData);
       setEditFormData({
         name: opportunityData.name,
-        stage: opportunityData.stage as any,
+        stage: opportunityData.stage,
+        status: opportunityData.status || "open",
         expected_fee_value: opportunityData.expected_fee_value?.toString() || "",
         expected_start_date: opportunityData.expected_start_date || "",
         expected_end_date: opportunityData.expected_end_date || "",
@@ -159,7 +161,7 @@ function OpportunityDetailContent() {
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!id || typeof id !== "string") return;
+    if (!id || typeof id === "string") return;
 
     try {
       const { error: updateError } = await supabase
@@ -167,12 +169,13 @@ function OpportunityDetailContent() {
         .update({
           name: editFormData.name,
           description: editFormData.description || null,
-          stage: editFormData.stage as any,
+          stage: editFormData.stage,
+          status: editFormData.status,
           tender_due_date: editFormData.tender_due_date || null,
           expected_start_date: editFormData.expected_start_date || null,
           expected_end_date: editFormData.expected_end_date || null,
           expected_fee_value: editFormData.expected_fee_value ? parseFloat(editFormData.expected_fee_value) : null,
-          probability_percent: editFormData.probability_percent ? parseInt(editFormData.probability_percent as string) : null,
+          probability_percent: editFormData.probability_percent ? parseInt(editFormData.probability_percent) : null,
           added_by_user_id: editFormData.added_by_user_id || null,
         })
         .eq("id", id);
@@ -189,7 +192,7 @@ function OpportunityDetailContent() {
   };
 
   const handleDelete = async () => {
-    if (!id || typeof id !== "string") return;
+    if (!id || typeof id === "string") return;
     if (!confirm("Are you sure you want to delete this opportunity?")) return;
 
     try {
@@ -207,25 +210,22 @@ function OpportunityDetailContent() {
   };
 
   const handleSave = async () => {
-    if (!id || typeof id !== "string") return;
+    if (!id || typeof id === "string") return;
 
     try {
       // Calculate probability based on stage - ALWAYS enforce the rules
       const probability = 
-        editFormData.stage === 'lead' ? 10 :
-        editFormData.stage === 'in_bid' ? 25 :
         editFormData.stage === 'bid' ? 25 :
         editFormData.stage === 'high_potential' ? 50 :
-        editFormData.stage === 'won' ? 100 :
-        editFormData.stage === 'secured' ? 100 :
-        editFormData.stage === 'lost' ? 0 : 50;
+        editFormData.stage === 'secured' ? 100 : 50;
 
-      // Determine if this should be archived
-      const shouldArchive = editFormData.stage === 'lost' || editFormData.stage === 'secured';
+      // Determine if this should be archived based on STATUS field (not stage)
+      const shouldArchive = editFormData.status === 'closed_lost' || editFormData.status === 'closed_won';
       
       const updates: any = {
         name: editFormData.name,
-        stage: editFormData.stage as any,
+        stage: editFormData.stage,
+        status: editFormData.status,
         probability_percent: probability,
         expected_fee_value: editFormData.expected_fee_value ? parseFloat(editFormData.expected_fee_value) : null,
         expected_start_date: editFormData.expected_start_date || null,
@@ -241,7 +241,7 @@ function OpportunityDetailContent() {
       if (shouldArchive) {
         updates.archived = true;
         updates.archived_at = new Date().toISOString();
-        updates.archived_reason = editFormData.stage; // 'lost' or 'secured'
+        updates.archived_reason = editFormData.status; // 'closed_lost' or 'closed_won'
         updates.archived_by_user_id = profile?.id || null;
       }
 
@@ -262,6 +262,7 @@ function OpportunityDetailContent() {
       }
     } catch (error) {
       console.error("Error saving opportunity:", error);
+      setError("Failed to save opportunity");
     }
   };
 
@@ -377,20 +378,35 @@ function OpportunityDetailContent() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="edit-stage">Stage</Label>
+                      <Label htmlFor="edit-stage">Sales Stage *</Label>
                       <Select
                         value={editFormData.stage}
-                        onValueChange={(value) => setEditFormData({ ...editFormData, stage: value as any })}
+                        onValueChange={(value) => setEditFormData({ ...editFormData, stage: value })}
                       >
                         <SelectTrigger id="edit-stage">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="lead">Lead</SelectItem>
-                          <SelectItem value="bid">In Bid</SelectItem>
+                          <SelectItem value="bid">Bid</SelectItem>
                           <SelectItem value="high_potential">High Potential</SelectItem>
-                          <SelectItem value="secured">Won</SelectItem>
-                          <SelectItem value="lost">Lost</SelectItem>
+                          <SelectItem value="secured">Secured</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-status">Status *</Label>
+                      <Select
+                        value={editFormData.status}
+                        onValueChange={(value) => setEditFormData({ ...editFormData, status: value })}
+                      >
+                        <SelectTrigger id="edit-status">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="open">Open</SelectItem>
+                          <SelectItem value="closed_won">Closed - Won</SelectItem>
+                          <SelectItem value="closed_lost">Closed - Lost</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -410,14 +426,17 @@ function OpportunityDetailContent() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="probability_percent" className="text-sm sm:text-base">Probability (%)</Label>
+                      <Label htmlFor="probability_percent" className="text-sm sm:text-base">Probability (%) - Auto-calculated</Label>
                       <Input
                         id="probability_percent"
                         type="number"
                         min="0"
                         max="100"
-                        value={editFormData.probability_percent}
-                        onChange={(e) => setEditFormData({ ...editFormData, probability_percent: e.target.value })}
+                        value={
+                          editFormData.stage === 'bid' ? '25' :
+                          editFormData.stage === 'high_potential' ? '50' :
+                          editFormData.stage === 'secured' ? '100' : '50'
+                        }
                         className="h-10 sm:h-11"
                         readOnly
                         disabled
@@ -480,7 +499,7 @@ function OpportunityDetailContent() {
                   </div>
 
                   <div className="flex flex-col sm:flex-row gap-3">
-                    <Button type="submit" className="h-10 sm:h-11">Save Changes</Button>
+                    <Button type="button" onClick={handleSave} className="h-10 sm:h-11">Save Changes</Button>
                     <Button type="button" variant="outline" onClick={() => setIsEditing(false)} className="h-10 sm:h-11">
                       Cancel
                     </Button>
@@ -513,6 +532,16 @@ function OpportunityDetailContent() {
                   )}
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-sm text-slate-600">Sales Stage</div>
+                      <div className="font-medium">{opportunity.stage.replace("_", " ")}</div>
+                    </div>
+
+                    <div>
+                      <div className="text-sm text-slate-600">Status</div>
+                      <div className="font-medium">{opportunity.status.replace("_", " ")}</div>
+                    </div>
+
                     {opportunity.project_reference && (
                       <div>
                         <div className="text-sm text-slate-600">Project Reference</div>
