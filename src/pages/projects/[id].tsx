@@ -302,28 +302,48 @@ function ProjectDetailContent() {
     if (!id || typeof id !== "string") return;
 
     try {
+      // Determine if this should be archived
+      const shouldArchive = projectForm.status === 'completed';
+      
+      const updates: any = {
+        code: projectForm.code,
+        name: projectForm.name,
+        status: projectForm.status as "pipeline" | "live" | "on_hold" | "completed" | "cancelled",
+        start_date: projectForm.start_date || null,
+        end_date: projectForm.end_date || null,
+        agreed_fee_value: projectForm.agreed_fee_value ? parseFloat(projectForm.agreed_fee_value) : null,
+        notes: projectForm.notes || null,
+      };
+
+      // Add archive fields if archiving
+      if (shouldArchive) {
+        updates.archived = true;
+        updates.archived_at = new Date().toISOString();
+        updates.archived_reason = 'completed';
+        updates.archived_by_user_id = profile?.id || null;
+      }
+
       const { error } = await supabase
         .from("projects")
-        .update({
-          code: projectForm.code,
-          name: projectForm.name,
-          status: projectForm.status as "pipeline" | "live" | "on_hold" | "completed" | "cancelled",
-          start_date: projectForm.start_date || null,
-          end_date: projectForm.end_date || null,
-          agreed_fee_value: projectForm.agreed_fee_value ? parseFloat(projectForm.agreed_fee_value) : null,
-          notes: projectForm.notes || null,
-        })
+        .update(updates)
         .eq("id", id);
 
       if (error) throw error;
 
       toast({
         title: "Project updated",
-        description: "Project details have been updated successfully.",
+        description: shouldArchive 
+          ? "Project has been completed and archived successfully."
+          : "Project details have been updated successfully.",
       });
 
-      await fetchProjectData(id);
-      setIsEditingProject(false);
+      if (shouldArchive) {
+        // Redirect back to projects list after archiving
+        router.push("/projects");
+      } else {
+        await fetchProjectData(id);
+        setIsEditingProject(false);
+      }
     } catch (err) {
       console.error("Failed to update project", err);
       toast({
@@ -1053,36 +1073,50 @@ function ProjectDetailContent() {
                     <div className="grid grid-cols-2 gap-4">
                       {project.companies && (
                         <div>
-                          <div className="text-sm font-medium text-slate-500">Client</div>
-                          <div className="text-slate-900">{project.companies.name}</div>
+                          <div className="text-sm font-medium text-slate-500 mb-1">
+                            Client
+                          </div>
+                          <div className="text-slate-900">
+                            {project.companies.name}
+                          </div>
                         </div>
                       )}
                       
                       {project.opportunities && (
                         <div>
-                          <div className="text-sm font-medium text-slate-500">Linked Opportunity</div>
-                          <div className="text-slate-900">{project.opportunities.name}</div>
+                          <div className="text-sm font-medium text-slate-500 mb-1">
+                            Linked Opportunity
+                          </div>
+                          <div className="text-slate-900">
+                            {project.opportunities.name}
+                          </div>
                         </div>
                       )}
 
                       {project.agreed_fee_value && (
                         <div>
-                          <div className="text-sm font-medium text-slate-500">Agreed Fee</div>
-                          <div className="text-slate-900 font-semibold">{formatCurrency(project.agreed_fee_value)}</div>
+                          <div className="text-sm font-medium text-slate-500 mb-1">Agreed Fee</div>
+                          <div className="text-slate-900 font-semibold">
+                            {formatCurrency(project.agreed_fee_value)}
+                          </div>
                         </div>
                       )}
 
                       {project.start_date && (
                         <div>
-                          <div className="text-sm font-medium text-slate-500">Start Date</div>
-                          <div className="text-slate-900">{formatDate(project.start_date)}</div>
+                          <div className="text-sm font-medium text-slate-500 mb-1">Start Date</div>
+                          <div className="text-slate-900">
+                            {formatDate(project.start_date)}
+                          </div>
                         </div>
                       )}
 
                       {project.end_date && (
                         <div>
-                          <div className="text-sm font-medium text-slate-500">End Date</div>
-                          <div className="text-slate-900">{formatDate(project.end_date)}</div>
+                          <div className="text-sm font-medium text-slate-500 mb-1">End Date</div>
+                          <div className="text-slate-900">
+                            {formatDate(project.end_date)}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1090,7 +1124,9 @@ function ProjectDetailContent() {
                     {project.notes && (
                       <div>
                         <div className="text-sm font-medium text-slate-500 mb-1">Notes</div>
-                        <div className="text-slate-900 whitespace-pre-wrap">{project.notes}</div>
+                        <div className="text-slate-900 whitespace-pre-wrap">
+                          {project.notes}
+                        </div>
                       </div>
                     )}
                   </div>

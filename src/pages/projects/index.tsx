@@ -56,6 +56,7 @@ function ProjectsContent() {
             name
           )
         `)
+        .eq("archived", false)
         .order("created_at", { ascending: false });
 
       if (fetchError) throw fetchError;

@@ -220,27 +220,46 @@ function OpportunityDetailContent() {
         editFormData.stage === 'secured' ? 100 :
         editFormData.stage === 'lost' ? 0 : 50;
 
+      // Determine if this should be archived
+      const shouldArchive = editFormData.stage === 'lost' || editFormData.stage === 'secured';
+      
+      const updates: any = {
+        name: editFormData.name,
+        stage: editFormData.stage as any,
+        probability_percent: probability,
+        expected_fee_value: editFormData.expected_fee_value ? parseFloat(editFormData.expected_fee_value) : null,
+        expected_start_date: editFormData.expected_start_date || null,
+        expected_end_date: editFormData.expected_end_date || null,
+        tender_due_date: editFormData.tender_due_date || null,
+        tender_received_date: editFormData.tender_received_date || null,
+        submitted_date: editFormData.submitted_date || null,
+        project_reference: editFormData.project_reference || null,
+        description: editFormData.description || null,
+      };
+
+      // Add archive fields if archiving
+      if (shouldArchive) {
+        updates.archived = true;
+        updates.archived_at = new Date().toISOString();
+        updates.archived_reason = editFormData.stage; // 'lost' or 'secured'
+        updates.archived_by_user_id = profile?.id || null;
+      }
+
       const { error } = await supabase
         .from("opportunities" as any)
-        .update({
-          name: editFormData.name,
-          stage: editFormData.stage as any,
-          probability_percent: probability,
-          expected_fee_value: editFormData.expected_fee_value ? parseFloat(editFormData.expected_fee_value) : null,
-          expected_start_date: editFormData.expected_start_date || null,
-          expected_end_date: editFormData.expected_end_date || null,
-          tender_due_date: editFormData.tender_due_date || null,
-          tender_received_date: editFormData.tender_received_date || null,
-          submitted_date: editFormData.submitted_date || null,
-          project_reference: editFormData.project_reference || null,
-          description: editFormData.description || null,
-        })
+        .update(updates)
         .eq("id", id);
 
       if (error) throw error;
 
       setIsEditing(false);
-      fetchOpportunity(id);
+      
+      if (shouldArchive) {
+        // Redirect back to opportunities list after archiving
+        router.push("/opportunities");
+      } else {
+        fetchOpportunity(id);
+      }
     } catch (error) {
       console.error("Error saving opportunity:", error);
     }

@@ -39,6 +39,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { href: "/timesheets/my", icon: Clock, label: "Timesheets" },
     { href: "/financials", icon: PoundSterling, label: "Financials" },
     { href: "/absences/my", icon: Calendar, label: "Absences" },
+    { href: "/archive", icon: Archive, label: "Archive" },
   ];
 
   if (isAdmin) {

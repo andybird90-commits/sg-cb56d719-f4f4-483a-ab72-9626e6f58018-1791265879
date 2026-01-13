@@ -1,60 +1,64 @@
-import { useState, useEffect } from "react";
-import { useRouter } from "next/router";
-import { Layout } from "@/components/Layout";
 import { RequireAuth } from "@/components/RequireAuth";
-import { supabase } from "@/lib/supabase";
+import { Layout } from "@/components/Layout";
 import { useAuth } from "@/contexts/AuthContext";
-import { Card, CardContent } from "@/components/ui/card";
+import { useRouter } from "next/router";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Archive, 
-  RotateCcw, 
-  Trash2, 
-  Building2, 
-  Calendar,
-  FileText,
-  AlertCircle
-} from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Archive as ArchiveIcon, Briefcase, AlertTriangle, Search, RefreshCw, Eye } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface ArchivedProject {
   id: string;
   code: string;
   name: string;
   status: string;
-  project_reference: string | null;
   archived_at: string | null;
-  archived: boolean;
-  client_company?: {
+  archived_reason: string | null;
+  companies?: {
     name: string;
   };
   archived_by_profile?: {
-    full_name: string;
-    email?: string;
+    full_name: string | null;
+    email: string;
   };
 }
 
-export default function ProjectsArchive() {
-  const router = useRouter();
+function ArchivedProjectsContent() {
   const { profile } = useAuth();
+  const router = useRouter();
+  const { toast } = useToast();
   const [projects, setProjects] = useState<ArchivedProject[]>([]);
+  const [filteredProjects, setFilteredProjects] = useState<ArchivedProject[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // Everyone can restore
+  const canRestore = !!profile;
 
   useEffect(() => {
-    if (profile) {
-      fetchArchivedProjects();
-    }
-  }, [profile]);
+    fetchArchivedProjects();
+  }, []);
+
+  useEffect(() => {
+    filterProjects();
+  }, [projects, searchTerm]);
 
   const fetchArchivedProjects = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      setError(null);
+
+      const { data, error: fetchError } = await supabase
         .from("projects" as any)
         .select(`
           *,
-          client_company:companies!projects_client_company_id_fkey (
+          companies!projects_client_company_id_fkey (
             name
           ),
           archived_by_profile:profiles!projects_archived_by_user_id_fkey (
@@ -65,8 +69,10 @@ export default function ProjectsArchive() {
         .eq("archived", true)
         .order("archived_at", { ascending: false });
 
-      if (error) throw error;
+      if (fetchError) throw fetchError;
+      
       setProjects((data as any) || []);
+      setFilteredProjects((data as any) || []);
     } catch (err) {
       console.error("Failed to load archived projects", err);
       setError("Failed to load archived projects");
@@ -75,10 +81,26 @@ export default function ProjectsArchive() {
     }
   };
 
+  const filterProjects = () => {
+    if (!searchTerm) {
+      setFilteredProjects(projects);
+      return;
+    }
+
+    const filtered = projects.filter((project) => {
+      const searchLower = searchTerm.toLowerCase();
+      return (
+        project.code.toLowerCase().includes(searchLower) ||
+        project.name.toLowerCase().includes(searchLower) ||
+        project.companies?.name.toLowerCase().includes(searchLower)
+      );
+    });
+
+    setFilteredProjects(filtered);
+  };
+
   const handleRestore = async (projectId: string) => {
-    if (!profile) return;
-    if (profile.role !== "director" && profile.role !== "admin") {
-      alert("Only Directors and Admins can restore archived projects");
+    if (!confirm("Are you sure you want to restore this project? It will be moved back to the active projects list.")) {
       return;
     }
 
@@ -88,42 +110,27 @@ export default function ProjectsArchive() {
         .update({
           archived: false,
           archived_at: null,
+          archived_reason: null,
           archived_by_user_id: null,
         })
         .eq("id", projectId);
 
       if (error) throw error;
-      
-      await fetchArchivedProjects();
+
+      toast({
+        title: "Project restored",
+        description: "The project has been restored to the active list.",
+      });
+
+      // Refresh the list
+      fetchArchivedProjects();
     } catch (err) {
       console.error("Failed to restore project", err);
-      alert("Failed to restore project");
-    }
-  };
-
-  const handleDelete = async (projectId: string) => {
-    if (!profile) return;
-    if (profile.role !== "admin") {
-      alert("Only Admins can permanently delete archived projects");
-      return;
-    }
-
-    if (!confirm("Are you sure you want to permanently delete this project? This action cannot be undone.")) {
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from("projects" as any)
-        .delete()
-        .eq("id", projectId);
-
-      if (error) throw error;
-      
-      await fetchArchivedProjects();
-    } catch (err) {
-      console.error("Failed to delete project", err);
-      alert("Failed to delete project");
+      toast({
+        title: "Error",
+        description: "Failed to restore project. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -136,151 +143,181 @@ export default function ProjectsArchive() {
     });
   };
 
-  const canRestore = profile?.role === "director" || profile?.role === "admin";
-  const canDelete = profile?.role === "admin";
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "live":
+        return "bg-green-100 text-green-800";
+      case "pipeline":
+        return "bg-blue-100 text-blue-800";
+      case "on_hold":
+        return "bg-yellow-100 text-yellow-800";
+      case "completed":
+        return "bg-slate-100 text-slate-800";
+      case "cancelled":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-slate-100 text-slate-800";
+    }
+  };
+
+  const getReasonBadge = (reason: string | null) => {
+    if (!reason) return null;
+    
+    const colors = {
+      completed: "bg-slate-100 text-slate-800",
+      cancelled: "bg-red-100 text-red-800",
+    };
+
+    return (
+      <Badge className={colors[reason as keyof typeof colors] || "bg-slate-100 text-slate-800"}>
+        {reason}
+      </Badge>
+    );
+  };
 
   return (
-    <RequireAuth>
-      <Layout>
-        <div className="container mx-auto px-4 py-6 sm:py-8 max-w-7xl">
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-slate-100 rounded-lg">
-                <Archive className="w-6 h-6 text-slate-600" />
-              </div>
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-bold">Archived Projects</h1>
-                <p className="text-sm text-slate-600">
-                  {projects.length} archived {projects.length === 1 ? "project" : "projects"}
-                </p>
-              </div>
+    <Layout>
+      <div className="space-y-4 sm:space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <ArchiveIcon className="w-6 h-6 text-slate-600" />
+              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Archived Projects</h1>
             </div>
-            <Button onClick={() => router.push("/projects")}>
-              Back to Projects
-            </Button>
+            <p className="text-sm sm:text-base text-slate-600">View and restore archived projects</p>
           </div>
+        </div>
 
-          {/* Permission Notice */}
-          {!canRestore && (
-            <Card className="mb-6 border-amber-200 bg-amber-50">
-              <CardContent className="p-4 flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
-                <div>
-                  <p className="text-sm text-amber-800">
-                    <strong>View Only:</strong> Only Directors and Admins can restore archived projects.
-                    {!canDelete && " Only Admins can permanently delete them."}
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+          <Input
+            placeholder="Search archived projects..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+
+        {/* Error State */}
+        {error && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {/* Loading State */}
+        {loading && !error && (
+          <Card>
+            <CardContent className="p-8 text-center">
+              <div className="text-slate-600">Loading archived projects...</div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Projects List */}
+        {!loading && !error && (
+          <div className="space-y-3">
+            {filteredProjects.length === 0 ? (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <ArchiveIcon className="w-12 h-12 mx-auto text-slate-300 mb-3" />
+                  <p className="text-slate-600">
+                    {searchTerm ? "No archived projects found" : "No archived projects"}
                   </p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Loading State */}
-          {loading && (
-            <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900 mx-auto"></div>
-              <p className="mt-4 text-slate-600">Loading archived projects...</p>
-            </div>
-          )}
-
-          {/* Error State */}
-          {error && (
-            <Card className="border-red-200 bg-red-50">
-              <CardContent className="p-6 text-center">
-                <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
-                <p className="text-red-800">{error}</p>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Empty State */}
-          {!loading && !error && projects.length === 0 && (
-            <Card>
-              <CardContent className="p-12 text-center">
-                <Archive className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No archived projects</h3>
-                <p className="text-slate-600">
-                  Completed or cancelled projects will appear here.
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Archived Projects Grid */}
-          {!loading && !error && projects.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {projects.map((project) => (
-                <Card key={project.id} className="hover:shadow-md transition-shadow">
+                </CardContent>
+              </Card>
+            ) : (
+              filteredProjects.map((project) => (
+                <Card 
+                  key={project.id} 
+                  className="hover:shadow-md transition-shadow"
+                >
                   <CardContent className="p-4 sm:p-6">
-                    <div className="mb-3">
-                      <div className="flex items-center gap-2 text-sm text-slate-600 mb-1">
-                        <FileText className="w-3 h-3" />
-                        <span>{project.code}</span>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
+                          <span className="font-mono text-xs sm:text-sm text-slate-500 flex-shrink-0">
+                            {project.code}
+                          </span>
+                          <h3 className="text-base sm:text-lg font-semibold text-slate-900 truncate">
+                            {project.name}
+                          </h3>
+                        </div>
+                        
+                        {/* Client */}
+                        <p className="text-sm text-slate-600 mb-2">{project.companies?.name}</p>
+                        
+                        {/* Status Badges */}
+                        <div className="flex flex-wrap gap-2 mb-2">
+                          <Badge className={`${getStatusColor(project.status)} w-fit text-xs`}>
+                            {project.status.replace("_", " ")}
+                          </Badge>
+                          {getReasonBadge(project.archived_reason)}
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-sm">
+                          {project.archived_at && (
+                            <span className="text-slate-500">
+                              Archived: {formatDate(project.archived_at)}
+                            </span>
+                          )}
+                        </div>
+
+                        {project.archived_by_profile && (
+                          <div className="text-xs text-slate-500 mt-1">
+                            Archived by {project.archived_by_profile.full_name || project.archived_by_profile.email}
+                          </div>
+                        )}
                       </div>
-                      <h3 className="font-semibold text-base sm:text-lg">
-                        {project.name}
-                      </h3>
-                      {project.client_company && (
-                        <p className="text-sm text-slate-600 flex items-center gap-1 mt-1">
-                          <Building2 className="w-3 h-3" />
-                          {project.client_company.name}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2 text-sm text-slate-600 mb-4">
-                      {project.project_reference && (
-                        <div className="flex items-center gap-2">
-                          <FileText className="w-4 h-4" />
-                          <span className="font-medium">{project.project_reference}</span>
-                        </div>
-                      )}
-
-                      {project.archived_at && (
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4" />
-                          <span>Archived: {formatDate(project.archived_at)}</span>
-                        </div>
-                      )}
-
-                      {project.archived_by_profile && (
-                        <div className="text-xs text-slate-500">
-                          By: {project.archived_by_profile.full_name || project.archived_by_profile.email || "Unknown"}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex gap-2 pt-3 border-t">
-                      {canRestore && (
+                      
+                      <div className="flex flex-col gap-2 flex-shrink-0">
                         <Button
-                          size="sm"
                           variant="outline"
-                          onClick={() => handleRestore(project.id)}
-                          className="flex-1"
-                        >
-                          <RotateCcw className="w-3 h-3 mr-1" />
-                          Restore
-                        </Button>
-                      )}
-                      {canDelete && (
-                        <Button
                           size="sm"
-                          variant="destructive"
-                          onClick={() => handleDelete(project.id)}
+                          onClick={() => router.push(`/projects/${project.id}`)}
+                          className="gap-2"
                         >
-                          <Trash2 className="w-3 h-3" />
+                          <Eye className="w-4 h-4" />
+                          View
                         </Button>
-                      )}
+                        {canRestore && (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => handleRestore(project.id)}
+                            className="gap-2"
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                            Restore
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
-              ))}
-            </div>
-          )}
-        </div>
-      </Layout>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* Results count */}
+        {!loading && !error && filteredProjects.length > 0 && (
+          <div className="text-center text-sm text-slate-600">
+            Showing {filteredProjects.length} archived {filteredProjects.length === 1 ? 'project' : 'projects'}
+          </div>
+        )}
+      </div>
+    </Layout>
+  );
+}
+
+export default function ArchivedProjectsPage() {
+  return (
+    <RequireAuth>
+      <ArchivedProjectsContent />
     </RequireAuth>
   );
 }

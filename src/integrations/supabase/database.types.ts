@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -312,6 +312,7 @@ export type Database = {
           archived: boolean | null
           archived_at: string | null
           archived_by_user_id: string | null
+          archived_reason: string | null
           company_id: string
           contact_id: string | null
           created_at: string
@@ -336,6 +337,7 @@ export type Database = {
           archived?: boolean | null
           archived_at?: string | null
           archived_by_user_id?: string | null
+          archived_reason?: string | null
           company_id: string
           contact_id?: string | null
           created_at?: string
@@ -360,6 +362,7 @@ export type Database = {
           archived?: boolean | null
           archived_at?: string | null
           archived_by_user_id?: string | null
+          archived_reason?: string | null
           company_id?: string
           contact_id?: string | null
           created_at?: string
@@ -801,6 +804,7 @@ export type Database = {
           archived: boolean | null
           archived_at: string | null
           archived_by_user_id: string | null
+          archived_reason: string | null
           client_company_id: string
           code: string
           created_at: string
@@ -809,6 +813,7 @@ export type Database = {
           name: string
           notes: string | null
           opportunity_id: string | null
+          project_reference: string | null
           start_date: string | null
           status: string
           updated_at: string
@@ -818,6 +823,7 @@ export type Database = {
           archived?: boolean | null
           archived_at?: string | null
           archived_by_user_id?: string | null
+          archived_reason?: string | null
           client_company_id: string
           code: string
           created_at?: string
@@ -826,6 +832,7 @@ export type Database = {
           name: string
           notes?: string | null
           opportunity_id?: string | null
+          project_reference?: string | null
           start_date?: string | null
           status?: string
           updated_at?: string
@@ -835,6 +842,7 @@ export type Database = {
           archived?: boolean | null
           archived_at?: string | null
           archived_by_user_id?: string | null
+          archived_reason?: string | null
           client_company_id?: string
           code?: string
           created_at?: string
@@ -843,6 +851,7 @@ export type Database = {
           name?: string
           notes?: string | null
           opportunity_id?: string | null
+          project_reference?: string | null
           start_date?: string | null
           status?: string
           updated_at?: string
