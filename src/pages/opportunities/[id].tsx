@@ -159,40 +159,8 @@ function OpportunityDetailContent() {
     }
   };
 
-  const handleUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!id || typeof id === "string") return;
-
-    try {
-      const { error: updateError } = await supabase
-        .from("opportunities")
-        .update({
-          name: editFormData.name,
-          description: editFormData.description || null,
-          stage: editFormData.stage,
-          status: editFormData.status,
-          tender_due_date: editFormData.tender_due_date || null,
-          expected_start_date: editFormData.expected_start_date || null,
-          expected_end_date: editFormData.expected_end_date || null,
-          expected_fee_value: editFormData.expected_fee_value ? parseFloat(editFormData.expected_fee_value) : null,
-          probability_percent: editFormData.probability_percent ? parseInt(editFormData.probability_percent) : null,
-          added_by_user_id: editFormData.added_by_user_id || null,
-        })
-        .eq("id", id);
-
-      if (updateError) throw updateError;
-
-      await fetchOpportunity(id);
-      setIsEditing(false);
-      setError(null);
-    } catch (err) {
-      console.error("Failed to update opportunity", err);
-      setError("Failed to update opportunity");
-    }
-  };
-
   const handleDelete = async () => {
-    if (!id || typeof id === "string") return;
+    if (!id || typeof id !== "string") return;
     if (!confirm("Are you sure you want to delete this opportunity?")) return;
 
     try {
@@ -209,8 +177,9 @@ function OpportunityDetailContent() {
     }
   };
 
-  const handleSave = async () => {
-    if (!id || typeof id === "string") return;
+  const handleSave = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!id || typeof id !== "string") return;
 
     try {
       // Calculate probability based on stage - ALWAYS enforce the rules
@@ -219,13 +188,14 @@ function OpportunityDetailContent() {
         editFormData.stage === 'high_potential' ? 50 :
         editFormData.stage === 'secured' ? 100 : 50;
 
-      // Determine if this should be archived based on STATUS field (not stage)
+      // Determine if this should be archived based on STATUS field
+      // Only 'closed_lost' and 'closed_won' should trigger archive
       const shouldArchive = editFormData.status === 'closed_lost' || editFormData.status === 'closed_won';
       
       const updates: any = {
         name: editFormData.name,
-        stage: editFormData.stage,
-        status: editFormData.status,
+        stage: editFormData.stage, // Must be 'bid', 'high_potential', or 'secured'
+        status: editFormData.status, // Must be 'open', 'closed_won', or 'closed_lost'
         probability_percent: probability,
         expected_fee_value: editFormData.expected_fee_value ? parseFloat(editFormData.expected_fee_value) : null,
         expected_start_date: editFormData.expected_start_date || null,
@@ -235,6 +205,7 @@ function OpportunityDetailContent() {
         submitted_date: editFormData.submitted_date || null,
         project_reference: editFormData.project_reference || null,
         description: editFormData.description || null,
+        added_by_user_id: editFormData.added_by_user_id || null,
       };
 
       // Add archive fields if archiving
@@ -262,7 +233,7 @@ function OpportunityDetailContent() {
       }
     } catch (error) {
       console.error("Error saving opportunity:", error);
-      setError("Failed to save opportunity");
+      setError("Failed to save opportunity. Please check all fields.");
     }
   };
 
@@ -332,9 +303,16 @@ function OpportunityDetailContent() {
             <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 flex-wrap">
                 <CardTitle className="text-xl sm:text-2xl">{opportunity.name}</CardTitle>
-                <Badge className={getStageColor(opportunity.stage)}>
-                  {opportunity.stage.replace("_", " ")}
-                </Badge>
+                <div className="flex gap-2">
+                  <Badge className={getStageColor(opportunity.stage)}>
+                    {opportunity.stage.replace("_", " ")}
+                  </Badge>
+                  {opportunity.status !== 'open' && (
+                    <Badge variant="outline">
+                      {opportunity.status.replace("_", " ")}
+                    </Badge>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 {canEdit && !isEditing && (
@@ -353,7 +331,7 @@ function OpportunityDetailContent() {
             </CardHeader>
             <CardContent>
               {isEditing ? (
-                <form onSubmit={handleUpdate} className="space-y-4">
+                <form onSubmit={handleSave} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="name" className="text-sm sm:text-base">Opportunity Name *</Label>
                     <Input
@@ -392,6 +370,7 @@ function OpportunityDetailContent() {
                           <SelectItem value="secured">Secured</SelectItem>
                         </SelectContent>
                       </Select>
+                      <p className="text-xs text-slate-500">Current progress of the deal</p>
                     </div>
 
                     <div className="space-y-2">
@@ -409,6 +388,7 @@ function OpportunityDetailContent() {
                           <SelectItem value="closed_lost">Closed - Lost</SelectItem>
                         </SelectContent>
                       </Select>
+                      <p className="text-xs text-slate-500">Outcome or current state</p>
                     </div>
                   </div>
 
@@ -499,7 +479,7 @@ function OpportunityDetailContent() {
                   </div>
 
                   <div className="flex flex-col sm:flex-row gap-3">
-                    <Button type="button" onClick={handleSave} className="h-10 sm:h-11">Save Changes</Button>
+                    <Button type="button" onClick={() => handleSave()} className="h-10 sm:h-11">Save Changes</Button>
                     <Button type="button" variant="outline" onClick={() => setIsEditing(false)} className="h-10 sm:h-11">
                       Cancel
                     </Button>
