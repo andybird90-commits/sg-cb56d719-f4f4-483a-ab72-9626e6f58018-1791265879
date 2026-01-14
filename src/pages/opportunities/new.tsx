@@ -41,15 +41,15 @@ async function generateNextOpportunityReferenceForCurrentYear(): Promise<string>
   const { data, error } = await supabase
     .from("opportunities")
     .select("project_reference")
-    .ilike("project_reference", `${yearSuffix}-%`);
+    .ilike("project_reference", `${yearSuffix}-%`) as any;
 
   if (error || !data) {
     return `${yearSuffix}-001`;
   }
 
   const usedNumbers = data
-    .map((row) => row.project_reference)
-    .filter((ref): ref is string => !!ref)
+    .map((row: any) => row.project_reference)
+    .filter((ref: any): ref is string => !!ref)
     .filter((ref) => ref.startsWith(`${yearSuffix}-`))
     .map((ref) => {
       const parts = ref.split("-");
