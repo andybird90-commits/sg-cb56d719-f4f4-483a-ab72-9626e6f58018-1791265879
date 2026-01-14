@@ -178,8 +178,8 @@ function DashboardContent() {
       const thirtyDaysFromNow = new Date();
       thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
 
-      const { data, error } = await supabase.
-      from("opportunities").
+      const { data, error } = await supabase
+      from("opportunities")
       select(`
           id,
           name,
@@ -188,11 +188,11 @@ function DashboardContent() {
           companies (
             name
           )
-        `).
-      not("tender_due_date", "is", null).
-      gte("tender_due_date", now.toISOString().split("T")[0]).
-      lte("tender_due_date", thirtyDaysFromNow.toISOString().split("T")[0]).
-      order("tender_due_date").
+        `)
+      not("tender_due_date", "is", null)
+      gte("tender_due_date", now.toISOString().split("T")[0])
+      lte("tender_due_date", thirtyDaysFromNow.toISOString().split("T")[0])
+      order("tender_due_date")
       limit(5);
 
       if (error) throw error;
@@ -210,8 +210,8 @@ function DashboardContent() {
       setActivityLoading(true);
       setActivityError(null);
 
-      const { data: contactTimeline, error: contactError } = (await supabase.
-      from("contact_timeline" as any).
+      const { data: contactTimeline, error: contactError } = (await supabase
+      from("contact_timeline" as any)
       select(`
           id,
           post_type,
@@ -228,14 +228,14 @@ function DashboardContent() {
           contact_events (
             event_type
           )
-        `).
-      order("created_at", { ascending: false }).
+        `)
+      order("created_at", { ascending: false })
       limit(10)) as any;
 
       if (contactError) throw contactError;
 
-      const { data: opportunityTimeline, error: opportunityError } = (await supabase.
-      from("opportunity_timeline" as any).
+      const { data: opportunityTimeline, error: opportunityError } = (await supabase
+      from("opportunity_timeline" as any)
       select(`
           id,
           post_type,
@@ -252,8 +252,8 @@ function DashboardContent() {
           opportunity_events (
             event_type
           )
-        `).
-      order("created_at", { ascending: false }).
+        `)
+      order("created_at", { ascending: false })
       limit(10)) as any;
 
       if (opportunityError) throw opportunityError;
@@ -301,8 +301,8 @@ function DashboardContent() {
       setLatestOpportunitiesLoading(true);
       setLatestOpportunitiesError(null);
 
-      const { data, error } = await supabase.
-      from("opportunities").
+      const { data, error } = await supabase
+      from("opportunities")
       select(`
           id,
           name,
@@ -313,8 +313,8 @@ function DashboardContent() {
           companies (
             name
           )
-        `).
-      order("created_at", { ascending: false }).
+        `)
+      order("created_at", { ascending: false })
       limit(5);
 
       if (error) throw error;
@@ -337,8 +337,8 @@ function DashboardContent() {
       const sevenDaysFromNow = new Date(today);
       sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
 
-      const { data, error } = (await supabase.
-      from("contact_events" as any).
+      const { data, error } = (await supabase
+      from("contact_events" as any)
       select(`
           *,
           contacts!contact_events_contact_id_fkey (
@@ -347,11 +347,11 @@ function DashboardContent() {
               name
             )
           )
-        `).
-      gte("event_date", today.toISOString().split("T")[0]).
-      lte("event_date", sevenDaysFromNow.toISOString().split("T")[0]).
-      order("event_date").
-      order("start_time").
+        `)
+      gte("event_date", today.toISOString().split("T")[0])
+      lte("event_date", sevenDaysFromNow.toISOString().split("T")[0])
+      order("event_date")
+      order("start_time")
       limit(20)) as any;
 
       if (error) throw error;
@@ -396,17 +396,17 @@ function DashboardContent() {
       });
 
       // MATCH MONTHLY VIEW: Fetch all opportunities with fee values, no stage filter
-      const { data: opportunities } = await supabase.
-      from("opportunities").
-      select("id, stage, expected_fee_value, expected_start_date, expected_end_date").
-      not("expected_fee_value", "is", null).
+      const { data: opportunities } = await supabase
+      from("opportunities")
+      select("id, stage, expected_fee_value, expected_start_date, expected_end_date")
+      not("expected_fee_value", "is", null)
       gte("expected_end_date", startOfCurrentMonth.toISOString());
 
       // MATCH MONTHLY VIEW: Fetch all projects with fee values, no status filter
-      const { data: projects } = await supabase.
-      from("projects").
-      select("id, status, agreed_fee_value, start_date, end_date").
-      not("agreed_fee_value", "is", null).
+      const { data: projects } = await supabase
+      from("projects")
+      select("id, status, agreed_fee_value, start_date, end_date")
+      not("agreed_fee_value", "is", null)
       gte("end_date", startOfCurrentMonth.toISOString());
 
       console.log("📊 Data loaded:", {
@@ -503,8 +503,8 @@ function DashboardContent() {
       setOpportunitiesTableLoading(true);
       setOpportunitiesTableError(null);
 
-      const { data, error } = await supabase.
-        .from("opportunities").
+      const { data, error } = await supabase
+        .from("opportunities")
         .select(`
           id,
           name,
@@ -519,8 +519,8 @@ function DashboardContent() {
           companies (
             name
           )
-        `).
-        .in("stage", ["bid", "high_potential"]).
+        `)
+        .in("stage", ["bid", "high_potential"])
         .order("created_at", { ascending: false });
 
       if (error) throw error;
