@@ -30,6 +30,43 @@ interface User {
   email: string;
 }
 
+type UiStage = "lead" | "bid" | "high_potential" | "secured" | "lost";
+type DbStage = "secured" | "high_potential" | "bid";
+
+async function generateNextOpportunityReferenceForCurrentYear(): Promise<string> {
+  const now = new Date();
+  const year = now.getFullYear();
+  const yearSuffix = year.toString().slice(-2);
+
+  const { data, error } = await supabase
+    .from("opportunities")
+    .select("project_reference")
+    .ilike("project_reference", `${yearSuffix}-%`);
+
+  if (error || !data) {
+    return `${yearSuffix}-001`;
+  }
+
+  const usedNumbers = data
+    .map((row) => row.project_reference)
+    .filter((ref): ref is string => !!ref)
+    .filter((ref) => ref.startsWith(`${yearSuffix}-`))
+    .map((ref) => {
+      const parts = ref.split("-");
+      const num = Number(parts[1]);
+      return Number.isFinite(num) ? num : null;
+    })
+    .filter((num): num is number => num !== null);
+
+  if (usedNumbers.length === 0) {
+    return `${yearSuffix}-001`;
+  }
+
+  const maxNumber = Math.max(...usedNumbers);
+  const nextNumber = String(maxNumber + 1).padStart(3, "0");
+  return `${yearSuffix}-${nextNumber}`;
+}
+
 function NewOpportunityContent() {
   const { profile } = useAuth();
   const router = useRouter();
@@ -42,7 +79,7 @@ function NewOpportunityContent() {
     name: "",
     company_id: "",
     contact_id: "",
-    stage: "lead",
+    stage: "lead" as UiStage,
     expected_fee_value: "",
     tender_due_date: "",
     tender_received_date: "",
@@ -56,14 +93,9 @@ function NewOpportunityContent() {
     added_by_user_id: "",
   });
 
-  // Map UI stage values to DB enum
-  type UiStage = "lead" | "bid" | "high_potential" | "secured" | "lost";
-  type DbStage = "secured" | "high_potential" | "bid";
-
   const mapStageToDb = (s: UiStage): DbStage => {
     if (s === "secured") return "secured";
     if (s === "high_potential") return "high_potential";
-    // Treat lead and lost as bid for now
     return "bid";
   };
 
@@ -111,7 +143,7 @@ function NewOpportunityContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const {
       name,
       company_id,
@@ -142,11 +174,16 @@ function NewOpportunityContent() {
       return;
     }
 
-    const dbStage = mapStageToDb(stage as UiStage);
-
     try {
       setLoading(true);
       setError("");
+
+      let finalProjectReference = project_reference.trim();
+      if (!finalProjectReference) {
+        finalProjectReference = await generateNextOpportunityReferenceForCurrentYear();
+      }
+
+      const dbStage = mapStageToDb(stage as UiStage);
 
       const payload = {
         name,
@@ -162,7 +199,7 @@ function NewOpportunityContent() {
         expected_start_date: expected_start_date || null,
         expected_end_date: expected_end_date || null,
         probability_percent,
-        project_reference: project_reference || null,
+        project_reference: finalProjectReference || null,
       };
 
       const { data, error } = await supabase
@@ -178,8 +215,8 @@ function NewOpportunityContent() {
       }
 
       router.push("/opportunities");
-    } catch (error) {
-      setError((error as Error).message);
+    } catch (err) {
+      setError((err as Error).message);
       setLoading(false);
     }
   };

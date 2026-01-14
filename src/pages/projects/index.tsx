@@ -49,10 +49,10 @@ function ProjectsContent() {
       setError(null);
 
       const { data, error: fetchError } = await supabase
-        .from("projects")
+        .from("projects" as any)
         .select(`
           *,
-          companies!projects_client_company_id_fkey (
+          companies!projects_client_company_id_fkey(
             name
           )
         `)
@@ -62,7 +62,7 @@ function ProjectsContent() {
       if (fetchError) throw fetchError;
       
       // Sort by project code descending (larger numbers first, with alpha suffixes)
-      const sortedData = (data || []).sort((a, b) => {
+      const sortedData = ((data as any) || []).sort((a: any, b: any) => {
         // Extract numeric and alpha parts from project codes
         const parseCode = (code: string) => {
           const match = code.match(/^(.+?)([a-z]*)$/i);
