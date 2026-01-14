@@ -524,7 +524,7 @@ function DashboardContent() {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setOpportunitiesTable(data || []);
+      setOpportunitiesTable((data as any) || []);
     } catch (error) {
       console.error("Failed to load opportunities table", error);
       setOpportunitiesTableError("Failed to load opportunities");
