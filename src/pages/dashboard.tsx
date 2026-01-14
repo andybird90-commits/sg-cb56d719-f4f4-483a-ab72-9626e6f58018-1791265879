@@ -34,6 +34,7 @@ interface Opportunity {
   id: string;
   name: string;
   stage: string;
+  project_reference?: string | null;
   tender_due_date: string | null;
   expected_fee_value?: number | null;
   expected_start_date?: string | null;
@@ -503,11 +504,12 @@ function DashboardContent() {
       setOpportunitiesTableError(null);
 
       const { data, error } = await supabase.
-      from("opportunities").
-      select(`
+        .from("opportunities").
+        .select(`
           id,
           name,
           stage,
+          project_reference,
           expected_fee_value,
           tender_due_date,
           expected_start_date,
@@ -518,8 +520,8 @@ function DashboardContent() {
             name
           )
         `).
-      in("stage", ["bid", "high_potential"]).
-      order("created_at", { ascending: false });
+        .in("stage", ["bid", "high_potential"]).
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
       setOpportunitiesTable(data || []);
@@ -996,7 +998,7 @@ function DashboardContent() {
                     onClick={() => router.push(`/opportunities/${opp.id}`)}>
 
                         <td className="py-3 px-3 text-sm text-slate-500">
-                          —
+                          {opp.project_reference || "—"}
                         </td>
                         <td className="py-3 px-3">
                           <div className="font-medium text-sm text-slate-900">{opp.name}</div>
