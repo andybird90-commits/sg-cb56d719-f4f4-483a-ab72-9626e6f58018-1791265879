@@ -179,8 +179,8 @@ function DashboardContent() {
       thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
 
       const { data, error } = await supabase
-      from("opportunities")
-      select(`
+        .from("opportunities")
+        .select(`
           id,
           name,
           stage,
@@ -189,11 +189,11 @@ function DashboardContent() {
             name
           )
         `)
-      not("tender_due_date", "is", null)
-      gte("tender_due_date", now.toISOString().split("T")[0])
-      lte("tender_due_date", thirtyDaysFromNow.toISOString().split("T")[0])
-      order("tender_due_date")
-      limit(5);
+        .not("tender_due_date", "is", null)
+        .gte("tender_due_date", now.toISOString().split("T")[0])
+        .lte("tender_due_date", thirtyDaysFromNow.toISOString().split("T")[0])
+        .order("tender_due_date")
+        .limit(5);
 
       if (error) throw error;
       setUpcomingTenders(data || []);
@@ -211,8 +211,8 @@ function DashboardContent() {
       setActivityError(null);
 
       const { data: contactTimeline, error: contactError } = (await supabase
-      from("contact_timeline" as any)
-      select(`
+        .from("contact_timeline" as any)
+        .select(`
           id,
           post_type,
           content,
@@ -229,14 +229,14 @@ function DashboardContent() {
             event_type
           )
         `)
-      order("created_at", { ascending: false })
-      limit(10)) as any;
+        .order("created_at", { ascending: false })
+        .limit(10)) as any;
 
       if (contactError) throw contactError;
 
       const { data: opportunityTimeline, error: opportunityError } = (await supabase
-      from("opportunity_timeline" as any)
-      select(`
+        .from("opportunity_timeline" as any)
+        .select(`
           id,
           post_type,
           content,
@@ -253,38 +253,38 @@ function DashboardContent() {
             event_type
           )
         `)
-      order("created_at", { ascending: false })
-      limit(10)) as any;
+        .order("created_at", { ascending: false })
+        .limit(10)) as any;
 
       if (opportunityError) throw opportunityError;
 
       const combinedActivity: ActivityEntry[] = [
-      ...(contactTimeline || []).map((entry: any) => ({
-        id: entry.id,
-        source: "contact" as const,
-        source_id: entry.contact_id,
-        source_name: entry.contacts?.name || "Unknown Contact",
-        post_type: entry.post_type,
-        content: entry.content,
-        created_at: entry.created_at,
-        author_name: entry.profiles?.full_name || entry.profiles?.email || "Unknown User",
-        event_type: entry.contact_events?.event_type
-      })),
-      ...(opportunityTimeline || []).map((entry: any) => ({
-        id: entry.id,
-        source: "opportunity" as const,
-        source_id: entry.opportunity_id,
-        source_name: entry.opportunities?.name || "Unknown Opportunity",
-        post_type: entry.post_type,
-        content: entry.content,
-        created_at: entry.created_at,
-        author_name: entry.profiles?.full_name || entry.profiles?.email || "Unknown User",
-        event_type: entry.opportunity_events?.event_type
-      }))];
-
+        ...(contactTimeline || []).map((entry: any) => ({
+          id: entry.id,
+          source: "contact" as const,
+          source_id: entry.contact_id,
+          source_name: entry.contacts?.name || "Unknown Contact",
+          post_type: entry.post_type,
+          content: entry.content,
+          created_at: entry.created_at,
+          author_name: entry.profiles?.full_name || entry.profiles?.email || "Unknown User",
+          event_type: entry.contact_events?.event_type
+        })),
+        ...(opportunityTimeline || []).map((entry: any) => ({
+          id: entry.id,
+          source: "opportunity" as const,
+          source_id: entry.opportunity_id,
+          source_name: entry.opportunities?.name || "Unknown Opportunity",
+          post_type: entry.post_type,
+          content: entry.content,
+          created_at: entry.created_at,
+          author_name: entry.profiles?.full_name || entry.profiles?.email || "Unknown User",
+          event_type: entry.opportunity_events?.event_type
+        }))
+      ];
 
       combinedActivity.sort((a, b) =>
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
 
       setLatestActivity(combinedActivity.slice(0, 10));
@@ -302,8 +302,8 @@ function DashboardContent() {
       setLatestOpportunitiesError(null);
 
       const { data, error } = await supabase
-      from("opportunities")
-      select(`
+        .from("opportunities")
+        .select(`
           id,
           name,
           stage,
@@ -314,8 +314,8 @@ function DashboardContent() {
             name
           )
         `)
-      order("created_at", { ascending: false })
-      limit(5);
+        .order("created_at", { ascending: false })
+        .limit(5);
 
       if (error) throw error;
       setLatestOpportunities(data || []);
@@ -338,8 +338,8 @@ function DashboardContent() {
       sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
 
       const { data, error } = (await supabase
-      from("contact_events" as any)
-      select(`
+        .from("contact_events" as any)
+        .select(`
           *,
           contacts!contact_events_contact_id_fkey (
             name,
@@ -348,11 +348,11 @@ function DashboardContent() {
             )
           )
         `)
-      gte("event_date", today.toISOString().split("T")[0])
-      lte("event_date", sevenDaysFromNow.toISOString().split("T")[0])
-      order("event_date")
-      order("start_time")
-      limit(20)) as any;
+        .gte("event_date", today.toISOString().split("T")[0])
+        .lte("event_date", sevenDaysFromNow.toISOString().split("T")[0])
+        .order("event_date")
+        .order("start_time")
+        .limit(20)) as any;
 
       if (error) throw error;
       setUpcomingVisits(data as ContactEvent[] || []);
@@ -397,17 +397,17 @@ function DashboardContent() {
 
       // MATCH MONTHLY VIEW: Fetch all opportunities with fee values, no stage filter
       const { data: opportunities } = await supabase
-      from("opportunities")
-      select("id, stage, expected_fee_value, expected_start_date, expected_end_date")
-      not("expected_fee_value", "is", null)
-      gte("expected_end_date", startOfCurrentMonth.toISOString());
+        .from("opportunities")
+        .select("id, stage, expected_fee_value, expected_start_date, expected_end_date")
+        .not("expected_fee_value", "is", null)
+        .gte("expected_end_date", startOfCurrentMonth.toISOString());
 
       // MATCH MONTHLY VIEW: Fetch all projects with fee values, no status filter
       const { data: projects } = await supabase
-      from("projects")
-      select("id, status, agreed_fee_value, start_date, end_date")
-      not("agreed_fee_value", "is", null)
-      gte("end_date", startOfCurrentMonth.toISOString());
+        .from("projects")
+        .select("id, status, agreed_fee_value, start_date, end_date")
+        .not("agreed_fee_value", "is", null)
+        .gte("end_date", startOfCurrentMonth.toISOString());
 
       console.log("📊 Data loaded:", {
         opportunities: opportunities?.length || 0,
@@ -427,8 +427,8 @@ function DashboardContent() {
 
         // MATCH MONTHLY VIEW: Use same duration calculation
         const durationMonths = Math.max(1,
-        (endDate.getFullYear() - startDate.getFullYear()) * 12 + (
-        endDate.getMonth() - startDate.getMonth()) + 1
+          (endDate.getFullYear() - startDate.getFullYear()) * 12 + (
+          endDate.getMonth() - startDate.getMonth()) + 1
         );
 
         const monthlyValue = totalValue / durationMonths;
@@ -464,8 +464,8 @@ function DashboardContent() {
 
         // MATCH MONTHLY VIEW: Use same duration calculation
         const durationMonths = Math.max(1,
-        (endDate.getFullYear() - startDate.getFullYear()) * 12 + (
-        endDate.getMonth() - startDate.getMonth()) + 1
+          (endDate.getFullYear() - startDate.getFullYear()) * 12 + (
+          endDate.getMonth() - startDate.getMonth()) + 1
         );
 
         const monthlyValue = totalValue / durationMonths;
@@ -603,17 +603,14 @@ function DashboardContent() {
         <div className="flex items-center gap-1">
           {label}
           {isActive ?
-          sortDirection === "asc" ?
-          <ArrowUp className="w-3 h-3" /> :
-
-          <ArrowDown className="w-3 h-3" /> :
-
-
-          <ArrowUpDown className="w-3 h-3 opacity-30" />
+            sortDirection === "asc" ?
+            <ArrowUp className="w-3 h-3" /> :
+            <ArrowDown className="w-3 h-3" /> :
+            <ArrowUpDown className="w-3 h-3 opacity-30" />
           }
         </div>
-      </th>);
-
+      </th>
+    );
   };
 
   const formatCurrency = (value: number) => {
@@ -704,7 +701,7 @@ function DashboardContent() {
   const maxValue = 200000;
 
   const ErrorState = ({ message }: {message: string;}) =>
-  <Alert variant="destructive" className="my-4">
+    <Alert variant="destructive" className="my-4">
       <AlertTriangle className="h-4 w-4" />
       <AlertDescription>{message}</AlertDescription>
     </Alert>;
@@ -731,7 +728,7 @@ function DashboardContent() {
             Welcome back{profile?.full_name ? `, ${profile.full_name}` : ""}
           </h1>
           {profile?.role &&
-          <p className="text-sm sm:text-base text-slate-600 capitalize">
+            <p className="text-sm sm:text-base text-slate-600 capitalize">
               {profile.role} Dashboard
             </p>
           }
@@ -739,9 +736,9 @@ function DashboardContent() {
 
         {/* Quick Stats Grid */}
         {statsError ?
-        <ErrorState message={statsError} /> :
+          <ErrorState message={statsError} /> :
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <Link href="/companies">
               <Card className="hover:shadow-md transition-shadow cursor-pointer">
                 <CardContent className="p-4 sm:p-6">
@@ -842,38 +839,38 @@ function DashboardContent() {
           </CardHeader>
           <CardContent>
             {pipelineLoading ?
-            <div className="h-96 flex items-center justify-center">
+              <div className="h-96 flex items-center justify-center">
                 <p className="text-muted-foreground">Loading pipeline data...</p>
               </div> :
-            pipelineError ?
-            <div className="h-96 flex items-center justify-center">
+              pipelineError ?
+              <div className="h-96 flex items-center justify-center">
                 <p className="text-destructive">{pipelineError}</p>
               </div> :
 
-            <>
+              <>
                 {/* Chart with dynamic height */}
                 <div className="w-full" style={{ minHeight: "500px", height: "auto" }}>
                   <ResponsiveContainer width="100%" height="100%" minHeight={500}>
                     <BarChart data={filteredPipelineData} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis
-                      dataKey="month"
-                      angle={-45}
-                      textAnchor="end"
-                      height={80}
-                      tick={{ fontSize: 12 }} />
+                        dataKey="month"
+                        angle={-45}
+                        textAnchor="end"
+                        height={80}
+                        tick={{ fontSize: 12 }} />
 
                       <YAxis
-                      tickFormatter={(value) => `£${(value / 1000).toFixed(0)}k`}
-                      tick={{ fontSize: 12 }} />
+                        tickFormatter={(value) => `£${(value / 1000).toFixed(0)}k`}
+                        tick={{ fontSize: 12 }} />
 
                       <Tooltip
-                      formatter={(value: number) => `£${value.toLocaleString()}`}
-                      contentStyle={{ fontSize: 12 }} />
+                        formatter={(value: number) => `£${value.toLocaleString()}`}
+                        contentStyle={{ fontSize: 12 }} />
 
                       <Legend
-                      wrapperStyle={{ paddingTop: "20px" }}
-                      iconType="circle" />
+                        wrapperStyle={{ paddingTop: "20px" }}
+                        iconType="circle" />
 
                       <Bar dataKey="secured" stackId="a" fill="#22c55e" name="Secured + Projects" />
                       {!showSecuredOnly && (
@@ -908,7 +905,7 @@ function DashboardContent() {
                       </thead>
                       <tbody>
                         {filteredPipelineData.map((row) =>
-                      <tr key={row.month} className="hover:bg-muted/50">
+                          <tr key={row.month} className="hover:bg-muted/50">
                             <td className="border p-2">{row.month}</td>
                             <td className="border p-2 text-right">{formatCurrency(row.secured)}</td>
                             {!showSecuredOnly && (
@@ -922,7 +919,7 @@ function DashboardContent() {
                               {formatCurrency(row.secured + row.highPotential + row.bid + row.budgetGap)}
                             </td>
                           </tr>
-                      )}
+                        )}
                         <tr className="bg-gray-100 dark:bg-gray-800 font-bold">
                           <td className="px-4 py-2">TOTAL</td>
                           <td className="px-4 py-2 text-green-600" style={{ textAlign: "right" }}>
@@ -965,17 +962,17 @@ function DashboardContent() {
           </CardHeader>
           <CardContent>
             {opportunitiesTableError ?
-            <ErrorState message={opportunitiesTableError} /> :
-            opportunitiesTableLoading ?
-            <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
+              <ErrorState message={opportunitiesTableError} /> :
+              opportunitiesTableLoading ?
+              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
                 Loading opportunities...
               </div> :
-            opportunitiesTable.length === 0 ?
-            <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
+              opportunitiesTable.length === 0 ?
+              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
                 No active opportunities in pipeline
               </div> :
 
-            <div className="overflow-x-auto -mx-2 sm:mx-0">
+              <div className="overflow-x-auto -mx-2 sm:mx-0">
                 <table className="w-full min-w-[800px]">
                   <thead>
                     <tr className="border-b">
@@ -992,10 +989,10 @@ function DashboardContent() {
                   </thead>
                   <tbody>
                     {sortedOpportunities.map((opp) =>
-                  <tr
-                    key={opp.id}
-                    className="border-b hover:bg-slate-50 cursor-pointer transition-colors"
-                    onClick={() => router.push(`/opportunities/${opp.id}`)}>
+                      <tr
+                        key={opp.id}
+                        className="border-b hover:bg-slate-50 cursor-pointer transition-colors"
+                        onClick={() => router.push(`/opportunities/${opp.id}`)}>
 
                         <td className="py-3 px-3 text-sm text-slate-500">
                           {opp.project_reference || "—"}
@@ -1027,7 +1024,7 @@ function DashboardContent() {
                           {opp.probability_percent !== null ? `${opp.probability_percent}%` : "—"}
                         </td>
                       </tr>
-                  )}
+                    )}
                   </tbody>
                   <tfoot>
                     <tr className="border-t-2 bg-slate-50">
@@ -1036,24 +1033,24 @@ function DashboardContent() {
                       </td>
                       <td className="py-3 px-3 text-right text-sm font-bold text-slate-900">
                         {(() => {
-                        const highPotentialTotal = opportunitiesTable.
-                        filter((opp) => opp.stage === "high_potential").
-                        reduce((sum, opp) => sum + (opp.expected_fee_value || 0), 0);
-                        const bidTotal = opportunitiesTable.
-                        filter((opp) => opp.stage === "bid").
-                        reduce((sum, opp) => sum + (opp.expected_fee_value || 0), 0);
+                          const highPotentialTotal = opportunitiesTable.
+                            filter((opp) => opp.stage === "high_potential").
+                            reduce((sum, opp) => sum + (opp.expected_fee_value || 0), 0);
+                          const bidTotal = opportunitiesTable.
+                            filter((opp) => opp.stage === "bid").
+                            reduce((sum, opp) => sum + (opp.expected_fee_value || 0), 0);
 
-                        return (
-                          <div className="space-y-1">
+                          return (
+                            <div className="space-y-1">
                               <div className="text-blue-600">
                                 High Potential: {formatCurrency(highPotentialTotal)}
                               </div>
                               <div className="text-yellow-600">
                                 Bids: {formatCurrency(bidTotal)}
                               </div>
-                            </div>);
-
-                      })()}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td colSpan={4}></td>
                     </tr>
@@ -1075,26 +1072,26 @@ function DashboardContent() {
           </CardHeader>
           <CardContent>
             {tendersError ?
-            <ErrorState message={tendersError} /> :
-            tendersLoading ?
-            <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
+              <ErrorState message={tendersError} /> :
+              tendersLoading ?
+              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
                 Loading tenders...
               </div> :
-            upcomingTenders.length === 0 ?
-            <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
+              upcomingTenders.length === 0 ?
+              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
                 No tenders due in the next 30 days
               </div> :
 
-            <div className="space-y-3">
+              <div className="space-y-3">
                 {upcomingTenders.map((opp) =>
-              <div
-                key={opp.id}
-                className="p-3 border rounded-lg hover:bg-slate-50 transition-colors">
+                  <div
+                    key={opp.id}
+                    className="p-3 border rounded-lg hover:bg-slate-50 transition-colors">
 
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <div
-                    className="font-medium text-sm text-slate-900 line-clamp-2 cursor-pointer hover:text-blue-600"
-                    onClick={() => router.push(`/opportunities/${opp.id}`)}>
+                        className="font-medium text-sm text-slate-900 line-clamp-2 cursor-pointer hover:text-blue-600"
+                        onClick={() => router.push(`/opportunities/${opp.id}`)}>
 
                         {opp.name}
                       </div>
@@ -1109,7 +1106,7 @@ function DashboardContent() {
                       Due: {formatDate(opp.tender_due_date)}
                     </div>
                   </div>
-              )}
+                )}
               </div>
             }
           </CardContent>
@@ -1126,27 +1123,27 @@ function DashboardContent() {
           </CardHeader>
           <CardContent>
             {activityError ?
-            <ErrorState message={activityError} /> :
-            activityLoading ?
-            <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
+              <ErrorState message={activityError} /> :
+              activityLoading ?
+              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
                 Loading activity...
               </div> :
-            latestActivity.length === 0 ?
-            <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
+              latestActivity.length === 0 ?
+              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
                 No recent activity
               </div> :
 
-            <div className="space-y-3">
+              <div className="space-y-3">
                 {latestActivity.map((activity) =>
-              <div
-                key={`${activity.source}-${activity.id}`}
-                className="p-3 border rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
-                onClick={() => {
-                  const path = activity.source === "contact" ?
-                  `/contacts/${activity.source_id}` :
-                  `/opportunities/${activity.source_id}`;
-                  router.push(path);
-                }}>
+                  <div
+                    key={`${activity.source}-${activity.id}`}
+                    className="p-3 border rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                    onClick={() => {
+                      const path = activity.source === "contact" ?
+                        `/contacts/${activity.source_id}` :
+                        `/opportunities/${activity.source_id}`;
+                      router.push(path);
+                    }}>
 
                     <div className="flex items-start gap-2 mb-2">
                       <span className="text-sm">{getActivitySourceIcon(activity.source)}</span>
@@ -1170,7 +1167,7 @@ function DashboardContent() {
                       </div>
                     </div>
                   </div>
-              )}
+                )}
               </div>
             }
           </CardContent>
@@ -1187,22 +1184,22 @@ function DashboardContent() {
           </CardHeader>
           <CardContent>
             {latestOpportunitiesError ?
-            <ErrorState message={latestOpportunitiesError} /> :
-            latestOpportunitiesLoading ?
-            <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
+              <ErrorState message={latestOpportunitiesError} /> :
+              latestOpportunitiesLoading ?
+              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
                 Loading opportunities...
               </div> :
-            latestOpportunities.length === 0 ?
-            <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
+              latestOpportunities.length === 0 ?
+              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
                 No opportunities yet
               </div> :
 
-            <div className="space-y-3">
+              <div className="space-y-3">
                 {latestOpportunities.map((opp) =>
-              <div
-                key={opp.id}
-                className="p-3 border rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
-                onClick={() => router.push(`/opportunities/${opp.id}`)}>
+                  <div
+                    key={opp.id}
+                    className="p-3 border rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                    onClick={() => router.push(`/opportunities/${opp.id}`)}>
 
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <div className="font-medium text-sm text-slate-900 line-clamp-2">
@@ -1218,13 +1215,13 @@ function DashboardContent() {
                     <div className="flex items-center justify-between text-xs text-slate-500">
                       <span>{formatDate(opp.created_at)}</span>
                       {opp.expected_fee_value &&
-                  <span className="font-medium text-slate-700">
+                        <span className="font-medium text-slate-700">
                           {formatCurrency(opp.expected_fee_value)}
                         </span>
-                  }
+                      }
                     </div>
                   </div>
-              )}
+                )}
               </div>
             }
           </CardContent>
@@ -1241,22 +1238,22 @@ function DashboardContent() {
           </CardHeader>
           <CardContent>
             {visitsError ?
-            <ErrorState message={visitsError} /> :
-            visitsLoading ?
-            <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
+              <ErrorState message={visitsError} /> :
+              visitsLoading ?
+              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
                 Loading visits...
               </div> :
-            upcomingVisits.length === 0 ?
-            <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
+              upcomingVisits.length === 0 ?
+              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
                 No visits or functions scheduled in the next 7 days
               </div> :
 
-            <div className="space-y-3">
+              <div className="space-y-3">
                 {upcomingVisits.map((visit) =>
-              <div
-                key={visit.id}
-                className="p-3 sm:p-4 border rounded-lg cursor-pointer hover:bg-slate-50 transition-colors"
-                onClick={() => router.push(`/contacts/${visit.contact_id}`)}>
+                  <div
+                    key={visit.id}
+                    className="p-3 sm:p-4 border rounded-lg cursor-pointer hover:bg-slate-50 transition-colors"
+                    onClick={() => router.push(`/contacts/${visit.contact_id}`)}>
 
                     <div className="flex flex-col sm:flex-row sm:items-start gap-3">
                       {/* Date & Time Column */}
@@ -1265,11 +1262,11 @@ function DashboardContent() {
                           {formatDate(visit.event_date)}
                         </div>
                         {visit.start_time &&
-                    <div className="text-xs text-slate-500">
+                          <div className="text-xs text-slate-500">
                             {visit.start_time.substring(0, 5)}
                             {visit.end_time && ` - ${visit.end_time.substring(0, 5)}`}
                           </div>
-                    }
+                        }
                       </div>
 
                       {/* Event Details Column */}
@@ -1285,31 +1282,31 @@ function DashboardContent() {
                         <div className="text-sm text-slate-600">
                           <span className="font-medium">{visit.contacts?.name}</span>
                           {visit.contacts?.companies?.name &&
-                      <span className="text-slate-500"> • {visit.contacts.companies.name}</span>
-                      }
+                            <span className="text-slate-500"> • {visit.contacts.companies.name}</span>
+                          }
                         </div>
                         {visit.location &&
-                    <div className="text-xs text-slate-500 mt-1">
+                          <div className="text-xs text-slate-500 mt-1">
                             📍 {visit.location}
                           </div>
-                    }
+                        }
                       </div>
                     </div>
                   </div>
-              )}
+                )}
               </div>
             }
           </CardContent>
         </Card>
       </div>
-    </Layout>);
-
+    </Layout>
+  );
 }
 
 export default function DashboardPage() {
   return (
     <RequireAuth>
       <DashboardContent />
-    </RequireAuth>);
-
+    </RequireAuth>
+  );
 }
