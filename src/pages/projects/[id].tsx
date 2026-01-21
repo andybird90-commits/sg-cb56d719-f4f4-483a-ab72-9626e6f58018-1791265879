@@ -956,6 +956,20 @@ function ProjectDetailContent() {
             </div>
           </div>
 
+          {canDelete && !isEditingProject && (
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setIsEditingProject(true)} className="gap-2">
+                <Edit className="w-4 h-4" />
+                Edit
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleDeleteProject} className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50">
+                <Trash2 className="w-4 h-4" />
+                Delete
+              </Button>
+            </div>
+          )}
+        </div>
+
         {/* Error State */}
         {projectError && (
           <Alert variant="destructive">
