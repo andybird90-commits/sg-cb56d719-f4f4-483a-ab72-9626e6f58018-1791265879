@@ -68,8 +68,8 @@ function NewProjectContent() {
     setCompanies(companiesData || []);
 
     // Fetch all non-archived opportunities that haven't been converted to projects yet
-    // Cast to any to bypass "Type instantiation is excessively deep" error
-    const { data: opportunitiesData } = await supabase
+    // Cast supabase to any to prevent "Type instantiation is excessively deep" error
+    const { data: opportunitiesData } = await (supabase as any)
       .from("opportunities")
       .select("id, name, company_id, project_reference")
       .is("linked_project_id", null)
@@ -77,19 +77,19 @@ function NewProjectContent() {
       .order("name");
 
     if (opportunitiesData) {
-      setOpportunities(opportunitiesData as any[]);
+      setOpportunities(opportunitiesData);
     }
   };
 
   const fetchOpportunityData = async (opportunityId: string) => {
-    // Cast to any to bypass type errors claiming columns don't exist
-    const { data } = await supabase
+    // Cast supabase to any to prevent type errors claiming columns don't exist
+    const { data } = await (supabase as any)
       .from("opportunities")
       .select("name, company_id, project_reference")
       .eq("id", opportunityId)
       .single();
     
-    const opp = data as any;
+    const opp = data;
 
     if (opp) {
       setFormData(prev => ({
