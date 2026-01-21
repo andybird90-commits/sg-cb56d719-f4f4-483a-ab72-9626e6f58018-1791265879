@@ -66,12 +66,21 @@ function NewProjectContent() {
 
     const { data: opportunitiesData } = await supabase
       .from("opportunities")
-      .select("id, name")
+      .select("id, name, project_reference")
       .eq("status", "open")
       .order("name");
 
     if (companiesData) setCompanies(companiesData);
-    if (opportunitiesData) setOpportunities(opportunitiesData);
+    if (opportunitiesData) {
+      // Filter out any potential errors from the query
+      const validOpportunities = opportunitiesData.filter(
+        (opp): opp is Opportunity => 
+          typeof opp === 'object' && 
+          'id' in opp && 
+          'name' in opp
+      );
+      setOpportunities(validOpportunities);
+    }
   };
 
   const fetchOpportunityData = async (opportunityId: string) => {

@@ -23,7 +23,9 @@ interface Project {
   id: string;
   code: string;
   name: string;
-  status: string;
+  project_reference: string | null;
+  opportunity_reference: string | null;
+  status: "pipeline" | "live" | "on_hold" | "completed" | "cancelled";
   start_date: string | null;
   end_date: string | null;
   agreed_fee_value: number | null;
@@ -923,14 +925,34 @@ function ProjectDetailContent() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Link href="/projects">
-            <Button variant="ghost" size="sm" className="gap-2">
-              <ArrowLeft className="w-4 h-4" />
-              Back
-            </Button>
-          </Link>
-        </div>
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <Link href="/projects">
+                <Button variant="ghost" size="sm" className="gap-2">
+                  <ArrowLeft className="w-4 h-4" />
+                  Back
+                </Button>
+              </Link>
+              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
+                {project.name}
+              </h1>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600 ml-2 sm:ml-0">
+              {project.project_reference && (
+                <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded font-medium">
+                  {project.project_reference}
+                </span>
+              )}
+              {project.opportunity_reference && (
+                <span className="px-2 py-1 bg-slate-100 text-slate-700 rounded text-xs">
+                  Origin: {project.opportunity_reference}
+                </span>
+              )}
+              <span>•</span>
+              <span className="font-medium">{project.code}</span>
+            </div>
+          </div>
 
         {/* Error State */}
         {projectError && (
