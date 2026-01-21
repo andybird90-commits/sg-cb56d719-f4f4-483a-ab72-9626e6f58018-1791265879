@@ -67,14 +67,21 @@ function NewProjectContent() {
 
     setCompanies(companiesData || []);
 
-    const { data: opportunitiesData } = await supabase
+    // Fetch all non-archived opportunities that haven't been converted to projects yet
+    const { data: opportunitiesData, error } = await supabase
       .from("opportunities")
       .select("id, name, company_id, project_reference")
-      .eq("stage", "proposal")
+      .is("linked_project_id", null)
+      .eq("archived", false)
       .order("name");
 
+    if (error) {
+      console.error("Error fetching opportunities:", error);
+    }
+
     if (opportunitiesData) {
-      setOpportunities(opportunitiesData);
+      // Cast to unknown first to bypass the SelectQueryError type mismatch caused by deep type instantiation
+      setOpportunities(opportunitiesData as unknown as Opportunity[]);
     }
   };
 
@@ -256,6 +263,11 @@ function NewProjectContent() {
                   <div className="text-blue-600 mt-0.5">ℹ️</div>
                   <div className="text-sm text-blue-900">
                     <strong>Project Reference:</strong> A unique P-prefixed reference (e.g., P26-001) will be automatically generated when you create this project.
+                    {formData.opportunity_reference && (
+                      <span className="block mt-1">
+                        The opportunity reference ({formData.opportunity_reference}) will be saved for tracking purposes.
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
