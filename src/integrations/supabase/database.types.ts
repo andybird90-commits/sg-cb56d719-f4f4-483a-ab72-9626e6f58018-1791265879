@@ -1046,6 +1046,7 @@ export type Database = {
     }
     Functions: {
       generate_opportunity_reference: { Args: never; Returns: string }
+      generate_project_reference: { Args: never; Returns: string }
     }
     Enums: {
       company_status: "active" | "prospect" | "inactive"

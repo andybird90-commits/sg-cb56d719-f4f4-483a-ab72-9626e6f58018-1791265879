@@ -51,6 +51,7 @@ interface Opportunity {
     id: string;
     code: string;
     name: string;
+    project_reference: string | null;
   };
 }
 
@@ -524,7 +525,7 @@ function OpportunityDetailContent() {
 
                     {opportunity.project_reference && (
                       <div>
-                        <div className="text-sm text-slate-600">Project Reference</div>
+                        <div className="text-sm text-slate-600">Opportunity Reference</div>
                         <div className="font-medium font-mono">{opportunity.project_reference}</div>
                       </div>
                     )}
@@ -620,22 +621,45 @@ function OpportunityDetailContent() {
               <CardTitle className="text-lg">Linked Project</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-mono text-sm text-slate-500 mb-1">
-                    {opportunity.projects.code}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-mono text-sm text-slate-500 mb-1">
+                      {opportunity.projects.code}
+                    </div>
+                    <div className="font-medium text-slate-900">
+                      {opportunity.projects.name}
+                    </div>
                   </div>
-                  <div className="font-medium text-slate-900">
-                    {opportunity.projects.name}
-                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push(`/projects/${opportunity.projects?.id}`)}
+                  >
+                    View Project
+                  </Button>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => router.push(`/projects/${opportunity.projects?.id}`)}
-                >
-                  View Project
-                </Button>
+                
+                {opportunity.projects.project_reference && (
+                  <div className="pt-4 border-t">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm text-slate-600">Project Reference</div>
+                        <div className="font-mono text-lg font-semibold text-blue-600">
+                          {opportunity.projects.project_reference}
+                        </div>
+                      </div>
+                      {opportunity.project_reference && (
+                        <div className="text-right">
+                          <div className="text-sm text-slate-600">Origin</div>
+                          <div className="font-mono text-sm text-slate-900">
+                            {opportunity.project_reference}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
