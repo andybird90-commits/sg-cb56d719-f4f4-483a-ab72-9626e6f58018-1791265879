@@ -186,6 +186,8 @@ function ProjectDetailContent() {
           notes,
           client_company_id,
           opportunity_id,
+          project_reference,
+          opportunity_reference,
           companies (
             id,
             name
