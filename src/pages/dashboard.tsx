@@ -916,7 +916,7 @@ function DashboardContent() {
                             )}
                             <td className="border p-2 text-right">{formatCurrency(row.budgetGap)}</td>
                             <td className="border p-2 text-right font-semibold">
-                              {formatCurrency(row.secured + row.highPotential + row.bid + row.budgetGap)}
+                              {formatCurrency(row.secured + row.highPotential + row.bid)}
                             </td>
                           </tr>
                         )}
@@ -939,7 +939,7 @@ function DashboardContent() {
                             £{filteredPipelineData.reduce((sum, month) => sum + month.budgetGap, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                           </td>
                           <td className="px-4 py-2" style={{ textAlign: "right" }}>
-                            £{filteredPipelineData.reduce((sum, month) => sum + month.secured + month.highPotential + month.bid + month.budgetGap, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                            £{filteredPipelineData.reduce((sum, month) => sum + month.secured + month.highPotential + month.bid, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                           </td>
                         </tr>
                       </tbody>
