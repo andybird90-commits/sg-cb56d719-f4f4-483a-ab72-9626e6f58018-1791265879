@@ -22,6 +22,7 @@ interface Company {
 interface Opportunity {
   id: string;
   name: string;
+  company_id: string | null;
   project_reference: string | null;
 }
 
@@ -64,41 +65,33 @@ function NewProjectContent() {
       .select("id, name")
       .order("name");
 
+    setCompanies(companiesData || []);
+
     const { data: opportunitiesData } = await supabase
       .from("opportunities")
-      .select("id, name, project_reference")
-      .eq("status", "open")
+      .select("id, name, company_id, project_reference")
+      .eq("stage", "proposal")
       .order("name");
 
-    if (companiesData) setCompanies(companiesData);
     if (opportunitiesData) {
-      // Filter out any potential errors from the query
-      const validOpportunities = opportunitiesData.filter(
-        (opp): opp is Opportunity => 
-          typeof opp === 'object' && 
-          'id' in opp && 
-          'name' in opp
-      );
-      setOpportunities(validOpportunities);
+      setOpportunities(opportunitiesData);
     }
   };
 
   const fetchOpportunityData = async (opportunityId: string) => {
-    const { data, error } = await supabase
+    const { data: opp } = await supabase
       .from("opportunities")
-      .select("name, project_reference, client_company_id")
+      .select("name, company_id, project_reference")
       .eq("id", opportunityId)
       .single();
-    
-    if (data) {
-      const oppData = data as any;
-      setFormData(prev => ({
-        ...prev,
-        opportunity_id: opportunityId,
-        name: oppData.name,
-        opportunity_reference: oppData.project_reference || "", // Store opp reference separately
-        client_company_id: oppData.client_company_id || "",
-      }));
+
+    if (opp) {
+      setFormData({
+        ...formData,
+        name: opp.name || "",
+        client_company_id: opp.company_id || "",
+        opportunity_reference: opp.project_reference || "", // The Opp ref is stored in project_reference on the opp table
+      });
     }
   };
 

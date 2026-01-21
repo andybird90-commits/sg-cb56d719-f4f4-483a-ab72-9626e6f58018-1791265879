@@ -23,13 +23,16 @@ interface Project {
   id: string;
   code: string;
   name: string;
-  project_reference: string | null;
-  opportunity_reference: string | null;
   status: "pipeline" | "live" | "on_hold" | "completed" | "cancelled";
-  start_date: string | null;
-  end_date: string | null;
-  agreed_fee_value: number | null;
-  notes: string | null;
+  project_reference?: string;
+  opportunity_reference?: string;
+  client_company_id: string;
+  opportunity_id?: string;
+  start_date?: string;
+  end_date?: string;
+  agreed_fee_value?: number;
+  notes?: string;
+  archived?: boolean;
   companies?: {
     name: string;
   };
@@ -186,8 +189,6 @@ function ProjectDetailContent() {
           notes,
           client_company_id,
           opportunity_id,
-          project_reference,
-          opportunity_reference,
           companies (
             id,
             name
@@ -941,18 +942,26 @@ function ProjectDetailContent() {
               </h1>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600 ml-2 sm:ml-0">
-              {project.project_reference && (
-                <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded font-medium">
-                  {project.project_reference}
-                </span>
-              )}
-              {project.opportunity_reference && (
-                <span className="px-2 py-1 bg-slate-100 text-slate-700 rounded text-xs">
-                  Origin: {project.opportunity_reference}
-                </span>
-              )}
               <span>•</span>
-              <span className="font-medium">{project.code}</span>
+              <div className="space-y-2">
+                <div className="flex items-center gap-3 text-slate-500 text-sm">
+                  {project.project_reference && (
+                    <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-mono text-xs">
+                      {project.project_reference}
+                    </span>
+                  )}
+                  {project.opportunity_reference && (
+                    <>
+                      <span className="text-slate-400">from</span>
+                      <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono text-xs">
+                        {project.opportunity_reference}
+                      </span>
+                    </>
+                  )}
+                  {project.project_reference && <span>•</span>}
+                  <span className="font-medium">{project.code}</span>
+                </div>
+              </div>
             </div>
           </div>
 

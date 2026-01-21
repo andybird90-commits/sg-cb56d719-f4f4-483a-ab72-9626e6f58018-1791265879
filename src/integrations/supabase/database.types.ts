@@ -813,6 +813,7 @@ export type Database = {
           name: string
           notes: string | null
           opportunity_id: string | null
+          opportunity_reference: string | null
           project_reference: string | null
           start_date: string | null
           status: string
@@ -832,6 +833,7 @@ export type Database = {
           name: string
           notes?: string | null
           opportunity_id?: string | null
+          opportunity_reference?: string | null
           project_reference?: string | null
           start_date?: string | null
           status?: string
@@ -851,6 +853,7 @@ export type Database = {
           name?: string
           notes?: string | null
           opportunity_id?: string | null
+          opportunity_reference?: string | null
           project_reference?: string | null
           start_date?: string | null
           status?: string
