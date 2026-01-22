@@ -21,11 +21,10 @@ import { useToast } from "@/hooks/use-toast";
 
 interface Project {
   id: string;
-  code: string;
-  name: string;
-  status: "pipeline" | "live" | "on_hold" | "completed" | "cancelled";
   project_reference?: string;
   opportunity_reference?: string;
+  name: string;
+  status: "pipeline" | "live" | "on_hold" | "completed" | "cancelled";
   client_company_id: string;
   opportunity_id?: string;
   start_date?: string;
@@ -118,7 +117,6 @@ function ProjectDetailContent() {
   // Project edit state
   const [isEditingProject, setIsEditingProject] = useState(false);
   const [projectForm, setProjectForm] = useState({
-    code: "",
     name: "",
     status: "pipeline",
     start_date: "",
@@ -180,7 +178,8 @@ function ProjectDetailContent() {
         .from("projects")
         .select(`
           id,
-          code,
+          project_reference,
+          opportunity_reference,
           name,
           status,
           start_date,
@@ -251,7 +250,6 @@ function ProjectDetailContent() {
       
       // Initialize project form with loaded data
       setProjectForm({
-        code: projectData.code,
         name: projectData.name,
         status: projectData.status,
         start_date: projectData.start_date || "",
@@ -311,7 +309,6 @@ function ProjectDetailContent() {
       const shouldArchive = projectForm.status === 'completed';
       
       const updates: any = {
-        code: projectForm.code,
         name: projectForm.name,
         status: projectForm.status as "pipeline" | "live" | "on_hold" | "completed" | "cancelled",
         start_date: projectForm.start_date || null,
@@ -942,7 +939,6 @@ function ProjectDetailContent() {
               </h1>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600 ml-2 sm:ml-0">
-              <span>•</span>
               <div className="space-y-2">
                 <div className="flex items-center gap-3 text-slate-500 text-sm">
                   {project.project_reference && (
@@ -958,8 +954,6 @@ function ProjectDetailContent() {
                       </span>
                     </>
                   )}
-                  {project.project_reference && <span>•</span>}
-                  <span className="font-medium">{project.code}</span>
                 </div>
               </div>
             </div>
@@ -1001,7 +995,9 @@ function ProjectDetailContent() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <span className="font-mono text-sm text-slate-500">{project.code}</span>
+                  {project.project_reference && (
+                    <span className="font-mono text-sm text-slate-500">{project.project_reference}</span>
+                  )}
                   <CardTitle className="text-2xl">{project.name}</CardTitle>
                   <Badge className={getStatusColor(project.status)}>
                     {project.status.replace("_", " ")}
@@ -1024,16 +1020,6 @@ function ProjectDetailContent() {
                 {isEditingProject ? (
                   <form onSubmit={handleUpdateProject} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="edit-code">Project Code *</Label>
-                        <Input
-                          id="edit-code"
-                          value={projectForm.code}
-                          onChange={(e) => setProjectForm({ ...projectForm, code: e.target.value })}
-                          required
-                        />
-                      </div>
-
                       <div className="space-y-2">
                         <Label htmlFor="edit-status">Status</Label>
                         <Select

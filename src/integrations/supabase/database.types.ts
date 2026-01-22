@@ -806,7 +806,7 @@ export type Database = {
           archived_by_user_id: string | null
           archived_reason: string | null
           client_company_id: string
-          code: string
+          code: string | null
           created_at: string
           end_date: string | null
           id: string
@@ -826,7 +826,7 @@ export type Database = {
           archived_by_user_id?: string | null
           archived_reason?: string | null
           client_company_id: string
-          code: string
+          code?: string | null
           created_at?: string
           end_date?: string | null
           id?: string
@@ -846,7 +846,7 @@ export type Database = {
           archived_by_user_id?: string | null
           archived_reason?: string | null
           client_company_id?: string
-          code?: string
+          code?: string | null
           created_at?: string
           end_date?: string | null
           id?: string

@@ -14,7 +14,7 @@ import Link from "next/link";
 
 interface Project {
   id: string;
-  code: string;
+  project_reference: string;
   name: string;
   status: string;
   companies?: {
@@ -61,38 +61,16 @@ function ProjectsContent() {
 
       if (fetchError) throw fetchError;
       
-      // Sort by project code descending (larger numbers first, with alpha suffixes)
+      // Sort by project_reference descending (larger numbers first)
       const sortedData = ((data as any) || []).sort((a: any, b: any) => {
-        // Extract numeric and alpha parts from project codes
-        const parseCode = (code: string) => {
-          const match = code.match(/^(.+?)([a-z]*)$/i);
-          if (!match) return { base: code, suffix: '' };
-          return { base: match[1], suffix: match[2].toLowerCase() };
-        };
+        const aRef = a.project_reference || '';
+        const bRef = b.project_reference || '';
         
-        const aCode = parseCode(a.code);
-        const bCode = parseCode(b.code);
+        // Extract numeric part from references like "P26001"
+        const aNum = parseInt(aRef.replace(/\D/g, '')) || 0;
+        const bNum = parseInt(bRef.replace(/\D/g, '')) || 0;
         
-        // Compare base codes (numeric comparison if both are numbers)
-        const aNum = parseFloat(aCode.base.replace(/[^0-9.-]/g, ''));
-        const bNum = parseFloat(bCode.base.replace(/[^0-9.-]/g, ''));
-        
-        if (!isNaN(aNum) && !isNaN(bNum)) {
-          if (aNum !== bNum) {
-            return bNum - aNum; // Descending order
-          }
-        } else {
-          const baseCompare = bCode.base.localeCompare(aCode.base);
-          if (baseCompare !== 0) {
-            return baseCompare;
-          }
-        }
-        
-        // If base codes are equal, compare suffixes (a > no suffix, b > a, etc.)
-        if (aCode.suffix === bCode.suffix) return 0;
-        if (aCode.suffix === '') return 1; // No suffix comes after suffixes
-        if (bCode.suffix === '') return -1; // Suffix comes before no suffix
-        return bCode.suffix.localeCompare(aCode.suffix); // Reverse for descending
+        return bNum - aNum; // Descending order
       });
       
       setProjects(sortedData);
@@ -113,7 +91,7 @@ function ProjectsContent() {
     const filtered = projects.filter((project) => {
       const searchLower = searchTerm.toLowerCase();
       return (
-        project.code.toLowerCase().includes(searchLower) ||
+        (project.project_reference && project.project_reference.toLowerCase().includes(searchLower)) ||
         project.name.toLowerCase().includes(searchLower) ||
         project.companies?.name.toLowerCase().includes(searchLower)
       );
@@ -210,9 +188,11 @@ function ProjectsContent() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2">
-                          <span className="font-mono text-xs sm:text-sm text-slate-500 flex-shrink-0">
-                            {project.code}
-                          </span>
+                          {project.project_reference && (
+                            <span className="font-mono text-xs sm:text-sm text-slate-500 flex-shrink-0">
+                              {project.project_reference}
+                            </span>
+                          )}
                           <h3 className="text-base sm:text-lg font-semibold text-slate-900 truncate">
                             {project.name}
                           </h3>

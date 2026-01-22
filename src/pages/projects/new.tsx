@@ -34,7 +34,6 @@ function NewProjectContent() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [formData, setFormData] = useState({
-    code: "",
     name: "",
     opportunity_id: "",
     client_company_id: "",
@@ -108,7 +107,6 @@ function NewProjectContent() {
 
     try {
       const payload = {
-        code: formData.code,
         name: formData.name,
         client_company_id: formData.client_company_id,
         status: "live" as "pipeline" | "live" | "on_hold" | "completed" | "cancelled",
@@ -123,8 +121,8 @@ function NewProjectContent() {
 
       const { data, error: insertError } = await supabase
         .from("projects")
-        .insert(payload)
-        .select("id")
+        .insert([payload])
+        .select()
         .single();
 
       if (insertError) {
@@ -199,18 +197,6 @@ function NewProjectContent() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="code" className="text-sm sm:text-base">Project Code *</Label>
-                  <Input
-                    id="code"
-                    value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    placeholder="e.g., PRJ-2025-001"
-                    required
-                    className="h-10 sm:h-11"
-                  />
-                </div>
-
-                <div className="space-y-2">
                   <Label htmlFor="status" className="text-sm sm:text-base">Status</Label>
                   <Select
                     value={formData.status}
@@ -230,14 +216,24 @@ function NewProjectContent() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="name" className="text-sm sm:text-base">Project Name *</Label>
-                <Input
-                  id="name"
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <p className="text-sm text-blue-800">
+                  <strong>Note:</strong> A P-prefixed reference (e.g., P26001) will be automatically generated for this project.
+                </p>
+              </div>
+
+              {/* Project Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Project Name *
+                </label>
+                <input
+                  type="text"
+                  required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                  className="h-10 sm:h-11"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter project name"
                 />
               </div>
 
@@ -256,20 +252,6 @@ function NewProjectContent() {
                   </p>
                 </div>
               )}
-
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-start gap-2">
-                  <div className="text-blue-600 mt-0.5">ℹ️</div>
-                  <div className="text-sm text-blue-900">
-                    <strong>Project Reference:</strong> A unique P-prefixed reference (e.g., P26001) will be automatically generated when you create this project.
-                    {formData.opportunity_reference && (
-                      <span className="block mt-1">
-                        The opportunity reference ({formData.opportunity_reference}) will be saved for tracking purposes.
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="client_company_id" className="text-sm sm:text-base">Client Company *</Label>
