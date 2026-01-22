@@ -261,7 +261,7 @@ function NewProjectContent() {
                 <div className="flex items-start gap-2">
                   <div className="text-blue-600 mt-0.5">ℹ️</div>
                   <div className="text-sm text-blue-900">
-                    <strong>Project Reference:</strong> A unique P-prefixed reference (e.g., P26-001) will be automatically generated when you create this project.
+                    <strong>Project Reference:</strong> A unique P-prefixed reference (e.g., P26001) will be automatically generated when you create this project.
                     {formData.opportunity_reference && (
                       <span className="block mt-1">
                         The opportunity reference ({formData.opportunity_reference}) will be saved for tracking purposes.
