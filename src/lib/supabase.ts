@@ -1,10 +1,8 @@
-import { createClient } from "@supabase/supabase-js";
+import { supabase as client } from "@/integrations/supabase/client";
 import type { Database } from "@/types/database";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder";
-
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+// Re-export the singleton client to ensure only one instance exists app-wide
+export const supabase = client;
 
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type Company = Database["public"]["Tables"]["companies"]["Row"];
