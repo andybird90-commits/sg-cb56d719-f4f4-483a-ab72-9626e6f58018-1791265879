@@ -243,7 +243,7 @@ function ProjectDetailContent() {
         .order("year", { ascending: true })
         .order("month", { ascending: true });
 
-      setProject(projectData);
+      setProject(projectData as Project);
       setActivities(activitiesData || []);
       setVariations(variationsData || []);
       setCosts(costsData || []);
@@ -261,7 +261,7 @@ function ProjectDetailContent() {
       });
       
       // Generate months grid
-      generateMonthsGrid(projectData, (phasingDataResult as unknown as PhasingRow[]) || []);
+      generateMonthsGrid(projectData as Project, (phasingDataResult as unknown as PhasingRow[]) || []);
     } catch (err) {
       console.error("Failed to load project data", err);
       setProjectError("Failed to load project");
