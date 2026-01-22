@@ -61,16 +61,39 @@ function ProjectsContent() {
 
       if (fetchError) throw fetchError;
       
-      // Sort by project_reference ascending (lower numbers first - newest projects)
+      // Sort projects: P26xxx first (ascending), then P25xxx (ascending), then others alphabetically
       const sortedData = ((data as any) || []).sort((a: any, b: any) => {
         const aRef = a.project_reference || '';
         const bRef = b.project_reference || '';
         
-        // Extract numeric part from references like "P26001"
-        const aNum = parseInt(aRef.replace(/\D/g, '')) || 0;
-        const bNum = parseInt(bRef.replace(/\D/g, '')) || 0;
+        // Extract year and number from references like "P26001"
+        const aMatch = aRef.match(/^P(\d{2})(\d+)$/);
+        const bMatch = bRef.match(/^P(\d{2})(\d+)$/);
         
-        return aNum - bNum; // Ascending order - lower numbers (newer) first
+        // If both have valid references
+        if (aMatch && bMatch) {
+          const aYear = parseInt(aMatch[1]);
+          const bYear = parseInt(bMatch[1]);
+          const aNum = parseInt(aMatch[2]);
+          const bNum = parseInt(bMatch[2]);
+          
+          // Sort by year descending (26 before 25)
+          if (aYear !== bYear) {
+            return bYear - aYear;
+          }
+          
+          // Within same year, sort by number ascending (001, 002, 003...)
+          return aNum - bNum;
+        }
+        
+        // If only A has a valid reference, A comes first
+        if (aMatch) return -1;
+        
+        // If only B has a valid reference, B comes first
+        if (bMatch) return 1;
+        
+        // If neither has a valid reference, sort alphabetically by name
+        return (a.name || '').localeCompare(b.name || '');
       });
       
       setProjects(sortedData);
