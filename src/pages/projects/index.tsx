@@ -61,7 +61,7 @@ function ProjectsContent() {
 
       if (fetchError) throw fetchError;
       
-      // Sort by project_reference descending (larger numbers first)
+      // Sort by project_reference ascending (lower numbers first - newest projects)
       const sortedData = ((data as any) || []).sort((a: any, b: any) => {
         const aRef = a.project_reference || '';
         const bRef = b.project_reference || '';
@@ -70,7 +70,7 @@ function ProjectsContent() {
         const aNum = parseInt(aRef.replace(/\D/g, '')) || 0;
         const bNum = parseInt(bRef.replace(/\D/g, '')) || 0;
         
-        return bNum - aNum; // Descending order
+        return aNum - bNum; // Ascending order - lower numbers (newer) first
       });
       
       setProjects(sortedData);
