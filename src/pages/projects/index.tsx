@@ -82,8 +82,8 @@ function ProjectsContent() {
             return bYear - aYear;
           }
           
-          // Within same year, sort by number ascending (001, 002, 003...)
-          return aNum - bNum;
+          // Within same year, sort by number descending (002, 001)
+          return bNum - aNum;
         }
         
         // If only A has a valid reference, A comes first
