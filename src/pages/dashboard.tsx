@@ -402,7 +402,7 @@ function DashboardContent() {
         .not("expected_fee_value", "is", null)
         .in("stage", ["bid", "high_potential"])
         .eq("archived", false)
-        .eq("status", "open")
+        .not("status", "in", '("closed_won","closed_lost")')
         .gte("expected_end_date", startOfCurrentMonth.toISOString());
 
       // MATCH MONTHLY VIEW: Fetch all projects with fee values, no status filter
