@@ -401,6 +401,7 @@ function DashboardContent() {
         .select("id, stage, expected_fee_value, expected_start_date, expected_end_date")
         .not("expected_fee_value", "is", null)
         .in("stage", ["bid", "high_potential"])
+        .neq("status", "archived")
         .gte("expected_end_date", startOfCurrentMonth.toISOString());
 
       // MATCH MONTHLY VIEW: Fetch all projects with fee values, no status filter
