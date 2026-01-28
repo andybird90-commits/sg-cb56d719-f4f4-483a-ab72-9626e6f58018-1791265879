@@ -12,6 +12,9 @@ import html2canvas from "html2canvas";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { useRouter } from "next/router";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface MonthlyProject {
   id: string;
@@ -36,6 +39,7 @@ function PipelineMonthlyContent() {
   const [exporting, setExporting] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draggedProject, setDraggedProject] = useState<MonthlyProject | null>(null);
+  const router = useRouter();
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -338,6 +342,14 @@ function PipelineMonthlyContent() {
     setDraggedProject(null);
   };
 
+  const handleCardClick = (project: MonthlyProject) => {
+    if (project.type === "opportunity") {
+      router.push(`/opportunities/${project.id}`);
+    } else {
+      router.push(`/projects/${project.id}`);
+    }
+  };
+
   const fetchMonthlyData = async () => {
     try {
       setLoading(true);
@@ -555,6 +567,76 @@ function PipelineMonthlyContent() {
     }
   };
 
+  function ProjectCard({ project, monthIndex, isFirst, isLast }: ProjectCardProps) {
+    return (
+      <div
+        className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow"
+        onClick={() => handleCardClick(project)}
+        style={{ cursor: "pointer" }}
+      >
+        {/* Card Header */}
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="text-xs font-mono text-slate-600">
+            {project.code}
+          </div>
+          <Badge className={`text-[10px] px-1.5 py-0.5 ${getStageBadgeColor(project.stage)}`}>
+            {formatStage(project.stage)}
+          </Badge>
+        </div>
+        <div className="font-medium text-sm mb-1 line-clamp-2">
+          {project.name}
+        </div>
+        <div className="text-xs text-slate-600 mb-2">
+          {project.companyShortName}
+        </div>
+        <div className="text-sm font-semibold text-slate-900">
+          {formatCurrency(project.turnover)}
+        </div>
+
+        {/* Arrow Navigation */}
+        <div className="flex items-center justify-center gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    shiftProject(project, "left");
+                  }}
+                  disabled={isFirst}
+                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  aria-label="Move back 1 month"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Move back 1 month</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    shiftProject(project, "right");
+                  }}
+                  disabled={isLast}
+                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  aria-label="Move forward 1 month"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Move forward 1 month</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Layout>
       <div className="space-y-6">
@@ -634,28 +716,13 @@ function PipelineMonthlyContent() {
                             </div>
                           ) : (
                             monthData.projects.map((project) => (
-                              <div
+                              <ProjectCard
                                 key={`${project.id}-${idx}`}
-                                className={`border rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow ${getStageColor(project.stage)}`}
-                              >
-                                <div className="flex items-start justify-between gap-2 mb-2">
-                                  <div className="text-xs font-mono text-slate-600">
-                                    {project.code}
-                                  </div>
-                                  <Badge className={`text-[10px] px-1.5 py-0.5 ${getStageBadgeColor(project.stage)}`}>
-                                    {formatStage(project.stage)}
-                                  </Badge>
-                                </div>
-                                <div className="font-medium text-sm mb-1 line-clamp-2">
-                                  {project.name}
-                                </div>
-                                <div className="text-xs text-slate-600 mb-2">
-                                  {project.companyShortName}
-                                </div>
-                                <div className="text-sm font-semibold text-slate-900">
-                                  {formatCurrency(project.turnover)}
-                                </div>
-                              </div>
+                                project={project}
+                                monthIndex={idx}
+                                isFirst={idx === 0}
+                                isLast={idx === monthsData.length - 1}
+                              />
                             ))
                           )}
                         </div>

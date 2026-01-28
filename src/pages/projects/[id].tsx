@@ -926,36 +926,33 @@ function ProjectDetailContent() {
     <Layout>
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <Link href="/projects">
-                <Button variant="ghost" size="sm" className="gap-2">
-                  <ArrowLeft className="w-4 h-4" />
-                  Back
-                </Button>
-              </Link>
-              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => router.push("/projects")}
+                className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
                 {project.name}
               </h1>
             </div>
-            <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600 ml-2 sm:ml-0">
-              <div className="space-y-2">
-                <div className="flex items-center gap-3 text-slate-500 text-sm">
-                  {project.project_reference && (
-                    <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-mono text-xs">
-                      {project.project_reference}
-                    </span>
-                  )}
-                  {project.opportunity_reference && (
-                    <>
-                      <span className="text-slate-400">from</span>
-                      <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono text-xs">
-                        {project.opportunity_reference}
-                      </span>
-                    </>
-                  )}
-                </div>
-              </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => router.push("/pipeline/monthly")}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                Back to Monthly View
+              </button>
+              <Button variant="outline" size="sm" onClick={() => setIsEditingProject(true)} className="gap-2">
+                <Edit className="w-4 h-4" />
+                Edit
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleDeleteProject} className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50">
+                <Trash2 className="w-4 h-4" />
+                Delete
+              </Button>
             </div>
           </div>
 
