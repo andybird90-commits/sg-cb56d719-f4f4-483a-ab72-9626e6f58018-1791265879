@@ -9,6 +9,9 @@ import { Button } from "@/components/ui/button";
 import { FileDown } from "lucide-react";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 interface MonthlyProject {
   id: string;
@@ -31,6 +34,16 @@ function PipelineMonthlyContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [draggedProject, setDraggedProject] = useState<MonthlyProject | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
 
   useEffect(() => {
     fetchMonthlyData();
@@ -222,6 +235,107 @@ function PipelineMonthlyContent() {
     } finally {
       setExporting(false);
     }
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    const [projectId, monthIndex] = (active.id as string).split("-");
+    
+    setActiveId(active.id as string);
+    
+    // Find the dragged project
+    const month = monthsData[parseInt(monthIndex)];
+    const project = month?.projects.find(p => p.id === projectId);
+    if (project) {
+      setDraggedProject(project);
+    }
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    setActiveId(null);
+    setDraggedProject(null);
+    
+    if (!over) return;
+    
+    const [projectId, sourceMonthIndex] = (active.id as string).split("-");
+    const targetMonthIndex = parseInt((over.id as string).replace("month-", ""));
+    
+    if (sourceMonthIndex === targetMonthIndex.toString()) return;
+    
+    const sourceMonth = monthsData[parseInt(sourceMonthIndex)];
+    const targetMonth = monthsData[targetMonthIndex];
+    const project = sourceMonth.projects.find(p => p.id === projectId);
+    
+    if (!project) return;
+    
+    // Calculate month difference
+    const monthDiff = targetMonthIndex - parseInt(sourceMonthIndex);
+    
+    try {
+      // Determine if it's an opportunity or project and update dates
+      const { data: oppCheck } = await supabase
+        .from("opportunities")
+        .select("id, expected_start_date, expected_end_date")
+        .eq("id", projectId)
+        .single();
+      
+      if (oppCheck) {
+        // It's an opportunity
+        const currentStart = new Date(oppCheck.expected_start_date);
+        const currentEnd = new Date(oppCheck.expected_end_date);
+        
+        const newStart = new Date(currentStart.getFullYear(), currentStart.getMonth() + monthDiff, currentStart.getDate());
+        const newEnd = new Date(currentEnd.getFullYear(), currentEnd.getMonth() + monthDiff, currentEnd.getDate());
+        
+        const { error: updateError } = await supabase
+          .from("opportunities")
+          .update({
+            expected_start_date: newStart.toISOString(),
+            expected_end_date: newEnd.toISOString(),
+          })
+          .eq("id", projectId);
+        
+        if (updateError) throw updateError;
+      } else {
+        // It's a project
+        const { data: projCheck } = await supabase
+          .from("projects")
+          .select("id, start_date, end_date")
+          .eq("id", projectId)
+          .single();
+        
+        if (projCheck) {
+          const currentStart = new Date(projCheck.start_date);
+          const currentEnd = new Date(projCheck.end_date);
+          
+          const newStart = new Date(currentStart.getFullYear(), currentStart.getMonth() + monthDiff, currentStart.getDate());
+          const newEnd = new Date(currentEnd.getFullYear(), currentEnd.getMonth() + monthDiff, currentEnd.getDate());
+          
+          const { error: updateError } = await supabase
+            .from("projects")
+            .update({
+              start_date: newStart.toISOString(),
+              end_date: newEnd.toISOString(),
+            })
+            .eq("id", projectId);
+          
+          if (updateError) throw updateError;
+        }
+      }
+      
+      // Refresh data
+      await fetchMonthlyData();
+    } catch (err) {
+      console.error("Failed to update project dates:", err);
+      setError("Failed to update project dates. Please try again.");
+    }
+  };
+
+  const handleDragCancel = () => {
+    setActiveId(null);
+    setDraggedProject(null);
   };
 
   const fetchMonthlyData = async () => {
