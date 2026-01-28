@@ -251,7 +251,8 @@ function PipelineMonthlyContent() {
           )
         `)
         .eq("archived", false)
-        .not("status", "in", '("closed_won","closed_lost")')
+        .neq("status", "closed_won")
+        .neq("status", "closed_lost")
         .not("expected_fee_value", "is", null)
         .gte("expected_end_date", startOfCurrentMonth.toISOString());
 
