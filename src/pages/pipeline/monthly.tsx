@@ -274,6 +274,8 @@ function PipelineMonthlyContent() {
             name
           )
         `)
+        .eq("archived", false)
+        .eq("status", "live")
         .not("agreed_fee_value", "is", null)
         .gte("end_date", startOfCurrentMonth.toISOString());
 
