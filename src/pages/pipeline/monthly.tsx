@@ -6,15 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileDown } from "lucide-react";
+import { FileDown, ChevronLeft, ChevronRight } from "lucide-react";
 import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
-import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
-import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { useRouter } from "next/router";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+// --- Interfaces ---
 
 interface MonthlyProject {
   id: string;
@@ -24,6 +21,9 @@ interface MonthlyProject {
   stage: string;
   turnover: number;
   month: Date;
+  type: "project" | "opportunity";
+  start_date: string;
+  end_date: string;
 }
 
 interface MonthData {
@@ -32,27 +32,144 @@ interface MonthData {
   totalTurnover: number;
 }
 
+interface ProjectCardProps {
+  project: MonthlyProject;
+  monthIndex: number;
+  isFirst: boolean;
+  isLast: boolean;
+  onShift: (project: MonthlyProject, direction: "left" | "right") => void;
+  onClick: (project: MonthlyProject) => void;
+}
+
+// --- Helper Functions ---
+
+const formatCurrency = (value: number) => {
+  return new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency: "GBP",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value);
+};
+
+const formatMonth = (date: Date) => {
+  return date.toLocaleDateString("en-GB", {
+    month: "short",
+    year: "numeric",
+  });
+};
+
+const formatStage = (stage: string) => {
+  switch (stage) {
+    case "secured":
+      return "Secured";
+    case "high_potential":
+      return "High Potential";
+    case "bid":
+      return "Bid";
+    default:
+      return stage;
+  }
+};
+
+const getStageBadgeColor = (stage: string) => {
+  switch (stage) {
+    case "secured":
+      return "bg-green-100 text-green-700";
+    case "high_potential":
+      return "bg-orange-100 text-orange-700";
+    case "bid":
+      return "bg-blue-100 text-blue-700";
+    default:
+      return "bg-slate-100 text-slate-700";
+  }
+};
+
+// --- Sub-Components ---
+
+function ProjectCard({ project, monthIndex, isFirst, isLast, onShift, onClick }: ProjectCardProps) {
+  return (
+    <div
+      className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow cursor-pointer group"
+      onClick={() => onClick(project)}
+    >
+      {/* Card Header */}
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="text-xs font-mono text-slate-600">
+          {project.code}
+        </div>
+        <Badge className={`text-[10px] px-1.5 py-0.5 ${getStageBadgeColor(project.stage)}`}>
+          {formatStage(project.stage)}
+        </Badge>
+      </div>
+      <div className="font-medium text-sm mb-1 line-clamp-2 text-slate-900 dark:text-slate-100">
+        {project.name}
+      </div>
+      <div className="text-xs text-slate-600 mb-2">
+        {project.companyShortName}
+      </div>
+      <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+        {formatCurrency(project.turnover)}
+      </div>
+
+      {/* Arrow Navigation */}
+      <div className="flex items-center justify-center gap-2 pt-2 border-t border-gray-200 dark:border-gray-700 mt-2">
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onShift(project, "left");
+                }}
+                disabled={isFirst}
+                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-slate-500 hover:text-slate-900"
+                aria-label="Move back 1 month"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Move back 1 month</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onShift(project, "right");
+                }}
+                disabled={isLast}
+                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-slate-500 hover:text-slate-900"
+                aria-label="Move forward 1 month"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Move forward 1 month</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+    </div>
+  );
+}
+
+// --- Main Component ---
+
 function PipelineMonthlyContent() {
   const [monthsData, setMonthsData] = useState<MonthData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [draggedProject, setDraggedProject] = useState<MonthlyProject | null>(null);
   const router = useRouter();
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    })
-  );
 
   useEffect(() => {
     fetchMonthlyData();
   }, []);
 
+  // Sync scrollbars
   useEffect(() => {
     const topScrollContainer = document.getElementById("top-scroll-container");
     const bottomScrollContainer = document.getElementById("bottom-scroll-container");
@@ -76,280 +193,6 @@ function PipelineMonthlyContent() {
     };
   }, [monthsData]);
 
-  const exportToPDF = async () => {
-    setExporting(true);
-    try {
-      const pdf = new jsPDF({
-        orientation: "landscape",
-        unit: "mm",
-        format: "a4",
-      });
-
-      // Title page
-      pdf.setFontSize(24);
-      pdf.text("Pipeline Report - Monthly View", 148, 20, { align: "center" });
-      pdf.setFontSize(12);
-      pdf.text(`Generated: ${new Date().toLocaleDateString("en-GB")}`, 148, 30, { align: "center" });
-
-      // Generate 12 months of data
-      const months: Date[] = [];
-      const currentDate = new Date();
-      for (let i = 0; i < 12; i++) {
-        const monthDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + i, 1);
-        months.push(monthDate);
-      }
-
-      // Fetch data with explicit typing
-      const { data: projectsData } = await (supabase as any)
-        .from("projects")
-        .select("id, code, name, start_date, end_date, agreed_fee_value, companies!projects_client_company_id_fkey(short_name)")
-        .eq("archived", false)
-        .not("start_date", "is", null)
-        .not("end_date", "is", null);
-
-      const { data: oppsData } = await (supabase as any)
-        .from("opportunities")
-        .select("id, name, expected_start_date, expected_end_date, expected_fee_value, stage, companies(short_name)")
-        .not("expected_start_date", "is", null)
-        .not("expected_end_date", "is", null);
-
-      // Process each month - one page per month
-      months.forEach((month, monthIndex) => {
-        if (monthIndex > 0) {
-          pdf.addPage();
-        } else {
-          pdf.addPage(); // First month starts on page 2 (after title)
-        }
-
-        pdf.setFontSize(18);
-        const monthName = month.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
-        pdf.text(`Monthly View - ${monthName}`, 148, 15, { align: "center" });
-
-        let yPos = 30;
-        let totalTurnover = 0;
-        const pageHeight = 190;
-
-        const monthProjects: Array<{
-          name: string;
-          company: string;
-          value: number;
-          stage: string;
-        }> = [];
-
-        // Process projects
-        if (projectsData) {
-          projectsData.forEach((project: any) => {
-            const projectStart = new Date(project.start_date!);
-            const projectEnd = new Date(project.end_date!);
-
-            if (projectStart <= new Date(month.getFullYear(), month.getMonth() + 1, 0) &&
-                projectEnd >= month) {
-              const totalMonths = Math.ceil(
-                (projectEnd.getTime() - projectStart.getTime()) / (1000 * 60 * 60 * 24 * 30)
-              );
-              const monthlyValue = (project.agreed_fee_value || 0) / Math.max(totalMonths, 1);
-
-              monthProjects.push({
-                name: project.name,
-                company: project.companies?.short_name || "Unknown",
-                value: monthlyValue,
-                stage: "Secured",
-              });
-              totalTurnover += monthlyValue;
-            }
-          });
-        }
-
-        // Process opportunities
-        if (oppsData) {
-          oppsData.forEach((opp: any) => {
-            const oppStart = new Date(opp.expected_start_date!);
-            const oppEnd = new Date(opp.expected_end_date!);
-
-            if (oppStart <= new Date(month.getFullYear(), month.getMonth() + 1, 0) &&
-                oppEnd >= month) {
-              const totalMonths = Math.ceil(
-                (oppEnd.getTime() - oppStart.getTime()) / (1000 * 60 * 60 * 24 * 30)
-              );
-              const monthlyValue = (opp.expected_fee_value || 0) / Math.max(totalMonths, 1);
-
-              monthProjects.push({
-                name: opp.name,
-                company: opp.companies?.short_name || "Unknown",
-                value: monthlyValue,
-                stage: opp.stage === "secured" ? "Secured" : opp.stage === "high_potential" ? "High Potential" : "Bid",
-              });
-              totalTurnover += monthlyValue;
-            }
-          });
-        }
-
-        // Display total
-        pdf.setFontSize(12);
-        pdf.setFont("helvetica", "bold");
-        pdf.text(`Total Turnover: £${totalTurnover.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`, 148, 25, { align: "center" });
-
-        // Display projects
-        pdf.setFontSize(10);
-        monthProjects.forEach((project) => {
-          if (yPos > pageHeight) {
-            pdf.addPage();
-            pdf.setFontSize(18);
-            pdf.text(`${monthName} (continued)`, 148, 15, { align: "center" });
-            pdf.setFontSize(12);
-            pdf.setFont("helvetica", "bold");
-            pdf.text(`Total Turnover: £${totalTurnover.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`, 148, 25, { align: "center" });
-            yPos = 35;
-            pdf.setFontSize(10);
-          }
-
-          // Stage badge color
-          if (project.stage === "Secured") {
-            pdf.setTextColor(34, 197, 94); // green
-          } else if (project.stage === "High Potential") {
-            pdf.setTextColor(249, 115, 22); // orange
-          } else {
-            pdf.setTextColor(59, 130, 246); // blue
-          }
-
-          pdf.setFont("helvetica", "bold");
-          pdf.text(`[${project.stage}]`, 10, yPos);
-
-          pdf.setTextColor(0, 0, 0);
-          pdf.setFont("helvetica", "normal");
-          pdf.text(project.name, 55, yPos);
-          pdf.text(project.company, 150, yPos);
-          pdf.text(`£${project.value.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`, 220, yPos);
-
-          yPos += 7;
-        });
-
-        if (monthProjects.length === 0) {
-          pdf.setFontSize(10);
-          pdf.setTextColor(100, 100, 100);
-          pdf.text("No projects scheduled for this month", 148, yPos, { align: "center" });
-        }
-      });
-
-      // Save PDF
-      pdf.save(`pipeline-report-${new Date().toISOString().split("T")[0]}.pdf`);
-    } catch (error) {
-      console.error("PDF export error:", error);
-      alert("Failed to export PDF. Please try again.");
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  const handleDragStart = (event: DragStartEvent) => {
-    const { active } = event;
-    const [projectId, monthIndex] = (active.id as string).split("-");
-    
-    setActiveId(active.id as string);
-    
-    // Find the dragged project
-    const month = monthsData[parseInt(monthIndex)];
-    const project = month?.projects.find(p => p.id === projectId);
-    if (project) {
-      setDraggedProject(project);
-    }
-  };
-
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-    
-    setActiveId(null);
-    setDraggedProject(null);
-    
-    if (!over) return;
-    
-    const [projectId, sourceMonthIndex] = (active.id as string).split("-");
-    const targetMonthIndex = parseInt((over.id as string).replace("month-", ""));
-    
-    if (sourceMonthIndex === targetMonthIndex.toString()) return;
-    
-    const sourceMonth = monthsData[parseInt(sourceMonthIndex)];
-    const targetMonth = monthsData[targetMonthIndex];
-    const project = sourceMonth.projects.find(p => p.id === projectId);
-    
-    if (!project) return;
-    
-    // Calculate month difference
-    const monthDiff = targetMonthIndex - parseInt(sourceMonthIndex);
-    
-    try {
-      // Determine if it's an opportunity or project and update dates
-      const { data: oppCheck } = await supabase
-        .from("opportunities")
-        .select("id, expected_start_date, expected_end_date")
-        .eq("id", projectId)
-        .single();
-      
-      if (oppCheck) {
-        // It's an opportunity
-        const currentStart = new Date(oppCheck.expected_start_date);
-        const currentEnd = new Date(oppCheck.expected_end_date);
-        
-        const newStart = new Date(currentStart.getFullYear(), currentStart.getMonth() + monthDiff, currentStart.getDate());
-        const newEnd = new Date(currentEnd.getFullYear(), currentEnd.getMonth() + monthDiff, currentEnd.getDate());
-        
-        const { error: updateError } = await supabase
-          .from("opportunities")
-          .update({
-            expected_start_date: newStart.toISOString(),
-            expected_end_date: newEnd.toISOString(),
-          })
-          .eq("id", projectId);
-        
-        if (updateError) throw updateError;
-      } else {
-        // It's a project
-        const { data: projCheck } = await supabase
-          .from("projects")
-          .select("id, start_date, end_date")
-          .eq("id", projectId)
-          .single();
-        
-        if (projCheck) {
-          const currentStart = new Date(projCheck.start_date);
-          const currentEnd = new Date(projCheck.end_date);
-          
-          const newStart = new Date(currentStart.getFullYear(), currentStart.getMonth() + monthDiff, currentStart.getDate());
-          const newEnd = new Date(currentEnd.getFullYear(), currentEnd.getMonth() + monthDiff, currentEnd.getDate());
-          
-          const { error: updateError } = await supabase
-            .from("projects")
-            .update({
-              start_date: newStart.toISOString(),
-              end_date: newEnd.toISOString(),
-            })
-            .eq("id", projectId);
-          
-          if (updateError) throw updateError;
-        }
-      }
-      
-      // Refresh data
-      await fetchMonthlyData();
-    } catch (err) {
-      console.error("Failed to update project dates:", err);
-      setError("Failed to update project dates. Please try again.");
-    }
-  };
-
-  const handleDragCancel = () => {
-    setActiveId(null);
-    setDraggedProject(null);
-  };
-
-  const handleCardClick = (project: MonthlyProject) => {
-    if (project.type === "opportunity") {
-      router.push(`/opportunities/${project.id}`);
-    } else {
-      router.push(`/projects/${project.id}`);
-    }
-  };
-
   const fetchMonthlyData = async () => {
     try {
       setLoading(true);
@@ -358,7 +201,6 @@ function PipelineMonthlyContent() {
       // Get current date and calculate 12 months range
       const now = new Date();
       const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const endDate = new Date(now.getFullYear(), now.getMonth() + 12, 0);
 
       // Fetch all opportunities with dates and turnover
       const { data: oppsData, error: oppsError } = await supabase
@@ -446,6 +288,9 @@ function PipelineMonthlyContent() {
                   stage: opp.stage,
                   turnover: monthlyTurnover,
                   month: monthData.month,
+                  type: "opportunity",
+                  start_date: startDate.toISOString(),
+                  end_date: endDate.toISOString(),
                 });
                 monthData.totalTurnover += monthlyTurnover;
               }
@@ -482,6 +327,9 @@ function PipelineMonthlyContent() {
                   stage: "secured", // Projects are secured
                   turnover: monthlyTurnover,
                   month: monthData.month,
+                  type: "project",
+                  start_date: startDate.toISOString(),
+                  end_date: endDate.toISOString(),
                 });
                 monthData.totalTurnover += monthlyTurnover;
               }
@@ -492,18 +340,6 @@ function PipelineMonthlyContent() {
 
       setMonthsData(months);
 
-      // Debug logging
-      console.log("=== MONTHLY VIEW DEBUG ===");
-      console.log("Total opportunities:", oppsData?.length || 0);
-      console.log("Total projects:", projectsData?.length || 0);
-      console.log("Months data:", months.map(m => ({
-        month: m.month.toLocaleDateString("en-GB", { month: "short", year: "numeric" }),
-        projects: m.projects.length,
-        total: m.totalTurnover
-      })));
-      console.log("Grand total:", months.reduce((sum, m) => sum + m.totalTurnover, 0));
-      console.log("=========================");
-
     } catch (err) {
       console.error("Failed to load monthly data", err);
       setError("Failed to load monthly data. Please try again.");
@@ -512,138 +348,143 @@ function PipelineMonthlyContent() {
     }
   };
 
-  const getStageColor = (stage: string) => {
-    switch (stage) {
-      case "secured":
-        return "bg-green-50 border-green-200 text-green-700";
-      case "high_potential":
-        return "bg-orange-50 border-orange-200 text-orange-700";
-      case "bid":
-        return "bg-blue-50 border-blue-200 text-blue-700";
-      default:
-        return "bg-slate-50 border-slate-200 text-slate-700";
+  const handleCardClick = (project: MonthlyProject) => {
+    if (project.type === "opportunity") {
+      router.push(`/opportunities/${project.id}`);
+    } else {
+      router.push(`/projects/${project.id}`);
     }
   };
 
-  const getStageBadgeColor = (stage: string) => {
-    switch (stage) {
-      case "secured":
-        return "bg-green-100 text-green-700";
-      case "high_potential":
-        return "bg-orange-100 text-orange-700";
-      case "bid":
-        return "bg-blue-100 text-blue-700";
-      default:
-        return "bg-slate-100 text-slate-700";
+  const shiftProject = async (project: MonthlyProject, direction: "left" | "right") => {
+    try {
+      const monthDiff = direction === "right" ? 1 : -1;
+      const currentStart = new Date(project.start_date);
+      const currentEnd = new Date(project.end_date);
+      
+      const newStart = new Date(currentStart.setMonth(currentStart.getMonth() + monthDiff));
+      const newEnd = new Date(currentEnd.setMonth(currentEnd.getMonth() + monthDiff));
+
+      if (project.type === "opportunity") {
+        const { error: updateError } = await supabase
+          .from("opportunities")
+          .update({
+            expected_start_date: newStart.toISOString(),
+            expected_end_date: newEnd.toISOString(),
+          })
+          .eq("id", project.id);
+        
+        if (updateError) throw updateError;
+      } else {
+        const { error: updateError } = await supabase
+          .from("projects")
+          .update({
+            start_date: newStart.toISOString(),
+            end_date: newEnd.toISOString(),
+          })
+          .eq("id", project.id);
+        
+        if (updateError) throw updateError;
+      }
+
+      await fetchMonthlyData();
+
+    } catch (err) {
+      console.error("Failed to shift project dates:", err);
+      setError("Failed to shift project dates. Please try again.");
     }
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("en-GB", {
-      style: "currency",
-      currency: "GBP",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
+  const exportToPDF = async () => {
+    setExporting(true);
+    try {
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: "a4",
+      });
 
-  const formatMonth = (date: Date) => {
-    return date.toLocaleDateString("en-GB", {
-      month: "short",
-      year: "numeric",
-    });
-  };
+      // Title page
+      pdf.setFontSize(24);
+      pdf.text("Pipeline Report - Monthly View", 148, 20, { align: "center" });
+      pdf.setFontSize(12);
+      pdf.text(`Generated: ${new Date().toLocaleDateString("en-GB")}`, 148, 30, { align: "center" });
 
-  const formatStage = (stage: string) => {
-    switch (stage) {
-      case "secured":
-        return "Secured";
-      case "high_potential":
-        return "High Potential";
-      case "bid":
-        return "Bid";
-      default:
-        return stage;
+      // Using the currently loaded data for the PDF to ensure consistency
+      monthsData.forEach((monthData, monthIndex) => {
+        if (monthIndex > 0) {
+          pdf.addPage();
+        } else {
+          pdf.addPage(); // First month starts on page 2
+        }
+
+        pdf.setFontSize(18);
+        const monthName = monthData.month.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+        pdf.text(`Monthly View - ${monthName}`, 148, 15, { align: "center" });
+
+        let yPos = 30;
+        const pageHeight = 190;
+
+        // Display total
+        pdf.setFontSize(12);
+        pdf.setFont("helvetica", "bold");
+        pdf.text(`Total Turnover: ${formatCurrency(monthData.totalTurnover)}`, 148, 25, { align: "center" });
+
+        // Display projects
+        pdf.setFontSize(10);
+        monthData.projects.forEach((project) => {
+          if (yPos > pageHeight) {
+            pdf.addPage();
+            pdf.setFontSize(18);
+            pdf.text(`${monthName} (continued)`, 148, 15, { align: "center" });
+            yPos = 35;
+            pdf.setFontSize(10);
+          }
+
+          // Stage colors for PDF
+          if (project.stage === "secured") {
+            pdf.setTextColor(34, 197, 94); // green
+          } else if (project.stage === "high_potential") {
+            pdf.setTextColor(249, 115, 22); // orange
+          } else {
+            pdf.setTextColor(59, 130, 246); // blue
+          }
+
+          pdf.setFont("helvetica", "bold");
+          pdf.text(`[${formatStage(project.stage)}]`, 10, yPos);
+
+          pdf.setTextColor(0, 0, 0);
+          pdf.setFont("helvetica", "normal");
+          pdf.text(project.name, 55, yPos);
+          pdf.text(project.companyShortName, 150, yPos);
+          pdf.text(formatCurrency(project.turnover), 220, yPos);
+
+          yPos += 7;
+        });
+
+        if (monthData.projects.length === 0) {
+          pdf.setFontSize(10);
+          pdf.setTextColor(100, 100, 100);
+          pdf.text("No projects scheduled for this month", 148, yPos, { align: "center" });
+        }
+      });
+
+      pdf.save(`pipeline-report-${new Date().toISOString().split("T")[0]}.pdf`);
+    } catch (error) {
+      console.error("PDF export error:", error);
+      alert("Failed to export PDF. Please try again.");
+    } finally {
+      setExporting(false);
     }
   };
-
-  function ProjectCard({ project, monthIndex, isFirst, isLast }: ProjectCardProps) {
-    return (
-      <div
-        className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow"
-        onClick={() => handleCardClick(project)}
-        style={{ cursor: "pointer" }}
-      >
-        {/* Card Header */}
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <div className="text-xs font-mono text-slate-600">
-            {project.code}
-          </div>
-          <Badge className={`text-[10px] px-1.5 py-0.5 ${getStageBadgeColor(project.stage)}`}>
-            {formatStage(project.stage)}
-          </Badge>
-        </div>
-        <div className="font-medium text-sm mb-1 line-clamp-2">
-          {project.name}
-        </div>
-        <div className="text-xs text-slate-600 mb-2">
-          {project.companyShortName}
-        </div>
-        <div className="text-sm font-semibold text-slate-900">
-          {formatCurrency(project.turnover)}
-        </div>
-
-        {/* Arrow Navigation */}
-        <div className="flex items-center justify-center gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    shiftProject(project, "left");
-                  }}
-                  disabled={isFirst}
-                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  aria-label="Move back 1 month"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>Move back 1 month</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    shiftProject(project, "right");
-                  }}
-                  disabled={isLast}
-                  className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  aria-label="Move forward 1 month"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>Move forward 1 month</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <Layout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">Monthly Pipeline View</h1>
-            <p className="text-slate-600 mt-1">Rolling 12-month view of projects and expected turnover</p>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Monthly Pipeline View</h1>
+            <p className="text-slate-600 dark:text-slate-400 mt-1">Rolling 12-month view of projects and expected turnover</p>
           </div>
           <Button 
             onClick={exportToPDF}
@@ -681,7 +522,7 @@ function PipelineMonthlyContent() {
                 {/* Top Scrollbar */}
                 <div 
                   id="top-scroll-container"
-                  className="overflow-x-auto border border-gray-300 rounded bg-gray-100 mb-2"
+                  className="overflow-x-auto border border-gray-300 rounded bg-gray-100 dark:bg-gray-800 dark:border-gray-600 mb-2"
                   style={{ height: "20px" }}
                 >
                   <div 
@@ -699,17 +540,17 @@ function PipelineMonthlyContent() {
                     {monthsData.map((monthData, idx) => (
                       <div key={idx} className="flex-shrink-0" style={{ width: "280px" }}>
                         {/* Month Header */}
-                        <div className="bg-slate-100 rounded-t-lg p-3 border-b-2 border-slate-300">
-                          <div className="font-semibold text-slate-900 text-center">
+                        <div className="bg-slate-100 dark:bg-slate-800 rounded-t-lg p-3 border-b-2 border-slate-300 dark:border-slate-600">
+                          <div className="font-semibold text-slate-900 dark:text-white text-center">
                             {formatMonth(monthData.month)}
                           </div>
-                          <div className="text-xs text-slate-600 text-center mt-1">
+                          <div className="text-xs text-slate-600 dark:text-slate-400 text-center mt-1">
                             {formatCurrency(monthData.totalTurnover)}
                           </div>
                         </div>
 
                         {/* Projects Column */}
-                        <div className="bg-slate-50 rounded-b-lg p-3 min-h-[400px] space-y-2">
+                        <div className="bg-slate-50 dark:bg-slate-900/50 rounded-b-lg p-3 min-h-[400px] space-y-2 border border-slate-200 dark:border-slate-700 border-t-0">
                           {monthData.projects.length === 0 ? (
                             <div className="text-center text-slate-400 text-sm py-8">
                               No projects
@@ -722,6 +563,8 @@ function PipelineMonthlyContent() {
                                 monthIndex={idx}
                                 isFirst={idx === 0}
                                 isLast={idx === monthsData.length - 1}
+                                onShift={shiftProject}
+                                onClick={handleCardClick}
                               />
                             ))
                           )}
@@ -731,57 +574,50 @@ function PipelineMonthlyContent() {
                   </div>
                 </div>
 
-                {/* Monthly Columns with dual scrollbars */}
-                <div>
-                  {/* Main Content with bottom scrollbar */}
-                  <div className="space-y-4">
-                    {/* Legend */}
-                    <div className="pt-4 border-t border-slate-200">
-                      <div className="text-sm font-medium text-slate-600 mb-3">Legend:</div>
-                      <div className="flex flex-wrap gap-4 text-xs">
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 bg-green-100 border border-green-200 rounded"></div>
-                          <span className="text-slate-700">Secured</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 bg-orange-100 border border-orange-200 rounded"></div>
-                          <span className="text-slate-700">High Potential</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 bg-blue-100 border border-blue-200 rounded"></div>
-                          <span className="text-slate-700">Bid</span>
-                        </div>
-                      </div>
+                {/* Legend and Summary */}
+                <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                  <div className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-3">Legend:</div>
+                  <div className="flex flex-wrap gap-4 text-xs">
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 bg-green-100 border border-green-200 rounded"></div>
+                      <span className="text-slate-700 dark:text-slate-300">Secured</span>
                     </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 bg-orange-100 border border-orange-200 rounded"></div>
+                      <span className="text-slate-700 dark:text-slate-300">High Potential</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 bg-blue-100 border border-blue-200 rounded"></div>
+                      <span className="text-slate-700 dark:text-slate-300">Bid</span>
+                    </div>
+                  </div>
+                </div>
 
-                    {/* Summary Stats */}
-                    <div className="pt-4 border-t border-slate-200">
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="bg-slate-50 rounded-lg p-4">
-                          <div className="text-2xl font-bold text-slate-900">
-                            {monthsData.reduce((sum, m) => sum + m.totalTurnover, 0) > 0
-                              ? formatCurrency(monthsData.reduce((sum, m) => sum + m.totalTurnover, 0))
-                              : "£0"}
-                          </div>
-                          <div className="text-xs text-slate-600 mt-1">Total 12 Months</div>
-                        </div>
-                        <div className="bg-slate-50 rounded-lg p-4">
-                          <div className="text-2xl font-bold text-slate-900">
-                            {formatCurrency(
-                              monthsData.reduce((sum, m) => sum + m.totalTurnover, 0) / 12
-                            )}
-                          </div>
-                          <div className="text-xs text-slate-600 mt-1">Average/Month</div>
-                        </div>
-                        <div className="bg-slate-50 rounded-lg p-4">
-                          <div className="text-2xl font-bold text-slate-900">
-                            {Math.max(...monthsData.map(m => m.totalTurnover)) > 0
-                              ? formatCurrency(Math.max(...monthsData.map(m => m.totalTurnover)))
-                              : "£0"}
-                          </div>
-                          <div className="text-xs text-slate-600 mt-1">Peak Month</div>
-                        </div>
+                <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
+                      <div className="text-2xl font-bold text-slate-900 dark:text-white">
+                        {monthsData.reduce((sum, m) => sum + m.totalTurnover, 0) > 0
+                          ? formatCurrency(monthsData.reduce((sum, m) => sum + m.totalTurnover, 0))
+                          : "£0"}
                       </div>
+                      <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">Total 12 Months</div>
+                    </div>
+                    <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
+                      <div className="text-2xl font-bold text-slate-900 dark:text-white">
+                        {formatCurrency(
+                          monthsData.reduce((sum, m) => sum + m.totalTurnover, 0) / 12
+                        )}
+                      </div>
+                      <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">Average/Month</div>
+                    </div>
+                    <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
+                      <div className="text-2xl font-bold text-slate-900 dark:text-white">
+                        {Math.max(...monthsData.map(m => m.totalTurnover)) > 0
+                          ? formatCurrency(Math.max(...monthsData.map(m => m.totalTurnover)))
+                          : "£0"}
+                      </div>
+                      <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">Peak Month</div>
                     </div>
                   </div>
                 </div>
