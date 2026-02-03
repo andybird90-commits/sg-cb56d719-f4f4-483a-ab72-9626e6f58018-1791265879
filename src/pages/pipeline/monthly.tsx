@@ -24,6 +24,7 @@ interface MonthlyProject {
   type: "project" | "opportunity";
   start_date: string;
   end_date: string;
+  hasManualPhasing: boolean;
 }
 
 interface MonthData {
@@ -98,9 +99,21 @@ function ProjectCard({ project, monthIndex, isFirst, isLast, onShift, onClick }:
         <div className="text-xs font-mono text-slate-600">
           {project.code}
         </div>
-        <Badge className={`text-[10px] px-1.5 py-0.5 ${getStageBadgeColor(project.stage)}`}>
-          {formatStage(project.stage)}
-        </Badge>
+        <div className="flex items-center gap-1">
+          <Badge className={`text-[10px] px-1.5 py-0.5 ${getStageBadgeColor(project.stage)}`}>
+            {formatStage(project.stage)}
+          </Badge>
+          {project.hasManualPhasing && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">M</span>
+                </TooltipTrigger>
+                <TooltipContent>Manual phasing active</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
       </div>
       <div className="font-medium text-sm mb-1 line-clamp-2 text-slate-900 dark:text-slate-100">
         {project.name}
@@ -249,6 +262,43 @@ function PipelineMonthlyContent() {
 
       if (projectsError) throw projectsError;
 
+      // Fetch all manual phasing for opportunities
+      const { data: oppPhasingData, error: oppPhasingError } = await supabase
+        .from("opportunity_monthly_phasing")
+        .select("opportunity_id, year, month, revenue_amount")
+        .gte("year", now.getFullYear())
+        .lte("year", now.getFullYear() + 1);
+
+      if (oppPhasingError) throw oppPhasingError;
+
+      // Fetch all manual phasing for projects
+      const { data: projPhasingData, error: projPhasingError } = await supabase
+        .from("project_monthly_phasing")
+        .select("project_id, year, month, revenue_amount")
+        .gte("year", now.getFullYear())
+        .lte("year", now.getFullYear() + 1);
+
+      if (projPhasingError) throw projPhasingError;
+
+      // Create phasing lookup maps
+      const oppPhasingMap = new Map<string, Map<string, number>>();
+      oppPhasingData?.forEach((p) => {
+        if (!oppPhasingMap.has(p.opportunity_id)) {
+          oppPhasingMap.set(p.opportunity_id, new Map());
+        }
+        const key = `${p.year}-${p.month}`;
+        oppPhasingMap.get(p.opportunity_id)!.set(key, p.revenue_amount || 0);
+      });
+
+      const projPhasingMap = new Map<string, Map<string, number>>();
+      projPhasingData?.forEach((p) => {
+        if (!projPhasingMap.has(p.project_id)) {
+          projPhasingMap.set(p.project_id, new Map());
+        }
+        const key = `${p.year}-${p.month}`;
+        projPhasingMap.get(p.project_id)!.set(key, p.revenue_amount || 0);
+      });
+
       // Create 12 months array
       const months: MonthData[] = [];
       for (let i = 0; i < 12; i++) {
@@ -267,12 +317,14 @@ function PipelineMonthlyContent() {
           const endDate = new Date(opp.expected_end_date || "");
 
           if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+            const hasManualPhasing = oppPhasingMap.has(opp.id);
+            
+            // Calculate default monthly turnover (fallback)
             const durationMonths = Math.max(1, 
               (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
               (endDate.getMonth() - startDate.getMonth()) + 1
             );
-
-            const monthlyTurnover = (opp.expected_fee_value || 0) / durationMonths;
+            const defaultMonthlyTurnover = (opp.expected_fee_value || 0) / durationMonths;
 
             // Add to each relevant month
             months.forEach((monthData) => {
@@ -280,6 +332,11 @@ function PipelineMonthlyContent() {
               const monthEnd = new Date(monthData.month.getFullYear(), monthData.month.getMonth() + 1, 0);
 
               if (startDate <= monthEnd && endDate >= monthStart) {
+                // Check if manual phasing exists for this month
+                const phasingKey = `${monthData.month.getFullYear()}-${monthData.month.getMonth() + 1}`;
+                const manualPhasing = oppPhasingMap.get(opp.id);
+                const monthlyTurnover = manualPhasing?.get(phasingKey) ?? defaultMonthlyTurnover;
+
                 monthData.projects.push({
                   id: opp.id,
                   code: opp.id.substring(0, 8),
@@ -291,6 +348,7 @@ function PipelineMonthlyContent() {
                   type: "opportunity",
                   start_date: startDate.toISOString(),
                   end_date: endDate.toISOString(),
+                  hasManualPhasing,
                 });
                 monthData.totalTurnover += monthlyTurnover;
               }
@@ -306,12 +364,14 @@ function PipelineMonthlyContent() {
           const endDate = new Date(proj.end_date || "");
 
           if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+            const hasManualPhasing = projPhasingMap.has(proj.id);
+            
+            // Calculate default monthly turnover (fallback)
             const durationMonths = Math.max(1, 
               (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
               (endDate.getMonth() - startDate.getMonth()) + 1
             );
-
-            const monthlyTurnover = (proj.agreed_fee_value || 0) / durationMonths;
+            const defaultMonthlyTurnover = (proj.agreed_fee_value || 0) / durationMonths;
 
             // Add to each relevant month
             months.forEach((monthData) => {
@@ -319,17 +379,23 @@ function PipelineMonthlyContent() {
               const monthEnd = new Date(monthData.month.getFullYear(), monthData.month.getMonth() + 1, 0);
 
               if (startDate <= monthEnd && endDate >= monthStart) {
+                // Check if manual phasing exists for this month
+                const phasingKey = `${monthData.month.getFullYear()}-${monthData.month.getMonth() + 1}`;
+                const manualPhasing = projPhasingMap.get(proj.id);
+                const monthlyTurnover = manualPhasing?.get(phasingKey) ?? defaultMonthlyTurnover;
+
                 monthData.projects.push({
                   id: proj.id,
                   code: proj.code,
                   name: proj.name,
                   companyShortName: proj.companies?.short_name || proj.companies?.name || "",
-                  stage: "secured", // Projects are secured
+                  stage: "secured",
                   turnover: monthlyTurnover,
                   month: monthData.month,
                   type: "project",
                   start_date: startDate.toISOString(),
                   end_date: endDate.toISOString(),
+                  hasManualPhasing,
                 });
                 monthData.totalTurnover += monthlyTurnover;
               }
@@ -451,7 +517,7 @@ function PipelineMonthlyContent() {
           }
 
           pdf.setFont("helvetica", "bold");
-          pdf.text(`[${formatStage(project.stage)}]`, 10, yPos);
+          pdf.text(`[${formatStage(project.stage)}${project.hasManualPhasing ? " M" : ""}]`, 10, yPos);
 
           pdf.setTextColor(0, 0, 0);
           pdf.setFont("helvetica", "normal");
@@ -589,6 +655,10 @@ function PipelineMonthlyContent() {
                     <div className="flex items-center gap-2">
                       <div className="w-4 h-4 bg-blue-100 border border-blue-200 rounded"></div>
                       <span className="text-slate-700 dark:text-slate-300">Bid</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">M</span>
+                      <span className="text-slate-700 dark:text-slate-300">Manual Phasing Active</span>
                     </div>
                   </div>
                 </div>
