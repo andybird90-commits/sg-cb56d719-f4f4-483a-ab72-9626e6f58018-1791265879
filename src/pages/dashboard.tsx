@@ -395,6 +395,32 @@ function DashboardContent() {
         end: endOfTwelfthMonth.toISOString()
       });
 
+      // Fetch manual phasing data for both opportunities and projects
+      const { data: opportunityPhasing } = await supabase
+        .from("opportunity_monthly_phasing")
+        .select("opportunity_id, year_month, forecast_value")
+        .gte("year_month", format(startOfCurrentMonth, "yyyy-MM"))
+        .lte("year_month", format(endOfTwelfthMonth, "yyyy-MM"));
+
+      const { data: projectPhasing } = await supabase
+        .from("project_monthly_phasing")
+        .select("project_id, year_month, forecast_value")
+        .gte("year_month", format(startOfCurrentMonth, "yyyy-MM"))
+        .lte("year_month", format(endOfTwelfthMonth, "yyyy-MM"));
+
+      // Create lookup maps for manual phasing
+      const oppPhasingMap = new Map<string, number>();
+      opportunityPhasing?.forEach((phase) => {
+        const key = `${phase.opportunity_id}-${phase.year_month}`;
+        oppPhasingMap.set(key, phase.forecast_value);
+      });
+
+      const projPhasingMap = new Map<string, number>();
+      projectPhasing?.forEach((phase) => {
+        const key = `${phase.project_id}-${phase.year_month}`;
+        projPhasingMap.set(key, phase.forecast_value);
+      });
+
       // MATCH MONTHLY VIEW: Fetch all opportunities with fee values, no stage filter
       const { data: opportunities } = await supabase
         .from("opportunities")
@@ -414,10 +440,12 @@ function DashboardContent() {
 
       console.log("📊 Data loaded:", {
         opportunities: opportunities?.length || 0,
-        projects: projects?.length || 0
+        projects: projects?.length || 0,
+        opportunityPhasing: opportunityPhasing?.length || 0,
+        projectPhasing: projectPhasing?.length || 0
       });
 
-      // Process opportunities - EXACT SAME LOGIC AS MONTHLY VIEW
+      // Process opportunities - CHECK MANUAL PHASING FIRST
       opportunities?.forEach((opp) => {
         if (!opp.expected_start_date || !opp.expected_end_date || !opp.expected_fee_value) {
           return;
@@ -428,13 +456,12 @@ function DashboardContent() {
         const totalValue = opp.expected_fee_value;
         const stage = opp.stage;
 
-        // MATCH MONTHLY VIEW: Use same duration calculation
+        // Calculate default monthly value (fallback)
         const durationMonths = Math.max(1,
           (endDate.getFullYear() - startDate.getFullYear()) * 12 + (
           endDate.getMonth() - startDate.getMonth()) + 1
         );
-
-        const monthlyValue = totalValue / durationMonths;
+        const defaultMonthlyValue = totalValue / durationMonths;
 
         // Add to each relevant month
         monthDates.forEach((monthDate, idx) => {
@@ -443,6 +470,13 @@ function DashboardContent() {
 
           if (startDate <= monthEnd && endDate >= monthStart) {
             const monthData = initialData[idx];
+            const yearMonth = format(monthDate, "yyyy-MM");
+            const phasingKey = `${opp.id}-${yearMonth}`;
+
+            // Use manual phasing if available, otherwise use default calculation
+            const monthlyValue = oppPhasingMap.has(phasingKey)
+              ? oppPhasingMap.get(phasingKey)!
+              : defaultMonthlyValue;
 
             if (stage === "high_potential") {
               monthData.highPotential += monthlyValue;
@@ -453,7 +487,7 @@ function DashboardContent() {
         });
       });
 
-      // Process projects - EXACT SAME LOGIC AS MONTHLY VIEW
+      // Process projects - CHECK MANUAL PHASING FIRST
       projects?.forEach((proj) => {
         if (!proj.start_date || !proj.end_date || !proj.agreed_fee_value) {
           return;
@@ -463,13 +497,12 @@ function DashboardContent() {
         const endDate = new Date(proj.end_date);
         const totalValue = proj.agreed_fee_value;
 
-        // MATCH MONTHLY VIEW: Use same duration calculation
+        // Calculate default monthly value (fallback)
         const durationMonths = Math.max(1,
           (endDate.getFullYear() - startDate.getFullYear()) * 12 + (
           endDate.getMonth() - startDate.getMonth()) + 1
         );
-
-        const monthlyValue = totalValue / durationMonths;
+        const defaultMonthlyValue = totalValue / durationMonths;
 
         // Add to each relevant month
         monthDates.forEach((monthDate, idx) => {
@@ -477,6 +510,14 @@ function DashboardContent() {
           const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
 
           if (startDate <= monthEnd && endDate >= monthStart) {
+            const yearMonth = format(monthDate, "yyyy-MM");
+            const phasingKey = `${proj.id}-${yearMonth}`;
+
+            // Use manual phasing if available, otherwise use default calculation
+            const monthlyValue = projPhasingMap.has(phasingKey)
+              ? projPhasingMap.get(phasingKey)!
+              : defaultMonthlyValue;
+
             initialData[idx].secured += monthlyValue;
           }
         });
