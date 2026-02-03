@@ -45,6 +45,9 @@ function NewProjectContent() {
     opportunity_reference: "", // Track where this came from
   });
 
+  // Check if we're coming from an opportunity
+  const fromOpportunityId = router.query.opportunity_id as string;
+
   useEffect(() => {
     if (profile && profile.role !== "admin" && profile.role !== "director") {
       router.push("/projects");
@@ -94,6 +97,7 @@ function NewProjectContent() {
       setFormData(prev => ({
         ...prev,
         name: opp.name || "",
+        opportunity_id: opportunityId, // Auto-set the opportunity_id
         client_company_id: opp.company_id || "",
         opportunity_reference: opp.project_reference || "", // The Opp ref is stored in project_reference on the opp table
       }));
@@ -140,13 +144,14 @@ function NewProjectContent() {
       }
 
       // If project is linked to an opportunity, update the opportunity
+      // CRITICAL FIX: Only update STATUS to closed_won, don't change STAGE
       if (formData.opportunity_id) {
         const { error: oppUpdateError } = await supabase
           .from("opportunities")
           .update({
             linked_project_id: data.id,
-            stage: "secured",
             status: "closed_won"
+            // DON'T update stage - keep it at whatever stage it was (bid/high_potential/secured)
           })
           .eq("id", formData.opportunity_id);
 
@@ -272,24 +277,27 @@ function NewProjectContent() {
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="opportunity_id" className="text-sm sm:text-base">Linked Opportunity</Label>
-                <Select
-                  value={formData.opportunity_id}
-                  onValueChange={(value) => setFormData({ ...formData, opportunity_id: value })}
-                >
-                  <SelectTrigger className="h-10 sm:h-11">
-                    <SelectValue placeholder="Select an opportunity (optional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {opportunities.map((opp) => (
-                      <SelectItem key={opp.id} value={opp.id}>
-                        {opp.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* CRITICAL FIX: Hide opportunity dropdown when coming from an opportunity */}
+              {!fromOpportunityId && (
+                <div className="space-y-2">
+                  <Label htmlFor="opportunity_id" className="text-sm sm:text-base">Linked Opportunity</Label>
+                  <Select
+                    value={formData.opportunity_id}
+                    onValueChange={(value) => setFormData({ ...formData, opportunity_id: value })}
+                  >
+                    <SelectTrigger className="h-10 sm:h-11">
+                      <SelectValue placeholder="Select an opportunity (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {opportunities.map((opp) => (
+                        <SelectItem key={opp.id} value={opp.id}>
+                          {opp.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">

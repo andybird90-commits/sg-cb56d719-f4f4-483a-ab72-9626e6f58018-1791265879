@@ -340,6 +340,20 @@ function ProjectDetailContent() {
       });
 
       if (shouldArchive) {
+        // If archiving, also update the linked opportunity if it exists
+        if (project?.opportunity_id) {
+          await supabase
+            .from("opportunities")
+            .update({
+              status: "closed_won",
+              archived: true,
+              archived_at: new Date().toISOString(),
+              archived_reason: "closed_won",
+              archived_by_user_id: profile?.id || null
+            })
+            .eq("id", project.opportunity_id);
+        }
+        
         // Redirect back to projects list after archiving
         router.push("/projects");
       } else {
@@ -930,9 +944,9 @@ function ProjectDetailContent() {
             <div className="flex items-center gap-4">
               <button
                 onClick={() => router.push("/projects")}
-                className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                className="text-sm text-blue-600 hover:text-blue-800"
               >
-                <ArrowLeft className="h-5 w-5" />
+                ← Back to Projects
               </button>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
                 {project.name}

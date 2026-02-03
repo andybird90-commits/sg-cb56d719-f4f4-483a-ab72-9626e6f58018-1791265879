@@ -272,13 +272,15 @@ function OpportunityDetailContent() {
   return (
     <Layout>
       <div className="space-y-4 sm:space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-          <Link href="/opportunities">
-            <Button variant="ghost" size="sm" className="gap-2 self-start">
-              <ArrowLeft className="w-4 h-4" />
-              Back
-            </Button>
-          </Link>
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => router.push("/opportunities")}
+              className="text-sm text-blue-600 hover:text-blue-800"
+            >
+              ← Back to Opportunities
+            </button>
+          </div>
         </div>
 
         {/* Error State */}
