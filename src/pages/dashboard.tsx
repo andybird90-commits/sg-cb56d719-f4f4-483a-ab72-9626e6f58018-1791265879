@@ -396,29 +396,33 @@ function DashboardContent() {
       });
 
       // Fetch manual phasing data for both opportunities and projects
+      // Get distinct opportunity IDs first to optimize
       const { data: opportunityPhasing } = await supabase
         .from("opportunity_monthly_phasing")
-        .select("opportunity_id, year_month, forecast_value")
-        .gte("year_month", format(startOfCurrentMonth, "yyyy-MM"))
-        .lte("year_month", format(endOfTwelfthMonth, "yyyy-MM"));
+        .select("opportunity_id, year, month, revenue_amount")
+        .gte("year", startOfCurrentMonth.getFullYear())
+        .lte("year", endOfTwelfthMonth.getFullYear());
 
       const { data: projectPhasing } = await supabase
         .from("project_monthly_phasing")
-        .select("project_id, year_month, forecast_value")
-        .gte("year_month", format(startOfCurrentMonth, "yyyy-MM"))
-        .lte("year_month", format(endOfTwelfthMonth, "yyyy-MM"));
+        .select("project_id, year, month, revenue_amount")
+        .gte("year", startOfCurrentMonth.getFullYear())
+        .lte("year", endOfTwelfthMonth.getFullYear());
 
       // Create lookup maps for manual phasing
       const oppPhasingMap = new Map<string, number>();
       opportunityPhasing?.forEach((phase) => {
-        const key = `${phase.opportunity_id}-${phase.year_month}`;
-        oppPhasingMap.set(key, phase.forecast_value);
+        // Format month to 2 digits for consistent key: YYYY-MM
+        const monthStr = phase.month.toString().padStart(2, '0');
+        const key = `${phase.opportunity_id}-${phase.year}-${monthStr}`;
+        oppPhasingMap.set(key, phase.revenue_amount);
       });
 
       const projPhasingMap = new Map<string, number>();
       projectPhasing?.forEach((phase) => {
-        const key = `${phase.project_id}-${phase.year_month}`;
-        projPhasingMap.set(key, phase.forecast_value);
+        const monthStr = phase.month.toString().padStart(2, '0');
+        const key = `${phase.project_id}-${phase.year}-${monthStr}`;
+        projPhasingMap.set(key, phase.revenue_amount);
       });
 
       // MATCH MONTHLY VIEW: Fetch all opportunities with fee values, no stage filter
