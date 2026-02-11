@@ -694,47 +694,105 @@ function ProjectDetailContent() {
     e.preventDefault();
     if (!id || typeof id !== "string") return;
 
-    if (editingVariation) {
-      const { error } = await supabase
-        .from("variations")
-        .update({
-          code: variationForm.code,
-          description: variationForm.description || null,
-          value: parseFloat(variationForm.value),
-          status: variationForm.status as "proposed" | "accepted" | "rejected",
-        })
-        .eq("id", editingVariation.id);
+    try {
+      const newStatus = variationForm.status as "proposed" | "accepted" | "rejected";
+      const newValue = parseFloat(variationForm.value);
+      
+      if (editingVariation) {
+        // When editing, check if status changed to/from accepted
+        const oldStatus = editingVariation.status;
+        const oldValue = editingVariation.value;
+        
+        // Update the variation
+        const { error: updateError } = await supabase
+          .from("variations")
+          .update({
+            code: variationForm.code,
+            description: variationForm.description || null,
+            value: newValue,
+            status: newStatus,
+          })
+          .eq("id", editingVariation.id);
 
-      if (error) {
-        alert("Error updating variation");
-        return;
-      }
-    } else {
-      const { error } = await supabase
-        .from("variations")
-        .insert({
-          project_id: id,
-          code: variationForm.code,
-          description: variationForm.description || null,
-          value: parseFloat(variationForm.value),
-          status: variationForm.status as "proposed" | "accepted" | "rejected",
-        });
+        if (updateError) throw updateError;
 
-      if (error) {
-        alert("Error creating variation");
-        return;
+        // Update project's agreed_fee_value based on status changes
+        if (oldStatus !== newStatus) {
+          let feeAdjustment = 0;
+          
+          // If changing from accepted to something else, subtract the old value
+          if (oldStatus === "accepted" && newStatus !== "accepted") {
+            feeAdjustment = -oldValue;
+          }
+          // If changing to accepted from something else, add the new value
+          else if (oldStatus !== "accepted" && newStatus === "accepted") {
+            feeAdjustment = newValue;
+          }
+          // If both are accepted but value changed, adjust by difference
+          else if (oldStatus === "accepted" && newStatus === "accepted") {
+            feeAdjustment = newValue - oldValue;
+          }
+          
+          if (feeAdjustment !== 0 && project) {
+            const newAgreedFee = (project.agreed_fee_value || 0) + feeAdjustment;
+            const { error: projectUpdateError } = await supabase
+              .from("projects")
+              .update({ agreed_fee_value: newAgreedFee })
+              .eq("id", id);
+            
+            if (projectUpdateError) throw projectUpdateError;
+          }
+        }
+      } else {
+        // When creating a new variation
+        const { error: insertError } = await supabase
+          .from("variations")
+          .insert({
+            project_id: id,
+            code: variationForm.code,
+            description: variationForm.description || null,
+            value: newValue,
+            status: newStatus,
+          });
+
+        if (insertError) throw insertError;
+
+        // If new variation is accepted, add to project's agreed_fee_value
+        if (newStatus === "accepted" && project) {
+          const newAgreedFee = (project.agreed_fee_value || 0) + newValue;
+          const { error: projectUpdateError } = await supabase
+            .from("projects")
+            .update({ agreed_fee_value: newAgreedFee })
+            .eq("id", id);
+          
+          if (projectUpdateError) throw projectUpdateError;
+        }
       }
+
+      toast({
+        title: editingVariation ? "Variation updated" : "Variation created",
+        description: editingVariation 
+          ? "Variation has been updated successfully."
+          : "New variation has been created successfully.",
+      });
+
+      await fetchProjectData(id);
+      setVariationFormOpen(false);
+      setEditingVariation(null);
+      setVariationForm({
+        code: "",
+        description: "",
+        value: "",
+        status: "proposed",
+      });
+    } catch (err) {
+      console.error("Failed to save variation", err);
+      toast({
+        title: "Error saving variation",
+        description: "Failed to save variation. Please try again.",
+        variant: "destructive",
+      });
     }
-
-    await fetchProjectData(id);
-    setVariationFormOpen(false);
-    setEditingVariation(null);
-    setVariationForm({
-      code: "",
-      description: "",
-      value: "",
-      status: "proposed",
-    });
   };
 
   const handleEditVariation = (variation: Variation) => {
@@ -751,18 +809,43 @@ function ProjectDetailContent() {
   const handleDeleteVariation = async (variationId: string) => {
     if (!confirm("Delete this variation?")) return;
 
-    const { error } = await supabase
-      .from("variations")
-      .delete()
-      .eq("id", variationId);
+    try {
+      // Find the variation being deleted
+      const variationToDelete = variations.find(v => v.id === variationId);
+      
+      const { error } = await supabase
+        .from("variations")
+        .delete()
+        .eq("id", variationId);
 
-    if (error) {
-      alert("Error deleting variation");
-      return;
-    }
+      if (error) throw error;
 
-    if (id && typeof id === "string") {
-      await fetchProjectData(id);
+      // If the deleted variation was accepted, subtract its value from project's agreed_fee_value
+      if (variationToDelete && variationToDelete.status === "accepted" && project && id && typeof id === "string") {
+        const newAgreedFee = (project.agreed_fee_value || 0) - variationToDelete.value;
+        const { error: projectUpdateError } = await supabase
+          .from("projects")
+          .update({ agreed_fee_value: newAgreedFee })
+          .eq("id", id);
+        
+        if (projectUpdateError) throw projectUpdateError;
+      }
+
+      toast({
+        title: "Variation deleted",
+        description: "Variation has been deleted successfully.",
+      });
+
+      if (id && typeof id === "string") {
+        await fetchProjectData(id);
+      }
+    } catch (err) {
+      console.error("Failed to delete variation", err);
+      toast({
+        title: "Error deleting variation",
+        description: "Failed to delete variation. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
