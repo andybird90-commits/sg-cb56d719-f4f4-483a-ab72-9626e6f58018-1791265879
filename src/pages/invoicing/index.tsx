@@ -263,7 +263,7 @@ export default function InvoicingPage() {
       <RequireAuth>
         <Layout>
           <div className="flex items-center justify-center h-64">
-            <p>Loading...</p>
+            <p className="text-lg">Loading invoice data...</p>
           </div>
         </Layout>
       </RequireAuth>
@@ -342,14 +342,19 @@ export default function InvoicingPage() {
           {/* Status Message */}
           {!invoiceMonth ? (
             <div className="p-8 text-center bg-white rounded-lg shadow">
-              <p className="text-muted-foreground">
-                No invoicing period created for this month yet.
+              <p className="text-lg text-muted-foreground mb-4">
+                No invoicing period created for {MONTHS[selectedMonth - 1]} {selectedYear} yet.
               </p>
-              {canEdit && (
-                <Button onClick={handleCreateMonth} className="mt-4">
+              {canEdit ? (
+                <Button onClick={handleCreateMonth} size="lg">
                   <Plus className="w-4 h-4 mr-2" />
                   Create invoicing period for {MONTHS[selectedMonth - 1]} {selectedYear}
                 </Button>
+              ) : (
+                <p className="text-sm text-red-600">
+                  You need admin or director permissions to create invoice periods.
+                  Your current role: {profile?.role || "unknown"}
+                </p>
               )}
             </div>
           ) : (
