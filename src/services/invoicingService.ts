@@ -68,7 +68,7 @@ export const invoicingService = {
       throw deleteError;
     }
 
-    // First, get the invoice month to know which year/month we're populating for
+    // Get the invoice month to know which year/month we're populating for
     const { data: invoiceMonth, error: monthError } = await supabase
       .from("invoice_months")
       .select("year, month")
@@ -80,23 +80,21 @@ export const invoicingService = {
       throw monthError;
     }
 
-    // Fetch all live projects with their monthly phasing for this specific month
+    // Fetch ALL live projects with their details
     const { data: projects, error: projectsError } = await supabase
       .from("projects")
       .select(`
         id,
         name,
         status,
+        agreed_fee_value,
+        start_date,
+        end_date,
         companies!projects_client_company_id_fkey (
           name
-        ),
-        project_monthly_phasing!inner (
-          revenue_amount
         )
       `)
-      .in("status", ["live", "Live"])
-      .eq("project_monthly_phasing.year", invoiceMonth.year)
-      .eq("project_monthly_phasing.month", invoiceMonth.month);
+      .in("status", ["live", "Live"]);
 
     if (projectsError) {
       console.error("Error fetching projects:", projectsError);
@@ -104,15 +102,51 @@ export const invoicingService = {
     }
 
     if (!projects || projects.length === 0) {
-      console.log("No live projects found with phasing for this month");
+      console.log("No live projects found");
       return;
     }
 
-    // Create invoice items for each project with the phased revenue amount
+    // Fetch ALL monthly phasing data for these projects for this specific month
+    const projectIds = projects.map(p => p.id);
+    const { data: phasingData, error: phasingError } = await supabase
+      .from("project_monthly_phasing")
+      .select("project_id, revenue_amount")
+      .in("project_id", projectIds)
+      .eq("year", invoiceMonth.year)
+      .eq("month", invoiceMonth.month);
+
+    if (phasingError) {
+      console.error("Error fetching phasing data:", phasingError);
+      throw phasingError;
+    }
+
+    // Create a map of project_id -> revenue_amount for quick lookup
+    const phasingMap = new Map<string, number>();
+    phasingData?.forEach(pd => {
+      phasingMap.set(pd.project_id, pd.revenue_amount || 0);
+    });
+
+    // Create invoice items for each project
     const invoiceItems: InvoiceItemInsert[] = projects.map((project) => {
-      const phasingData = Array.isArray(project.project_monthly_phasing)
-        ? project.project_monthly_phasing[0]
-        : project.project_monthly_phasing;
+      let invoiceValue = 0;
+
+      // Check if manual phasing exists for this project/month
+      if (phasingMap.has(project.id)) {
+        // Use manual phasing value
+        invoiceValue = phasingMap.get(project.id)!;
+      } else {
+        // Calculate fallback: total fee ÷ duration in months
+        if (project.agreed_fee_value && project.start_date && project.end_date) {
+          const start = new Date(project.start_date);
+          const end = new Date(project.end_date);
+          const durationMonths = Math.max(
+            1,
+            (end.getFullYear() - start.getFullYear()) * 12 + 
+            (end.getMonth() - start.getMonth()) + 1
+          );
+          invoiceValue = project.agreed_fee_value / durationMonths;
+        }
+      }
       
       return {
         invoice_month_id: invoiceMonthId,
@@ -121,7 +155,7 @@ export const invoicingService = {
         client_name: Array.isArray(project.companies) 
           ? project.companies[0]?.name || "Unknown Client"
           : (project.companies as any)?.name || "Unknown Client",
-        invoice_value: phasingData?.revenue_amount || 0,
+        invoice_value: invoiceValue,
         description: "",
         excluded_this_month: false,
         created_by: session.session.user.id,
