@@ -99,6 +99,7 @@ export const invoicingService = {
       .select(`
         id,
         code,
+        project_reference,
         name,
         status,
         agreed_fee_value,
@@ -175,7 +176,7 @@ export const invoicingService = {
       return {
         invoice_month_id: invoiceMonthId,
         project_id: project.id,
-        project_code: project.code || "",
+        project_code: project.code || project.project_reference || "",
         project_name: project.name,
         client_name: Array.isArray(project.companies) 
           ? project.companies[0]?.name || "Unknown Client"
