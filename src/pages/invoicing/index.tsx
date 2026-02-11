@@ -79,13 +79,19 @@ export default function InvoicingPage() {
   const isLocked = invoiceMonth?.status === "locked";
 
   useEffect(() => {
+    console.log("Auth state:", { user: !!user, profile, canEdit });
+  }, [user, profile, canEdit]);
+
+  useEffect(() => {
     loadInvoiceData();
   }, [selectedYear, selectedMonth]);
 
   async function loadInvoiceData() {
     try {
       setLoading(true);
+      console.log("Loading invoice data for:", selectedYear, selectedMonth);
       const month = await invoicingService.getOrCreateInvoiceMonth(selectedYear, selectedMonth);
+      console.log("Invoice month result:", month);
       // Ensure status is typed correctly when setting state
       if (month) {
         setInvoiceMonth(month as InvoiceMonth);
