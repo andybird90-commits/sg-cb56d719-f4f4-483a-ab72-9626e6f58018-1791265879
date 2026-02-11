@@ -65,7 +65,7 @@ export const invoicingService = {
         id,
         name,
         status,
-        client_companies (
+        companies!projects_client_company_id_fkey (
           name
         )
       `)
@@ -86,9 +86,9 @@ export const invoicingService = {
       invoice_month_id: invoiceMonthId,
       project_id: project.id,
       project_name: project.name,
-      client_name: Array.isArray(project.client_companies) 
-        ? project.client_companies[0]?.name || "Unknown Client"
-        : (project.client_companies as any)?.name || "Unknown Client",
+      client_name: Array.isArray(project.companies) 
+        ? project.companies[0]?.name || "Unknown Client"
+        : (project.companies as any)?.name || "Unknown Client",
       invoice_value: null,
       description: "",
       excluded_this_month: false,
