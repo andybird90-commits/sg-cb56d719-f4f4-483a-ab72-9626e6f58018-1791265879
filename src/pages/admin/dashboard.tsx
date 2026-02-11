@@ -58,13 +58,14 @@ function AdminDashboardContent() {
   }
 
   async function fetchFinancialTrends() {
-    // Get last completed month (not current month in progress)
-    const lastCompletedMonth = startOfMonth(subMonths(new Date(), 1));
-    const startMonth = subMonths(lastCompletedMonth, 11); // 12 months total
+    // Rolling 12 months starting from February 2026
+    const startMonth = new Date(2026, 1, 1); // February 2026
+    const endMonth = new Date(startMonth);
+    endMonth.setMonth(endMonth.getMonth() + 11); // 12 months total
 
     const months = eachMonthOfInterval({
       start: startMonth,
-      end: lastCompletedMonth
+      end: endMonth
     });
 
     const monthlyData: MonthlyFinancials[] = [];
@@ -165,13 +166,14 @@ function AdminDashboardContent() {
   }
 
   async function fetchConversions() {
-    // Get last completed month (not current month in progress)
-    const lastCompletedMonth = startOfMonth(subMonths(new Date(), 1));
-    const startMonth = subMonths(lastCompletedMonth, 11); // 12 months total
+    // Rolling 12 months starting from February 2026
+    const startMonth = new Date(2026, 1, 1); // February 2026
+    const endMonth = new Date(startMonth);
+    endMonth.setMonth(endMonth.getMonth() + 11); // 12 months total
 
     const months = eachMonthOfInterval({
       start: startMonth,
-      end: lastCompletedMonth
+      end: endMonth
     });
 
     const conversionData: ConversionData[] = [];
