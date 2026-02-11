@@ -29,18 +29,6 @@ interface ProjectFinancials {
   stage: string;
 }
 
-interface PhasingRow {
-  id: string;
-  project_id: string;
-  year: number;
-  month: number;
-  revenue_amount: number;
-  actual_revenue: number | null;
-  invoice_status: string | null;
-  invoice_ref: string | null;
-  invoice_date: string | null;
-}
-
 interface ToInvoiceItem {
   project_id: string;
   project_code: string;
@@ -59,7 +47,6 @@ function FinancialsContent() {
   const [error, setError] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
-  const [revenueMode, setRevenueMode] = useState<"forecast" | "actual">("forecast");
   const [activeTab, setActiveTab] = useState("overview");
   
   const [totalRevenue, setTotalRevenue] = useState(0);
@@ -78,12 +65,9 @@ function FinancialsContent() {
     invoice_date: new Date().toISOString().split("T")[0],
   });
 
-  // Everyone can mark invoices, only directors/admins can modify financial data
-  const canModifyFinancials = profile?.role === "admin" || profile?.role === "director";
-
   useEffect(() => {
     fetchFinancials();
-  }, [selectedYear, selectedMonth, revenueMode]);
+  }, [selectedYear, selectedMonth]);
 
   const fetchFinancials = async () => {
     try {
@@ -192,7 +176,7 @@ function FinancialsContent() {
           end_date: p.end_date,
           total_value: p.agreed_fee_value || 0,
           type: "project" as const,
-          stage: "secured" as const,
+          stage: "secured", // Removed 'as const' to fix TS error
         })),
         ...(opportunitiesData || []).map(o => ({
           id: o.id,
@@ -203,7 +187,7 @@ function FinancialsContent() {
           end_date: o.expected_end_date,
           total_value: o.expected_fee_value || 0,
           type: "opportunity" as const,
-          stage: o.stage as const,
+          stage: o.stage, // Removed 'as const' to fix TS error
         }))
       ];
 
@@ -406,7 +390,7 @@ function FinancialsContent() {
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Financials</h1>
-            <p className="text-sm sm:text-base text-slate-600 mt-1">Monthly financial overview (includes secured opportunities)</p>
+            <p className="text-sm sm:text-base text-slate-600 mt-1">Monthly financial overview</p>
           </div>
         </div>
 
@@ -455,32 +439,6 @@ function FinancialsContent() {
           </CardContent>
         </Card>
 
-        {/* Forecast/Actual Toggle - Mobile friendly */}
-        <div className="flex justify-center">
-          <div className="inline-flex rounded-lg border border-slate-200 p-1 bg-slate-50">
-            <button
-              onClick={() => setRevenueMode("forecast")}
-              className={`px-4 sm:px-6 py-2 text-sm font-medium rounded-md transition-colors ${
-                revenueMode === "forecast"
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              Forecast
-            </button>
-            <button
-              onClick={() => setRevenueMode("actual")}
-              className={`px-4 sm:px-6 py-2 text-sm font-medium rounded-md transition-colors ${
-                revenueMode === "actual"
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              Actual
-            </button>
-          </div>
-        </div>
-
         {loading ? (
           <div className="text-center py-12">
             <div className="text-slate-600">Loading financial data...</div>
@@ -507,7 +465,7 @@ function FinancialsContent() {
                 <CardContent className="p-4 sm:p-6">
                   <div className="space-y-2">
                     <div className="text-xs sm:text-sm text-slate-600">
-                      Total Revenue ({revenueMode === "forecast" ? "Forecast" : "Actual"})
+                      Total Revenue
                     </div>
                     <div className="text-xl sm:text-2xl font-bold text-slate-900">
                       {formatCurrency(totalRevenue)}
