@@ -226,6 +226,8 @@ export const invoicingService = {
       invoice_value?: number | null;
       description?: string;
       excluded_this_month?: boolean;
+      project_code?: string;
+      po_number?: string | null;
     }
   ): Promise<void> {
     const { error } = await supabase
