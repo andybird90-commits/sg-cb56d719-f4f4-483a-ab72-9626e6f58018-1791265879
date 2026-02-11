@@ -16,6 +16,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -26,7 +34,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Download, Lock, LockOpen, Plus, RefreshCw } from "lucide-react";
+import { Download, Lock, LockOpen, Plus, RefreshCw, Edit } from "lucide-react";
 import Link from "next/link";
 
 type InvoiceMonth = {
@@ -77,6 +85,11 @@ export default function InvoicingPage() {
   const [profileLoading, setProfileLoading] = useState(true);
   const [showLockDialog, setShowLockDialog] = useState(false);
   const [editingItems, setEditingItems] = useState<Set<string>>(new Set());
+  
+  // Dialog state for editing description
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editingDescription, setEditingDescription] = useState("");
 
   const canEdit = profile?.role === "admin" || profile?.role === "director";
   const isLocked = invoiceMonth?.status === "locked";
@@ -194,6 +207,21 @@ export default function InvoicingPage() {
         return next;
       });
     }
+  }
+
+  function handleOpenEditDialog(item: InvoiceItem) {
+    setEditingItemId(item.id);
+    setEditingDescription(item.description || "");
+    setEditDialogOpen(true);
+  }
+
+  async function handleSaveDescription() {
+    if (!editingItemId) return;
+
+    await handleUpdateItem(editingItemId, "description", editingDescription);
+    setEditDialogOpen(false);
+    setEditingItemId(null);
+    setEditingDescription("");
   }
 
   async function handleLockMonth() {
@@ -553,14 +581,20 @@ export default function InvoicingPage() {
                             </td>
                             <td className="px-4 py-3">
                               {canEdit && !isLocked && !item.excluded_this_month ? (
-                                <Textarea
-                                  value={item.description || ""}
-                                  onChange={(e) =>
-                                    handleUpdateItem(item.id, "description", e.target.value)
-                                  }
-                                  className="min-h-[60px]"
-                                  placeholder="What we're invoicing this month..."
-                                />
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleOpenEditDialog(item)}
+                                  className="w-full justify-start text-left min-h-[60px] whitespace-normal"
+                                >
+                                  {item.description ? (
+                                    <span className="text-sm">{item.description}</span>
+                                  ) : (
+                                    <span className="text-sm text-muted-foreground italic">
+                                      Click to add description...
+                                    </span>
+                                  )}
+                                </Button>
                               ) : (
                                 <span className="text-sm whitespace-pre-wrap">
                                   {item.description || "—"}
@@ -631,6 +665,41 @@ export default function InvoicingPage() {
             </>
           )}
         </div>
+
+        {/* Edit Description Dialog */}
+        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Edit Invoice Description</DialogTitle>
+              <DialogDescription>
+                Describe what you&apos;re invoicing for this project this month. This text will appear on the invoice.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <Textarea
+                value={editingDescription}
+                onChange={(e) => setEditingDescription(e.target.value)}
+                placeholder="What we're invoicing this month..."
+                className="min-h-[200px]"
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setEditDialogOpen(false);
+                  setEditingItemId(null);
+                  setEditingDescription("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleSaveDescription}>
+                Save Description
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Lock Confirmation Dialog */}
         <AlertDialog open={showLockDialog} onOpenChange={setShowLockDialog}>
