@@ -6,11 +6,8 @@ import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useRouter } from "next/router";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -29,17 +26,6 @@ interface ProjectFinancials {
   stage: string;
 }
 
-interface ToInvoiceItem {
-  project_id: string;
-  project_code: string;
-  project_name: string;
-  client_name: string;
-  year: number;
-  month: number;
-  actual_revenue: number;
-  phasing_id: string;
-}
-
 function FinancialsContent() {
   const { profile } = useAuth();
   const router = useRouter();
@@ -47,7 +33,6 @@ function FinancialsContent() {
   const [error, setError] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
-  const [activeTab, setActiveTab] = useState("overview");
   
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [totalInternalCost, setTotalInternalCost] = useState(0);
@@ -56,14 +41,6 @@ function FinancialsContent() {
   const [budgetCost, setBudgetCost] = useState<number | null>(null);
   
   const [projectFinancials, setProjectFinancials] = useState<ProjectFinancials[]>([]);
-  const [toInvoiceItems, setToInvoiceItems] = useState<ToInvoiceItem[]>([]);
-  
-  // Invoice marking dialog state
-  const [markingInvoice, setMarkingInvoice] = useState<ToInvoiceItem | null>(null);
-  const [invoiceForm, setInvoiceForm] = useState({
-    invoice_ref: "",
-    invoice_date: new Date().toISOString().split("T")[0],
-  });
 
   useEffect(() => {
     fetchFinancials();
@@ -176,7 +153,7 @@ function FinancialsContent() {
           end_date: p.end_date,
           total_value: p.agreed_fee_value || 0,
           type: "project" as const,
-          stage: "secured", // Removed 'as const' to fix TS error
+          stage: "secured",
         })),
         ...(opportunitiesData || []).map(o => ({
           id: o.id,
@@ -187,7 +164,7 @@ function FinancialsContent() {
           end_date: o.expected_end_date,
           total_value: o.expected_fee_value || 0,
           type: "opportunity" as const,
-          stage: o.stage, // Removed 'as const' to fix TS error
+          stage: o.stage,
         }))
       ];
 
@@ -295,45 +272,12 @@ function FinancialsContent() {
       setTotalInternalCost(totalIntCost);
       setTotalSubcontractorCost(totalSubCost);
       setProjectFinancials(breakdown);
-      setToInvoiceItems([]);
     } catch (err) {
       console.error("Failed to load financials data", err);
       setError("Failed to load financial data. Please try again.");
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleMarkInvoiced = async (item?: ToInvoiceItem) => {
-    // If called with an item, open dialog
-    if (item) {
-      setMarkingInvoice(item);
-      return;
-    }
-
-    // If called without item, it's the confirm action
-    if (!markingInvoice) return;
-
-    const { error } = await supabase
-      .from("project_monthly_phasing")
-      .update({
-        invoice_status: "invoiced",
-        invoice_ref: invoiceForm.invoice_ref,
-        invoice_date: invoiceForm.invoice_date,
-      } as any)
-      .eq("id", markingInvoice.phasing_id);
-
-    if (error) {
-      alert("Error marking as invoiced: " + error.message);
-      return;
-    }
-
-    setMarkingInvoice(null);
-    setInvoiceForm({
-      invoice_ref: "",
-      invoice_date: new Date().toISOString().split("T")[0],
-    });
-    await fetchFinancials();
   };
 
   const formatCurrency = (value: number | null) => {
@@ -343,10 +287,6 @@ function FinancialsContent() {
       currency: "GBP",
       minimumFractionDigits: 0,
     }).format(value);
-  };
-
-  const getMonthName = (month: number) => {
-    return new Date(2000, month - 1, 1).toLocaleDateString("en-GB", { month: "long" });
   };
 
   const formatStage = (stage: string) => {
@@ -525,32 +465,107 @@ function FinancialsContent() {
               </Card>
             </div>
 
-            {/* Tabs for Overview and To Invoice - Mobile friendly */}
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="w-full grid grid-cols-2">
-                <TabsTrigger value="overview" className="text-sm sm:text-base">Overview</TabsTrigger>
-                <TabsTrigger value="to_invoice" className="text-sm sm:text-base">To Invoice</TabsTrigger>
-              </TabsList>
+            {/* Project Breakdown - Cards on mobile, table on desktop */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base sm:text-lg">Project Breakdown</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {projectFinancials.length === 0 ? (
+                  <div className="text-center py-8 text-slate-600 text-sm">
+                    No project data for this month
+                  </div>
+                ) : (
+                  <>
+                    {/* Mobile: Card View */}
+                    <div className="block lg:hidden space-y-3">
+                      {projectFinancials.map((pf) => (
+                        <Card 
+                          key={pf.project_id}
+                          className="cursor-pointer hover:shadow-md transition-shadow"
+                          onClick={() => {
+                            if (pf.type === "project") {
+                              router.push(`/projects/${pf.project_id}`);
+                            } else {
+                              router.push(`/opportunities/${pf.project_id}`);
+                            }
+                          }}
+                        >
+                          <CardContent className="p-4">
+                            <div className="space-y-2">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <div className="font-mono text-xs text-slate-500">
+                                      {pf.project_code}
+                                    </div>
+                                    <Badge className={`text-[10px] px-1.5 py-0.5 ${getStageBadgeColor(pf.stage)}`}>
+                                      {pf.type === "opportunity" ? "Opp" : "Project"}
+                                    </Badge>
+                                  </div>
+                                  <div className="font-semibold text-sm text-slate-900 truncate">
+                                    {pf.project_name}
+                                  </div>
+                                  <div className="text-xs text-slate-600 truncate">
+                                    {pf.client_name}
+                                  </div>
+                                </div>
+                              </div>
 
-              <TabsContent value="overview" className="space-y-4 sm:space-y-6">
-                {/* Project Breakdown - Cards on mobile, table on desktop */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base sm:text-lg">Project Breakdown</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {projectFinancials.length === 0 ? (
-                      <div className="text-center py-8 text-slate-600 text-sm">
-                        No project data for this month
-                      </div>
-                    ) : (
-                      <>
-                        {/* Mobile: Card View */}
-                        <div className="block lg:hidden space-y-3">
+                              <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t">
+                                <div>
+                                  <span className="text-slate-500">Revenue:</span>
+                                  <div className="font-semibold text-slate-900">
+                                    {formatCurrency(pf.revenue)}
+                                  </div>
+                                </div>
+                                <div>
+                                  <span className="text-slate-500">Cost:</span>
+                                  <div className="font-semibold text-slate-900">
+                                    {formatCurrency(pf.total_cost)}
+                                  </div>
+                                </div>
+                                <div>
+                                  <span className="text-slate-500">Margin:</span>
+                                  <div className={`font-semibold ${pf.margin >= 0 ? "text-green-600" : "text-red-600"}`}>
+                                    {formatCurrency(pf.margin)}
+                                  </div>
+                                </div>
+                                <div>
+                                  <span className="text-slate-500">Margin %:</span>
+                                  <div className={`font-semibold ${pf.margin_percent >= 0 ? "text-green-600" : "text-red-600"}`}>
+                                    {pf.margin_percent.toFixed(1)}%
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+
+                    {/* Desktop: Table View */}
+                    <div className="hidden lg:block overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left p-3 text-sm font-medium text-slate-600">Code</th>
+                            <th className="text-left p-3 text-sm font-medium text-slate-600">Project</th>
+                            <th className="text-left p-3 text-sm font-medium text-slate-600">Client</th>
+                            <th className="text-center p-3 text-sm font-medium text-slate-600">Type</th>
+                            <th className="text-right p-3 text-sm font-medium text-slate-600">Revenue</th>
+                            <th className="text-right p-3 text-sm font-medium text-slate-600">Internal Cost</th>
+                            <th className="text-right p-3 text-sm font-medium text-slate-600">Subbie Cost</th>
+                            <th className="text-right p-3 text-sm font-medium text-slate-600">Total Cost</th>
+                            <th className="text-right p-3 text-sm font-medium text-slate-600">Margin</th>
+                            <th className="text-right p-3 text-sm font-medium text-slate-600">Margin %</th>
+                          </tr>
+                        </thead>
+                        <tbody>
                           {projectFinancials.map((pf) => (
-                            <Card 
+                            <tr
                               key={pf.project_id}
-                              className="cursor-pointer hover:shadow-md transition-shadow"
+                              className="border-b hover:bg-slate-50 cursor-pointer"
                               onClick={() => {
                                 if (pf.type === "project") {
                                   router.push(`/projects/${pf.project_id}`);
@@ -559,281 +574,33 @@ function FinancialsContent() {
                                 }
                               }}
                             >
-                              <CardContent className="p-4">
-                                <div className="space-y-2">
-                                  <div className="flex items-start justify-between gap-2">
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-2 mb-1">
-                                        <div className="font-mono text-xs text-slate-500">
-                                          {pf.project_code}
-                                        </div>
-                                        <Badge className={`text-[10px] px-1.5 py-0.5 ${getStageBadgeColor(pf.stage)}`}>
-                                          {pf.type === "opportunity" ? "Opp" : "Project"}
-                                        </Badge>
-                                      </div>
-                                      <div className="font-semibold text-sm text-slate-900 truncate">
-                                        {pf.project_name}
-                                      </div>
-                                      <div className="text-xs text-slate-600 truncate">
-                                        {pf.client_name}
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t">
-                                    <div>
-                                      <span className="text-slate-500">Revenue:</span>
-                                      <div className="font-semibold text-slate-900">
-                                        {formatCurrency(pf.revenue)}
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <span className="text-slate-500">Cost:</span>
-                                      <div className="font-semibold text-slate-900">
-                                        {formatCurrency(pf.total_cost)}
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <span className="text-slate-500">Margin:</span>
-                                      <div className={`font-semibold ${pf.margin >= 0 ? "text-green-600" : "text-red-600"}`}>
-                                        {formatCurrency(pf.margin)}
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <span className="text-slate-500">Margin %:</span>
-                                      <div className={`font-semibold ${pf.margin_percent >= 0 ? "text-green-600" : "text-red-600"}`}>
-                                        {pf.margin_percent.toFixed(1)}%
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </CardContent>
-                            </Card>
+                              <td className="p-3 text-sm font-mono text-slate-600">{pf.project_code}</td>
+                              <td className="p-3 text-sm font-medium text-slate-900">{pf.project_name}</td>
+                              <td className="p-3 text-sm text-slate-600">{pf.client_name}</td>
+                              <td className="p-3 text-center">
+                                <Badge className={`text-[10px] px-2 py-0.5 ${getStageBadgeColor(pf.stage)}`}>
+                                  {pf.type === "opportunity" ? "Opp" : "Project"}
+                                </Badge>
+                              </td>
+                              <td className="p-3 text-sm text-right font-medium">{formatCurrency(pf.revenue)}</td>
+                              <td className="p-3 text-sm text-right">{formatCurrency(pf.internal_cost)}</td>
+                              <td className="p-3 text-sm text-right">{formatCurrency(pf.subcontractor_cost)}</td>
+                              <td className="p-3 text-sm text-right font-medium">{formatCurrency(pf.total_cost)}</td>
+                              <td className={`p-3 text-sm text-right font-semibold ${pf.margin >= 0 ? "text-green-600" : "text-red-600"}`}>
+                                {formatCurrency(pf.margin)}
+                              </td>
+                              <td className={`p-3 text-sm text-right font-semibold ${pf.margin_percent >= 0 ? "text-green-600" : "text-red-600"}`}>
+                                {pf.margin_percent.toFixed(1)}%
+                              </td>
+                            </tr>
                           ))}
-                        </div>
-
-                        {/* Desktop: Table View */}
-                        <div className="hidden lg:block overflow-x-auto">
-                          <table className="w-full">
-                            <thead>
-                              <tr className="border-b">
-                                <th className="text-left p-3 text-sm font-medium text-slate-600">Code</th>
-                                <th className="text-left p-3 text-sm font-medium text-slate-600">Project</th>
-                                <th className="text-left p-3 text-sm font-medium text-slate-600">Client</th>
-                                <th className="text-center p-3 text-sm font-medium text-slate-600">Type</th>
-                                <th className="text-right p-3 text-sm font-medium text-slate-600">Revenue</th>
-                                <th className="text-right p-3 text-sm font-medium text-slate-600">Internal Cost</th>
-                                <th className="text-right p-3 text-sm font-medium text-slate-600">Subbie Cost</th>
-                                <th className="text-right p-3 text-sm font-medium text-slate-600">Total Cost</th>
-                                <th className="text-right p-3 text-sm font-medium text-slate-600">Margin</th>
-                                <th className="text-right p-3 text-sm font-medium text-slate-600">Margin %</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {projectFinancials.map((pf) => (
-                                <tr
-                                  key={pf.project_id}
-                                  className="border-b hover:bg-slate-50 cursor-pointer"
-                                  onClick={() => {
-                                    if (pf.type === "project") {
-                                      router.push(`/projects/${pf.project_id}`);
-                                    } else {
-                                      router.push(`/opportunities/${pf.project_id}`);
-                                    }
-                                  }}
-                                >
-                                  <td className="p-3 text-sm font-mono text-slate-600">{pf.project_code}</td>
-                                  <td className="p-3 text-sm font-medium text-slate-900">{pf.project_name}</td>
-                                  <td className="p-3 text-sm text-slate-600">{pf.client_name}</td>
-                                  <td className="p-3 text-center">
-                                    <Badge className={`text-[10px] px-2 py-0.5 ${getStageBadgeColor(pf.stage)}`}>
-                                      {pf.type === "opportunity" ? "Opp" : "Project"}
-                                    </Badge>
-                                  </td>
-                                  <td className="p-3 text-sm text-right font-medium">{formatCurrency(pf.revenue)}</td>
-                                  <td className="p-3 text-sm text-right">{formatCurrency(pf.internal_cost)}</td>
-                                  <td className="p-3 text-sm text-right">{formatCurrency(pf.subcontractor_cost)}</td>
-                                  <td className="p-3 text-sm text-right font-medium">{formatCurrency(pf.total_cost)}</td>
-                                  <td className={`p-3 text-sm text-right font-semibold ${pf.margin >= 0 ? "text-green-600" : "text-red-600"}`}>
-                                    {formatCurrency(pf.margin)}
-                                  </td>
-                                  <td className={`p-3 text-sm text-right font-semibold ${pf.margin_percent >= 0 ? "text-green-600" : "text-red-600"}`}>
-                                    {pf.margin_percent.toFixed(1)}%
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="to_invoice" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base sm:text-lg">
-                      To Invoice - {getMonthName(selectedMonth)} {selectedYear}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {toInvoiceItems.length === 0 ? (
-                      <div className="text-center py-8 text-slate-600 text-sm">
-                        No items ready to invoice for this month
-                      </div>
-                    ) : (
-                      <>
-                        {/* Mobile: Card View */}
-                        <div className="block lg:hidden space-y-3">
-                          {toInvoiceItems.map((item) => (
-                            <Card key={item.phasing_id} className="border-orange-200 bg-orange-50">
-                              <CardContent className="p-4">
-                                <div className="space-y-3">
-                                  <div>
-                                    <div className="font-mono text-xs text-slate-500 mb-1">
-                                      {item.project_code}
-                                    </div>
-                                    <div className="font-semibold text-sm text-slate-900">
-                                      {item.project_name}
-                                    </div>
-                                    <div className="text-xs text-slate-600 mt-1">
-                                      {item.client_name}
-                                    </div>
-                                  </div>
-
-                                  <div className="flex items-center justify-between pt-2 border-t">
-                                    <div>
-                                      <div className="text-xs text-slate-500">Actual Revenue</div>
-                                      <div className="text-lg font-bold text-slate-900">
-                                        {formatCurrency(item.actual_revenue)}
-                                      </div>
-                                    </div>
-                                    <Badge className="bg-orange-100 text-orange-800">
-                                      To Invoice
-                                    </Badge>
-                                  </div>
-
-                                  <Button
-                                    size="sm"
-                                    onClick={() => handleMarkInvoiced(item)}
-                                    className="w-full"
-                                  >
-                                    Mark as Invoiced
-                                  </Button>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          ))}
-                        </div>
-
-                        {/* Desktop: Table View */}
-                        <div className="hidden lg:block overflow-x-auto">
-                          <table className="w-full">
-                            <thead>
-                              <tr className="border-b">
-                                <th className="text-left p-3 text-sm font-medium text-slate-600">Code</th>
-                                <th className="text-left p-3 text-sm font-medium text-slate-600">Project</th>
-                                <th className="text-left p-3 text-sm font-medium text-slate-600">Client</th>
-                                <th className="text-right p-3 text-sm font-medium text-slate-600">Actual Revenue</th>
-                                <th className="text-center p-3 text-sm font-medium text-slate-600">Status</th>
-                                <th className="text-center p-3 text-sm font-medium text-slate-600">Action</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {toInvoiceItems.map((item) => (
-                                <tr key={item.phasing_id} className="border-b bg-orange-50">
-                                  <td className="p-3 text-sm font-mono text-slate-600">{item.project_code}</td>
-                                  <td className="p-3 text-sm font-medium text-slate-900">{item.project_name}</td>
-                                  <td className="p-3 text-sm text-slate-600">{item.client_name}</td>
-                                  <td className="p-3 text-sm text-right font-semibold">{formatCurrency(item.actual_revenue)}</td>
-                                  <td className="p-3 text-center">
-                                    <Badge className="bg-orange-100 text-orange-800">To Invoice</Badge>
-                                  </td>
-                                  <td className="p-3 text-center">
-                                    <Button size="sm" onClick={() => handleMarkInvoiced(item)}>
-                                      Mark as Invoiced
-                                    </Button>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-
-                        <div className="mt-4 pt-4 border-t">
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm font-medium text-slate-600">Total To Invoice:</span>
-                            <span className="text-xl font-bold text-slate-900">
-                              {formatCurrency(toInvoiceItems.reduce((sum, item) => sum + item.actual_revenue, 0))}
-                            </span>
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-
-            {/* Mark Invoiced Dialog - Full screen on mobile */}
-            <Dialog open={!!markingInvoice} onOpenChange={(open) => !open && setMarkingInvoice(null)}>
-              <DialogContent className="w-[95vw] max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Mark as Invoiced</DialogTitle>
-                </DialogHeader>
-                {markingInvoice && (
-                  <div className="space-y-4">
-                    <div>
-                      <div className="text-sm text-slate-600 mb-2">
-                        {markingInvoice.project_code} - {markingInvoice.project_name}
-                      </div>
-                      <div className="text-lg font-semibold">
-                        {formatCurrency(markingInvoice.actual_revenue)}
-                      </div>
+                        </tbody>
+                      </table>
                     </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="invoice_ref">Invoice Reference *</Label>
-                      <Input
-                        id="invoice_ref"
-                        value={invoiceForm.invoice_ref}
-                        onChange={(e) =>
-                          setInvoiceForm({ ...invoiceForm, invoice_ref: e.target.value })
-                        }
-                        placeholder="INV-2025-001"
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="invoice_date">Invoice Date *</Label>
-                      <Input
-                        id="invoice_date"
-                        type="date"
-                        value={invoiceForm.invoice_date}
-                        onChange={(e) =>
-                          setInvoiceForm({ ...invoiceForm, invoice_date: e.target.value })
-                        }
-                        required
-                      />
-                    </div>
-
-                    <div className="flex gap-3">
-                      <Button onClick={() => handleMarkInvoiced()}>Confirm</Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setMarkingInvoice(null)}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
+                  </>
                 )}
-              </DialogContent>
-            </Dialog>
+              </CardContent>
+            </Card>
           </>
         )}
       </div>
