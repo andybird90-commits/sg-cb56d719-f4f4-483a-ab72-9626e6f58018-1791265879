@@ -8,7 +8,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, TrendingUp, DollarSign, Percent } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, Percent, PoundSterling } from "lucide-react";
 import Link from "next/link";
 
 interface MonthlyFinancials {
@@ -358,6 +358,8 @@ function AdminDashboardContent() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis
+                    domain={[0, 250000]}
+                    ticks={[0, 50000, 100000, 150000, 200000, 250000]}
                     tickFormatter={(value) => `£${(value / 1000).toFixed(0)}k`}
                   />
                   <Tooltip
@@ -410,7 +412,7 @@ function AdminDashboardContent() {
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-sm font-medium flex items-center gap-2">
-                        <DollarSign className="h-4 w-4 text-red-600" />
+                        <PoundSterling className="h-4 w-4 text-red-600" />
                         Year-End Costs
                       </CardTitle>
                     </CardHeader>
@@ -427,7 +429,11 @@ function AdminDashboardContent() {
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-sm font-medium flex items-center gap-2">
-                        <TrendingUp className="h-4 w-4 text-blue-600" />
+                        {yearEndForecast.totalMargin >= 0 ? (
+                          <TrendingUp className="h-4 w-4 text-blue-600" />
+                        ) : (
+                          <TrendingDown className="h-4 w-4 text-red-600" />
+                        )}
                         Year-End Margin
                       </CardTitle>
                     </CardHeader>
