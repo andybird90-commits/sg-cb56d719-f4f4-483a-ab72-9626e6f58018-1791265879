@@ -287,6 +287,7 @@ export type Database = {
           invoice_month_id: string
           invoice_reference: string | null
           invoice_value: number | null
+          po_number: string | null
           project_code: string | null
           project_id: string
           project_name: string
@@ -302,6 +303,7 @@ export type Database = {
           invoice_month_id: string
           invoice_reference?: string | null
           invoice_value?: number | null
+          po_number?: string | null
           project_code?: string | null
           project_id: string
           project_name: string
@@ -317,6 +319,7 @@ export type Database = {
           invoice_month_id?: string
           invoice_reference?: string | null
           invoice_value?: number | null
+          po_number?: string | null
           project_code?: string | null
           project_id?: string
           project_name?: string
@@ -928,6 +931,7 @@ export type Database = {
           notes: string | null
           opportunity_id: string | null
           opportunity_reference: string | null
+          po_number: string | null
           project_reference: string | null
           start_date: string | null
           status: string
@@ -948,6 +952,7 @@ export type Database = {
           notes?: string | null
           opportunity_id?: string | null
           opportunity_reference?: string | null
+          po_number?: string | null
           project_reference?: string | null
           start_date?: string | null
           status?: string
@@ -968,6 +973,7 @@ export type Database = {
           notes?: string | null
           opportunity_id?: string | null
           opportunity_reference?: string | null
+          po_number?: string | null
           project_reference?: string | null
           start_date?: string | null
           status?: string
@@ -1122,6 +1128,7 @@ export type Database = {
           created_at: string
           description: string
           id: string
+          po_number: string | null
           project_id: string
           status: string
           updated_at: string
@@ -1132,6 +1139,7 @@ export type Database = {
           created_at?: string
           description: string
           id?: string
+          po_number?: string | null
           project_id: string
           status?: string
           updated_at?: string
@@ -1142,6 +1150,7 @@ export type Database = {
           created_at?: string
           description?: string
           id?: string
+          po_number?: string | null
           project_id?: string
           status?: string
           updated_at?: string

@@ -103,6 +103,7 @@ export const invoicingService = {
         name,
         status,
         agreed_fee_value,
+        po_number,
         start_date,
         end_date,
         companies!projects_client_company_id_fkey (
@@ -182,6 +183,7 @@ export const invoicingService = {
           ? project.companies[0]?.name || "Unknown Client"
           : (project.companies as any)?.name || "Unknown Client",
         invoice_value: invoiceValue,
+        po_number: project.po_number || null,
         description: "",
         excluded_this_month: false,
         created_by: session.session.user.id,
@@ -325,6 +327,7 @@ export const invoicingService = {
     const tableData = includedItems.map(item => [
       item.project_code ? `${item.project_code} - ${item.project_name}` : item.project_name,
       item.client_name,
+      item.po_number || "—",
       item.description || "",
       `£${(item.invoice_value || 0).toFixed(2)}`
     ]);
@@ -332,15 +335,16 @@ export const invoicingService = {
     // Table
     autoTable(doc, {
       startY: 45,
-      head: [['Project', 'Client', 'Description', 'Value']],
+      head: [['Project', 'Client', 'PO Number', 'Description', 'Value']],
       body: tableData,
       theme: 'grid',
       headStyles: { fillColor: [66, 66, 66] },
       columnStyles: {
-        0: { cellWidth: 40 }, // Project
-        1: { cellWidth: 40 }, // Client
-        2: { cellWidth: 'auto' }, // Description
-        3: { cellWidth: 30, halign: 'right' }, // Value
+        0: { cellWidth: 35 }, // Project
+        1: { cellWidth: 30 }, // Client
+        2: { cellWidth: 25 }, // PO Number
+        3: { cellWidth: 'auto' }, // Description
+        4: { cellWidth: 25, halign: 'right' }, // Value
       },
     });
 

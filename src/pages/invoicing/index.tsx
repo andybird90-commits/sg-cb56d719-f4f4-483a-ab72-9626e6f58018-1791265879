@@ -49,6 +49,7 @@ type InvoiceItem = {
   project_code: string;
   client_name: string;
   invoice_value: number | null;
+  po_number: string | null;
   description: string;
   excluded_this_month: boolean;
   invoice_reference: string | null;
@@ -501,6 +502,9 @@ export default function InvoicingPage() {
                             Client
                           </th>
                           <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                            PO Number
+                          </th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
                             Invoice Value (from Monthly Phasing)
                           </th>
                           <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
@@ -532,6 +536,9 @@ export default function InvoicingPage() {
                               </Link>
                             </td>
                             <td className="px-4 py-3 text-sm">{item.client_name}</td>
+                            <td className="px-4 py-3 text-sm">
+                              {item.po_number || "—"}
+                            </td>
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-2">
                                 <span className="text-sm font-medium">

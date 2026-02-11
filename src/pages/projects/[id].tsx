@@ -52,10 +52,11 @@ interface Activity {
 
 interface Variation {
   id: string;
-  code: string;
-  description: string | null;
+  description: string;
   value: number;
   status: string;
+  po_number?: string | null;
+  created_at: string;
 }
 
 interface SubcontractorCost {
@@ -93,6 +94,19 @@ interface MonthPhasing {
   hasData: boolean;
 }
 
+type ProjectForm = {
+  code: string;
+  project_reference: string;
+  name: string;
+  client_company_id: string;
+  status: string;
+  start_date: string;
+  end_date: string;
+  agreed_fee_value?: number;
+  po_number?: string;
+  notes?: string;
+};
+
 function ProjectDetailContent() {
   const { profile } = useAuth();
   const router = useRouter();
@@ -116,12 +130,16 @@ function ProjectDetailContent() {
 
   // Project edit state
   const [isEditingProject, setIsEditingProject] = useState(false);
-  const [projectForm, setProjectForm] = useState({
+  const [projectForm, setProjectForm] = useState<ProjectForm>({
+    code: "",
+    project_reference: "",
     name: "",
-    status: "pipeline",
+    client_company_id: "",
+    status: "",
     start_date: "",
     end_date: "",
     agreed_fee_value: "",
+    po_number: "",
     notes: "",
   });
 
@@ -140,10 +158,10 @@ function ProjectDetailContent() {
   const [variationFormOpen, setVariationFormOpen] = useState(false);
   const [editingVariation, setEditingVariation] = useState<Variation | null>(null);
   const [variationForm, setVariationForm] = useState({
-    code: "",
     description: "",
     value: "",
-    status: "proposed",
+    status: "pending",
+    po_number: "",
   });
 
   // Subcontractor cost form state
@@ -177,25 +195,12 @@ function ProjectDetailContent() {
       const { data: projectData, error: projectError } = await supabase
         .from("projects")
         .select(`
-          id,
-          project_reference,
-          opportunity_reference,
-          name,
-          status,
-          start_date,
-          end_date,
-          agreed_fee_value,
-          notes,
-          client_company_id,
-          opportunity_id,
-          companies (
-            id,
-            name
-          ),
-          opportunities!projects_opportunity_id_fkey (
-            id,
-            name
-          )
+          *,
+          companies!projects_client_company_id_fkey(id, name, short_name),
+          project_activities(*),
+          variations(*),
+          subcontractor_costs(*),
+          project_monthly_phasing(*)
         `)
         .eq("id", projectId)
         .single();
@@ -250,11 +255,15 @@ function ProjectDetailContent() {
       
       // Initialize project form with loaded data
       setProjectForm({
-        name: projectData.name,
-        status: projectData.status,
+        code: projectData.code || "",
+        project_reference: projectData.project_reference || "",
+        name: projectData.name || "",
+        client_company_id: projectData.client_company_id || "",
+        status: projectData.status || "",
         start_date: projectData.start_date || "",
         end_date: projectData.end_date || "",
         agreed_fee_value: projectData.agreed_fee_value?.toString() || "",
+        po_number: projectData.po_number || "",
         notes: projectData.notes || "",
       });
       
@@ -327,7 +336,19 @@ function ProjectDetailContent() {
 
       const { error } = await supabase
         .from("projects")
-        .update(updates)
+        .update({
+          code: projectForm.code || null,
+          project_reference: projectForm.project_reference || null,
+          name: projectForm.name,
+          client_company_id: projectForm.client_company_id || null,
+          status: projectForm.status,
+          start_date: projectForm.start_date || null,
+          end_date: projectForm.end_date || null,
+          agreed_fee_value: projectForm.agreed_fee_value ? parseFloat(projectForm.agreed_fee_value) : null,
+          po_number: projectForm.po_number || null,
+          notes: projectForm.notes || null,
+          updated_at: new Date().toISOString(),
+        })
         .eq("id", id);
 
       if (error) throw error;
@@ -692,104 +713,114 @@ function ProjectDetailContent() {
   // Variation handlers
   const handleVariationSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!id || typeof id !== "string") return;
+    if (!project) return;
+
+    const newValue = parseFloat(variationForm.value);
+    if (isNaN(newValue) || newValue <= 0) {
+      toast({
+        title: "Invalid value",
+        description: "Please enter a valid positive number",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
-      const newStatus = variationForm.status as "proposed" | "accepted" | "rejected";
-      const newValue = parseFloat(variationForm.value);
-      
-      if (editingVariation) {
-        // When editing, check if status changed to/from accepted
-        const oldStatus = editingVariation.status;
-        const oldValue = editingVariation.value;
-        
-        // Update the variation
+      const { error } = await supabase.from("variations").insert({
+        project_id: project.id,
+        description: variationForm.description,
+        value: newValue,
+        status: variationForm.status,
+        po_number: variationForm.po_number || null,
+      });
+
+      if (error) throw error;
+
+      // If new variation is accepted, add to project's agreed_fee_value
+      if (variationForm.status === "accepted") {
+        const newAgreedFee = (project.agreed_fee_value || 0) + newValue;
         const { error: updateError } = await supabase
-          .from("variations")
-          .update({
-            code: variationForm.code,
-            description: variationForm.description || null,
-            value: newValue,
-            status: newStatus,
-          })
-          .eq("id", editingVariation.id);
+          .from("projects")
+          .update({ agreed_fee_value: newAgreedFee })
+          .eq("id", project.id);
 
         if (updateError) throw updateError;
+      }
 
-        // Update project's agreed_fee_value based on status changes
-        if (oldStatus !== newStatus) {
-          let feeAdjustment = 0;
-          
-          // If changing from accepted to something else, subtract the old value
-          if (oldStatus === "accepted" && newStatus !== "accepted") {
-            feeAdjustment = -oldValue;
-          }
-          // If changing to accepted from something else, add the new value
-          else if (oldStatus !== "accepted" && newStatus === "accepted") {
-            feeAdjustment = newValue;
-          }
-          // If both are accepted but value changed, adjust by difference
-          else if (oldStatus === "accepted" && newStatus === "accepted") {
-            feeAdjustment = newValue - oldValue;
-          }
-          
-          if (feeAdjustment !== 0 && project) {
-            const newAgreedFee = (project.agreed_fee_value || 0) + feeAdjustment;
-            const { error: projectUpdateError } = await supabase
-              .from("projects")
-              .update({ agreed_fee_value: newAgreedFee })
-              .eq("id", id);
-            
-            if (projectUpdateError) throw projectUpdateError;
-          }
+      setShowVariationDialog(false);
+      setVariationForm({ description: "", value: "", status: "pending", po_number: "" });
+      loadProjectData();
+
+      toast({
+        title: "Success",
+        description: "Variation added successfully",
+      });
+    } catch (error) {
+      console.error("Error adding variation:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add variation. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleUpdateVariation = async (
+    variationId: string,
+    field: "description" | "value" | "status" | "po_number",
+    value: string | number
+  ) => {
+    if (!project) return;
+
+    try {
+      const variation = variations.find((v) => v.id === variationId);
+      if (!variation) return;
+
+      const previousStatus = variation.status;
+      const updates: any = { [field]: value };
+
+      // Handle agreed_fee_value adjustments based on status changes
+      if (field === "status") {
+        let feeAdjustment = 0;
+        
+        // If changing FROM accepted TO something else, subtract the variation value
+        if (previousStatus === "accepted" && value !== "accepted") {
+          feeAdjustment = -variation.value;
         }
-      } else {
-        // When creating a new variation
-        const { error: insertError } = await supabase
-          .from("variations")
-          .insert({
-            project_id: id,
-            code: variationForm.code,
-            description: variationForm.description || null,
-            value: newValue,
-            status: newStatus,
-          });
+        // If changing FROM something else TO accepted, add the variation value
+        else if (previousStatus !== "accepted" && value === "accepted") {
+          feeAdjustment = variation.value;
+        }
 
-        if (insertError) throw insertError;
-
-        // If new variation is accepted, add to project's agreed_fee_value
-        if (newStatus === "accepted" && project) {
-          const newAgreedFee = (project.agreed_fee_value || 0) + newValue;
-          const { error: projectUpdateError } = await supabase
+        if (feeAdjustment !== 0) {
+          const newAgreedFee = (project.agreed_fee_value || 0) + feeAdjustment;
+          const { error: projectError } = await supabase
             .from("projects")
             .update({ agreed_fee_value: newAgreedFee })
-            .eq("id", id);
-          
-          if (projectUpdateError) throw projectUpdateError;
+            .eq("id", project.id);
+
+          if (projectError) throw projectError;
         }
       }
 
-      toast({
-        title: editingVariation ? "Variation updated" : "Variation created",
-        description: editingVariation 
-          ? "Variation has been updated successfully."
-          : "New variation has been created successfully.",
-      });
+      const { error } = await supabase
+        .from("variations")
+        .update(updates)
+        .eq("id", variationId);
 
-      await fetchProjectData(id);
-      setVariationFormOpen(false);
-      setEditingVariation(null);
-      setVariationForm({
-        code: "",
-        description: "",
-        value: "",
-        status: "proposed",
-      });
-    } catch (err) {
-      console.error("Failed to save variation", err);
+      if (error) throw error;
+
+      loadProjectData();
+
       toast({
-        title: "Error saving variation",
-        description: "Failed to save variation. Please try again.",
+        title: "Success",
+        description: "Variation updated",
+      });
+    } catch (error) {
+      console.error("Error updating variation:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update variation",
         variant: "destructive",
       });
     }
@@ -1024,7 +1055,7 @@ function ProjectDetailContent() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => router.push("/projects")}
                 className="text-sm text-blue-600 hover:text-blue-800"
@@ -1470,68 +1501,77 @@ function ProjectDetailContent() {
                             New Variation
                           </Button>
                         </DialogTrigger>
-                        <DialogContent>
+                        <DialogContent className="max-w-md">
                           <DialogHeader>
-                            <DialogTitle>{editingVariation ? "Edit Variation" : "New Variation"}</DialogTitle>
+                            <DialogTitle>Add Variation</DialogTitle>
                           </DialogHeader>
                           <form onSubmit={handleVariationSubmit} className="space-y-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="variation_code">Code *</Label>
-                              <Input
-                                id="variation_code"
-                                value={variationForm.code}
-                                onChange={(e) => setVariationForm({ ...variationForm, code: e.target.value })}
-                                placeholder="e.g., VAR-001"
+                            <div>
+                              <Label htmlFor="variation-description">Description</Label>
+                              <Textarea
+                                id="variation-description"
+                                value={variationForm.description}
+                                onChange={(e) =>
+                                  setVariationForm({ ...variationForm, description: e.target.value })
+                                }
                                 required
                               />
                             </div>
-
-                            <div className="space-y-2">
-                              <Label htmlFor="variation_description">Description</Label>
-                              <Textarea
-                                id="variation_description"
-                                value={variationForm.description}
-                                onChange={(e) => setVariationForm({ ...variationForm, description: e.target.value })}
-                                rows={3}
-                              />
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label htmlFor="variation_value">Value (£) *</Label>
+                            <div>
+                              <Label htmlFor="variation-value">Value (£)</Label>
                               <Input
-                                id="variation_value"
+                                id="variation-value"
                                 type="number"
                                 step="0.01"
                                 value={variationForm.value}
-                                onChange={(e) => setVariationForm({ ...variationForm, value: e.target.value })}
+                                onChange={(e) =>
+                                  setVariationForm({ ...variationForm, value: e.target.value })
+                                }
                                 required
                               />
                             </div>
-
-                            <div className="space-y-2">
-                              <Label htmlFor="variation_status">Status</Label>
+                            <div>
+                              <Label htmlFor="variation-po-number">PO Number</Label>
+                              <Input
+                                id="variation-po-number"
+                                type="text"
+                                placeholder="Purchase Order Number (optional)"
+                                value={variationForm.po_number}
+                                onChange={(e) =>
+                                  setVariationForm({ ...variationForm, po_number: e.target.value })
+                                }
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="variation-status">Status</Label>
                               <Select
                                 value={variationForm.status}
-                                onValueChange={(value) => setVariationForm({ ...variationForm, status: value })}
+                                onValueChange={(value) =>
+                                  setVariationForm({ ...variationForm, status: value })
+                                }
                               >
-                                <SelectTrigger>
+                                <SelectTrigger id="variation-status">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="proposed">Proposed</SelectItem>
+                                  <SelectItem value="pending">Pending</SelectItem>
                                   <SelectItem value="accepted">Accepted</SelectItem>
                                   <SelectItem value="rejected">Rejected</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
-
-                            <div className="flex gap-3">
-                              <Button type="submit">
-                                {editingVariation ? "Update" : "Create"}
-                              </Button>
-                              <Button type="button" variant="outline" onClick={() => setVariationFormOpen(false)}>
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => {
+                                  setShowVariationDialog(false);
+                                  setVariationForm({ description: "", value: "", status: "pending", po_number: "" });
+                                }}
+                              >
                                 Cancel
                               </Button>
+                              <Button type="submit">Add Variation</Button>
                             </div>
                           </form>
                         </DialogContent>
@@ -1545,48 +1585,86 @@ function ProjectDetailContent() {
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        {variations.map((variation) => (
-                          <div key={variation.id} className="p-4 border rounded-lg">
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-3 mb-2">
-                                  <span className="font-mono text-sm text-slate-500">{variation.code}</span>
-                                  <Badge className={getStatusColor(variation.status)}>
-                                    {variation.status}
-                                  </Badge>
-                                </div>
-                                {variation.description && (
-                                  <div className="text-sm text-slate-600 mb-2 whitespace-pre-wrap">
-                                    {variation.description}
-                                  </div>
-                                )}
-                                <div className="text-lg font-semibold text-slate-900">
-                                  {formatCurrency(variation.value)}
-                                </div>
-                              </div>
-                              {canEdit && (
-                                <div className="flex gap-2">
+                        <table className="w-full">
+                          <thead className="bg-gray-50 border-b">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-sm font-medium">Description</th>
+                              <th className="px-4 py-3 text-left text-sm font-medium">Value</th>
+                              <th className="px-4 py-3 text-left text-sm font-medium">PO Number</th>
+                              <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
+                              <th className="px-4 py-3 text-left text-sm font-medium">Date</th>
+                              <th className="px-4 py-3"></th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y">
+                            {variations.map((variation) => (
+                              <tr key={variation.id}>
+                                <td className="px-4 py-3">
+                                  <Textarea
+                                    value={variation.description}
+                                    onChange={(e) =>
+                                      handleUpdateVariation(variation.id, "description", e.target.value)
+                                    }
+                                    className="min-h-[60px]"
+                                  />
+                                </td>
+                                <td className="px-4 py-3">
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    value={variation.value}
+                                    onChange={(e) =>
+                                      handleUpdateVariation(
+                                        variation.id,
+                                        "value",
+                                        parseFloat(e.target.value)
+                                      )
+                                    }
+                                  />
+                                </td>
+                                <td className="px-4 py-3">
+                                  <Input
+                                    type="text"
+                                    placeholder="PO Number"
+                                    value={variation.po_number || ""}
+                                    onChange={(e) =>
+                                      handleUpdateVariation(variation.id, "po_number", e.target.value)
+                                    }
+                                  />
+                                </td>
+                                <td className="px-4 py-3">
+                                  <Select
+                                    value={variation.status}
+                                    onValueChange={(value) =>
+                                      handleUpdateVariation(variation.id, "status", value)
+                                    }
+                                  >
+                                    <SelectTrigger className="w-32">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="pending">Pending</SelectItem>
+                                      <SelectItem value="accepted">Accepted</SelectItem>
+                                      <SelectItem value="rejected">Rejected</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </td>
+                                <td className="px-4 py-3 text-sm text-gray-500">
+                                  {new Date(variation.created_at).toLocaleDateString()}
+                                </td>
+                                <td className="px-4 py-3">
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => handleEditVariation(variation)}
+                                    onClick={() => handleDeleteVariation(variation.id)}
                                   >
-                                    <Edit className="w-4 h-4" />
+                                    Delete
                                   </Button>
-                                  {canDelete && (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleDeleteVariation(variation.id)}
-                                    >
-                                      <Trash2 className="w-4 h-4 text-red-600" />
-                                    </Button>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     )}
                   </CardContent>
