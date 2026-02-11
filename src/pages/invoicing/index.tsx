@@ -26,7 +26,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Download, Lock, LockOpen, Plus } from "lucide-react";
+import { Download, Lock, LockOpen, Plus, RefreshCw } from "lucide-react";
 import Link from "next/link";
 
 type InvoiceMonth = {
@@ -260,6 +260,50 @@ export default function InvoicingPage() {
     }
   }
 
+  const handleFinishInvoicing = async () => {
+    if (!invoiceMonth) return;
+
+    try {
+      await invoicingService.lockInvoiceMonth(invoiceMonth.id);
+      
+      toast({
+        title: "Success",
+        description: "Invoice month locked successfully.",
+      });
+
+      loadInvoiceData();
+    } catch (error) {
+      console.error("Error locking invoice month:", error);
+      toast({
+        title: "Error",
+        description: "Failed to lock invoice month.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSyncProjects = async () => {
+    if (!invoiceMonth) return;
+
+    try {
+      await invoicingService.populateInvoiceItems(invoiceMonth.id);
+      
+      toast({
+        title: "Success",
+        description: "Invoice items synced from live projects.",
+      });
+
+      loadInvoiceData();
+    } catch (error) {
+      console.error("Error syncing projects:", error);
+      toast({
+        title: "Error",
+        description: "Failed to sync projects.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const includedItems = invoiceItems.filter(
     (item) => !item.excluded_this_month && item.invoice_value !== null
   );
@@ -490,41 +534,32 @@ export default function InvoicingPage() {
                 )}
               </div>
 
-              {/* Footer */}
-              <div className="flex items-center justify-between p-4 bg-white rounded-lg shadow">
+              {/* Footer Actions */}
+              <div className="flex items-center justify-between pt-6 border-t">
                 <div className="text-lg font-semibold">
                   Total invoice value this month:{" "}
-                  <span className="text-green-600">£{totalValue.toFixed(2)}</span>
+                  <span className="text-primary">
+                    £{totalValue.toFixed(2)}
+                  </span>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  {isLocked ? (
+                <div className="flex gap-2">
+                  {canEdit && invoiceMonth.status === "open" && (
                     <>
-                      {invoiceMonth.pdf_url && (
-                        <Button asChild variant="default">
-                          <a href={invoiceMonth.pdf_url} download>
-                            <Download className="w-4 h-4 mr-2" />
-                            Download PDF
-                          </a>
-                        </Button>
-                      )}
-                      {canEdit && profile?.role === "admin" && (
-                        <Button onClick={handleReopenMonth} variant="outline">
-                          <LockOpen className="w-4 h-4 mr-2" />
-                          Reopen Month
-                        </Button>
-                      )}
-                    </>
-                  ) : (
-                    canEdit && (
                       <Button
-                        onClick={() => setShowLockDialog(true)}
-                        disabled={!allIncludedItemsValid || includedItems.length === 0}
+                        onClick={handleSyncProjects}
+                        variant="outline"
                       >
-                        <Lock className="w-4 h-4 mr-2" />
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        Sync Projects
+                      </Button>
+                      <Button
+                        onClick={handleFinishInvoicing}
+                        disabled={totalValue === 0}
+                      >
+                        <Lock className="mr-2 h-4 w-4" />
                         Finish Invoicing for this Month
                       </Button>
-                    )
+                    </>
                   )}
                 </div>
               </div>
