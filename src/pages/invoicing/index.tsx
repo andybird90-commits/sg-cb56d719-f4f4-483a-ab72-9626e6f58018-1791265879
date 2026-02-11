@@ -186,23 +186,40 @@ export default function InvoicingPage() {
     if (!invoiceMonth) return;
 
     try {
+      setLoading(true); // Show loading state while generating PDF
+
+      // 1. Generate and Upload PDF first
+      // We need fresh items state to ensure we capture latest edits
+      const currentItems = await invoicingService.getInvoiceItems(invoiceMonth.id);
+      const pdfUrl = await invoicingService.generateAndUploadPdf(invoiceMonth, currentItems);
+      
+      // 2. Save PDF URL
+      await invoicingService.savePdfUrl(invoiceMonth.id, pdfUrl);
+
+      // 3. Lock the month
       await invoicingService.lockInvoiceMonth(invoiceMonth.id);
-      setInvoiceMonth({ ...invoiceMonth, status: "locked" });
+      
+      setInvoiceMonth({ 
+        ...invoiceMonth, 
+        status: "locked",
+        pdf_url: pdfUrl 
+      });
       setShowLockDialog(false);
 
       toast({
         title: "Success",
-        description: "Invoice period locked successfully",
+        description: "Invoice period locked and PDF generated successfully",
       });
 
-      // TODO: Generate PDF here
     } catch (error) {
       console.error("Error locking invoice month:", error);
       toast({
         title: "Error",
-        description: "Failed to lock invoice period",
+        description: "Failed to lock invoice period. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   }
 
