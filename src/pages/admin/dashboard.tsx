@@ -3,7 +3,7 @@ import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
-import { format, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths, startOfDay } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths } from "date-fns";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -58,10 +58,13 @@ function AdminDashboardContent() {
   }
 
   async function fetchFinancialTrends() {
-    // Rolling 12 months starting from February 2026
-    const startMonth = new Date(2026, 1, 1); // February 2026
-    const endMonth = new Date(startMonth);
-    endMonth.setMonth(endMonth.getMonth() + 11); // 12 months total
+    // Start from January 2026 as requested
+    const startMonth = new Date(2026, 0, 1); // January 2026
+    const endMonth = new Date();
+    // Ensure we show at least 12 months or up to current date
+    if (endMonth.getTime() < new Date(2026, 11, 31).getTime()) {
+        endMonth.setTime(new Date(2026, 11, 31).getTime());
+    }
 
     const months = eachMonthOfInterval({
       start: startMonth,
@@ -76,50 +79,55 @@ function AdminDashboardContent() {
       const monthStart = startOfMonth(month);
       const monthEnd = endOfMonth(month);
 
-      // Get revenue from live projects and secured opportunities
-      const { data: projects } = await supabase
-        .from("projects")
-        .select("id, agreed_fee_value, start_date, end_date, project_monthly_phasing(revenue_amount, year, month)")
-        .eq("status", "live")
-        .or(`and(start_date.lte.${format(monthEnd, "yyyy-MM-dd")},end_date.gte.${format(monthStart, "yyyy-MM-dd")}),start_date.is.null,end_date.is.null`);
-
-      const { data: opportunities } = await supabase
-        .from("opportunities")
-        .select("id, expected_fee_value, expected_start_date, expected_end_date, opportunity_monthly_phasing(revenue_amount, year, month)")
-        .eq("stage", "secured")
-        .or(`and(expected_start_date.lte.${format(monthEnd, "yyyy-MM-dd")},expected_end_date.gte.${format(monthStart, "yyyy-MM-dd")}),expected_start_date.is.null,expected_end_date.is.null`);
-
       let totalRevenue = 0;
 
-      // Calculate project revenue
-      projects?.forEach(project => {
-        const phasing = Array.isArray(project.project_monthly_phasing) ? project.project_monthly_phasing : [];
-        const monthPhasing = phasing.find((p: any) => p.year === year && p.month === monthNum);
-        
-        if (monthPhasing) {
-          totalRevenue += Number(monthPhasing.revenue_amount) || 0;
-        } else if (project.agreed_fee_value && project.start_date && project.end_date) {
-          const start = new Date(project.start_date);
-          const end = new Date(project.end_date);
-          const durationMonths = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30)));
-          totalRevenue += Number(project.agreed_fee_value) / durationMonths;
-        }
-      });
+      // Special handling for January 2026
+      if (year === 2026 && monthNum === 1) {
+        totalRevenue = 120000; // Hardcoded January revenue
+      } else {
+        // Get revenue from live projects and secured opportunities
+        const { data: projects } = await supabase
+            .from("projects")
+            .select("id, agreed_fee_value, start_date, end_date, project_monthly_phasing(revenue_amount, year, month)")
+            .eq("status", "live")
+            .or(`and(start_date.lte.${format(monthEnd, "yyyy-MM-dd")},end_date.gte.${format(monthStart, "yyyy-MM-dd")}),start_date.is.null,end_date.is.null`);
 
-      // Calculate opportunity revenue
-      opportunities?.forEach(opp => {
-        const phasing = Array.isArray(opp.opportunity_monthly_phasing) ? opp.opportunity_monthly_phasing : [];
-        const monthPhasing = phasing.find((p: any) => p.year === year && p.month === monthNum);
-        
-        if (monthPhasing) {
-          totalRevenue += Number(monthPhasing.revenue_amount) || 0;
-        } else if (opp.expected_fee_value && opp.expected_start_date && opp.expected_end_date) {
-          const start = new Date(opp.expected_start_date);
-          const end = new Date(opp.expected_end_date);
-          const durationMonths = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30)));
-          totalRevenue += Number(opp.expected_fee_value) / durationMonths;
-        }
-      });
+        const { data: opportunities } = await supabase
+            .from("opportunities")
+            .select("id, expected_fee_value, expected_start_date, expected_end_date, opportunity_monthly_phasing(revenue_amount, year, month)")
+            .eq("stage", "secured")
+            .or(`and(expected_start_date.lte.${format(monthEnd, "yyyy-MM-dd")},expected_end_date.gte.${format(monthStart, "yyyy-MM-dd")}),expected_start_date.is.null,expected_end_date.is.null`);
+
+        // Calculate project revenue
+        projects?.forEach(project => {
+            const phasing = Array.isArray(project.project_monthly_phasing) ? project.project_monthly_phasing : [];
+            const monthPhasing = phasing.find((p: any) => p.year === year && p.month === monthNum);
+            
+            if (monthPhasing) {
+            totalRevenue += Number(monthPhasing.revenue_amount) || 0;
+            } else if (project.agreed_fee_value && project.start_date && project.end_date) {
+            const start = new Date(project.start_date);
+            const end = new Date(project.end_date);
+            const durationMonths = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30)));
+            totalRevenue += Number(project.agreed_fee_value) / durationMonths;
+            }
+        });
+
+        // Calculate opportunity revenue
+        opportunities?.forEach(opp => {
+            const phasing = Array.isArray(opp.opportunity_monthly_phasing) ? opp.opportunity_monthly_phasing : [];
+            const monthPhasing = phasing.find((p: any) => p.year === year && p.month === monthNum);
+            
+            if (monthPhasing) {
+            totalRevenue += Number(monthPhasing.revenue_amount) || 0;
+            } else if (opp.expected_fee_value && opp.expected_start_date && opp.expected_end_date) {
+            const start = new Date(opp.expected_start_date);
+            const end = new Date(opp.expected_end_date);
+            const durationMonths = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30)));
+            totalRevenue += Number(opp.expected_fee_value) / durationMonths;
+            }
+        });
+      }
 
       // Get costs
       const { data: timesheets } = await supabase
@@ -166,10 +174,13 @@ function AdminDashboardContent() {
   }
 
   async function fetchConversions() {
-    // Rolling 12 months starting from February 2026
-    const startMonth = new Date(2026, 1, 1); // February 2026
-    const endMonth = new Date(startMonth);
-    endMonth.setMonth(endMonth.getMonth() + 11); // 12 months total
+    // Start from January 2026
+    const startMonth = new Date(2026, 0, 1); // January 2026
+    const endMonth = new Date();
+    // Ensure we show at least 12 months or up to current date
+    if (endMonth.getTime() < new Date(2026, 11, 31).getTime()) {
+        endMonth.setTime(new Date(2026, 11, 31).getTime());
+    }
 
     const months = eachMonthOfInterval({
       start: startMonth,
