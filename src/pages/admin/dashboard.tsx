@@ -35,12 +35,11 @@ function AdminDashboardContent() {
   const [financials, setFinancials] = useState<MonthlyFinancials[]>([]);
   const [conversions, setConversions] = useState<ConversionData[]>([]);
   const [teamStats, setTeamStats] = useState<TeamMemberStats[]>([]);
-  const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchDashboardData();
-  }, [selectedMonth]);
+  }, []);
 
   async function fetchDashboardData() {
     setLoading(true);
@@ -215,12 +214,10 @@ function AdminDashboardContent() {
   }
 
   async function fetchTeamStats() {
-    const year = selectedMonth.getFullYear();
-    const monthNum = selectedMonth.getMonth() + 1;
-    const monthStart = startOfMonth(selectedMonth);
-    const monthEnd = endOfMonth(selectedMonth);
+    // Start from Jan 1, 2026
+    const startDate = "2026-01-01";
 
-    // Get projects created this month with their opportunities
+    // Get projects created since Jan 2026 with their opportunities
     const { data: projects } = await supabase
       .from("projects")
       .select(`
@@ -229,8 +226,7 @@ function AdminDashboardContent() {
         opportunity_id,
         opportunities!projects_opportunity_id_fkey(added_by_user_id, profiles!opportunities_added_by_user_id_fkey(full_name))
       `)
-      .gte("created_at", monthStart.toISOString())
-      .lte("created_at", monthEnd.toISOString())
+      .gte("created_at", startDate)
       .not("opportunity_id", "is", null);
 
     // Group by user
@@ -260,8 +256,7 @@ function AdminDashboardContent() {
     const { data: orphanProjects } = await supabase
       .from("projects")
       .select("id, agreed_fee_value")
-      .gte("created_at", monthStart.toISOString())
-      .lte("created_at", monthEnd.toISOString())
+      .gte("created_at", startDate)
       .is("opportunity_id", null);
 
     if (orphanProjects && orphanProjects.length > 0) {
@@ -421,30 +416,13 @@ function AdminDashboardContent() {
             <CardHeader>
               <CardTitle>Work Secured by Team Member</CardTitle>
               <CardDescription>
-                {format(selectedMonth, "MMMM yyyy")} - Projects converted from opportunities
+                Cumulative since January 2026 - Projects converted from opportunities
               </CardDescription>
-              <div className="flex gap-2 mt-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSelectedMonth(subMonths(selectedMonth, 1))}
-                >
-                  Previous Month
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSelectedMonth(new Date())}
-                  disabled={format(selectedMonth, "yyyy-MM") === format(new Date(), "yyyy-MM")}
-                >
-                  Current Month
-                </Button>
-              </div>
             </CardHeader>
             <CardContent>
               {teamStats.length === 0 ? (
                 <p className="text-muted-foreground text-sm">
-                  No projects converted from opportunities this month
+                  No projects converted from opportunities since Jan 2026
                 </p>
               ) : (
                 <div className="space-y-4">
