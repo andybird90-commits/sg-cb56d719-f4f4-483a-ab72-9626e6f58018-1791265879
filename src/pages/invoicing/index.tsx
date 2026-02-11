@@ -386,96 +386,108 @@ export default function InvoicingPage() {
 
               {/* Invoice Items Table */}
               <div className="bg-white rounded-lg shadow overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50 border-b">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                          Include
-                        </th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                          Project
-                        </th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                          Client
-                        </th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                          Invoice Value (£)
-                        </th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                          Description
-                        </th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                          Last Updated
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {invoiceItems.map((item) => (
-                        <tr key={item.id} className={item.excluded_this_month ? "opacity-50" : ""}>
-                          <td className="px-4 py-3">
-                            <Checkbox
-                              checked={!item.excluded_this_month}
-                              disabled={!canEdit || isLocked}
-                              onCheckedChange={(checked) =>
-                                handleUpdateItem(item.id, "excluded_this_month", !checked)
-                              }
-                            />
-                          </td>
-                          <td className="px-4 py-3">
-                            <Link
-                              href={`/projects/${item.project_id}`}
-                              className="text-blue-600 hover:underline"
-                            >
-                              {item.project_name}
-                            </Link>
-                          </td>
-                          <td className="px-4 py-3 text-sm">{item.client_name}</td>
-                          <td className="px-4 py-3">
-                            {canEdit && !isLocked && !item.excluded_this_month ? (
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={item.invoice_value || ""}
-                                onChange={(e) =>
-                                  handleUpdateItem(item.id, "invoice_value", e.target.value)
-                                }
-                                className="w-32"
-                                placeholder="0.00"
-                              />
-                            ) : (
-                              <span className="text-sm">
-                                {item.invoice_value
-                                  ? `£${item.invoice_value.toFixed(2)}`
-                                  : "—"}
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            {canEdit && !isLocked && !item.excluded_this_month ? (
-                              <Textarea
-                                value={item.description || ""}
-                                onChange={(e) =>
-                                  handleUpdateItem(item.id, "description", e.target.value)
-                                }
-                                className="min-h-[60px]"
-                                placeholder="What we're invoicing this month..."
-                              />
-                            ) : (
-                              <span className="text-sm whitespace-pre-wrap">
-                                {item.description || "—"}
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-500">
-                            {new Date(item.updated_at).toLocaleDateString()}
-                          </td>
+                {invoiceItems.length === 0 ? (
+                  <div className="p-8 text-center">
+                    <p className="text-lg text-muted-foreground mb-2">
+                      No active projects found for this billing period.
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Invoice items are automatically created from active projects. 
+                      Make sure you have projects with status "active" and they will appear here.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50 border-b">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                            Include
+                          </th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                            Project
+                          </th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                            Client
+                          </th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                            Invoice Value (£)
+                          </th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                            Description
+                          </th>
+                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                            Last Updated
+                          </th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y">
+                        {invoiceItems.map((item) => (
+                          <tr key={item.id} className={item.excluded_this_month ? "opacity-50" : ""}>
+                            <td className="px-4 py-3">
+                              <Checkbox
+                                checked={!item.excluded_this_month}
+                                disabled={!canEdit || isLocked}
+                                onCheckedChange={(checked) =>
+                                  handleUpdateItem(item.id, "excluded_this_month", !checked)
+                                }
+                              />
+                            </td>
+                            <td className="px-4 py-3">
+                              <Link
+                                href={`/projects/${item.project_id}`}
+                                className="text-blue-600 hover:underline"
+                              >
+                                {item.project_name}
+                              </Link>
+                            </td>
+                            <td className="px-4 py-3 text-sm">{item.client_name}</td>
+                            <td className="px-4 py-3">
+                              {canEdit && !isLocked && !item.excluded_this_month ? (
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={item.invoice_value || ""}
+                                  onChange={(e) =>
+                                    handleUpdateItem(item.id, "invoice_value", e.target.value)
+                                  }
+                                  className="w-32"
+                                  placeholder="0.00"
+                                />
+                              ) : (
+                                <span className="text-sm">
+                                  {item.invoice_value
+                                    ? `£${item.invoice_value.toFixed(2)}`
+                                    : "—"}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              {canEdit && !isLocked && !item.excluded_this_month ? (
+                                <Textarea
+                                  value={item.description || ""}
+                                  onChange={(e) =>
+                                    handleUpdateItem(item.id, "description", e.target.value)
+                                  }
+                                  className="min-h-[60px]"
+                                  placeholder="What we're invoicing this month..."
+                                />
+                              ) : (
+                                <span className="text-sm whitespace-pre-wrap">
+                                  {item.description || "—"}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-500">
+                              {new Date(item.updated_at).toLocaleDateString()}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
 
               {/* Footer */}
