@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -272,6 +272,73 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_items: {
+        Row: {
+          client_name: string
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          excluded_this_month: boolean | null
+          id: string
+          invoice_month_id: string
+          invoice_reference: string | null
+          invoice_value: number | null
+          project_id: string
+          project_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          client_name: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          excluded_this_month?: boolean | null
+          id?: string
+          invoice_month_id: string
+          invoice_reference?: string | null
+          invoice_value?: number | null
+          project_id: string
+          project_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          client_name?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          excluded_this_month?: boolean | null
+          id?: string
+          invoice_month_id?: string
+          invoice_reference?: string | null
+          invoice_value?: number | null
+          project_id?: string
+          project_name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_items_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_items_invoice_month_id_fkey"
+            columns: ["invoice_month_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_months"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
