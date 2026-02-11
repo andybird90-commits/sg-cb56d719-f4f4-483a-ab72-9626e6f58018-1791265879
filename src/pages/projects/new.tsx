@@ -144,13 +144,14 @@ function NewProjectContent() {
       }
 
       // If project is linked to an opportunity, update the opportunity
-      // CRITICAL FIX: Only update STATUS to closed_won, don't change STAGE
+      // CRITICAL FIX: Archive the opportunity AND set status to closed_won
       if (formData.opportunity_id) {
         const { error: oppUpdateError } = await supabase
           .from("opportunities")
           .update({
             linked_project_id: data.id,
-            status: "closed_won"
+            status: "closed_won",
+            archived: true
             // DON'T update stage - keep it at whatever stage it was (bid/high_potential/secured)
           })
           .eq("id", formData.opportunity_id);
