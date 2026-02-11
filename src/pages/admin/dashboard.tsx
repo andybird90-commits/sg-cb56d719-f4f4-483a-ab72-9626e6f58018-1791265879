@@ -95,45 +95,59 @@ function AdminDashboardContent() {
         // Hardcoded January revenue
         totalRevenue = 120000;
       } else {
-        // Get revenue from live projects
+        // Get revenue from live projects with explicit FK
         const { data: projects } = await supabase
           .from("projects")
-          .select("id, agreed_fee_value, start_date, end_date, project_monthly_phasing(revenue_amount, year, month)")
+          .select("id, agreed_fee_value, start_date, end_date, project_monthly_phasing!project_monthly_phasing_project_id_fkey(revenue_amount, year, month)")
           .eq("status", "live")
           .or(`and(start_date.lte.${format(monthEnd, "yyyy-MM-dd")},end_date.gte.${format(monthStart, "yyyy-MM-dd")}),start_date.is.null,end_date.is.null`);
 
-        // Get revenue from secured opportunities
+        // Get revenue from secured opportunities with explicit FK
         const { data: opportunities } = await supabase
           .from("opportunities")
-          .select("id, expected_fee_value, expected_start_date, expected_end_date, opportunity_monthly_phasing(revenue_amount, year, month)")
+          .select("id, expected_fee_value, expected_start_date, expected_end_date, opportunity_monthly_phasing!opportunity_monthly_phasing_opportunity_id_fkey(revenue_amount, year, month)")
           .eq("stage", "secured")
           .or(`and(expected_start_date.lte.${format(monthEnd, "yyyy-MM-dd")},expected_end_date.gte.${format(monthStart, "yyyy-MM-dd")}),expected_start_date.is.null,expected_end_date.is.null`);
 
+        // Calculate project revenue
         projects?.forEach(project => {
           const phasing = Array.isArray(project.project_monthly_phasing) ? project.project_monthly_phasing : [];
           const monthPhasing = phasing.find((p: any) => p.year === year && p.month === monthNum);
           
-          if (monthPhasing) {
-            totalRevenue += Number(monthPhasing.revenue_amount) || 0;
+          if (monthPhasing?.revenue_amount) {
+            // Use manual phasing if available
+            totalRevenue += Number(monthPhasing.revenue_amount);
           } else if (project.agreed_fee_value && project.start_date && project.end_date) {
+            // Only distribute if no phasing AND we have dates
             const start = new Date(project.start_date);
             const end = new Date(project.end_date);
-            const durationMonths = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30)));
-            totalRevenue += Number(project.agreed_fee_value) / durationMonths;
+            
+            // Check if this month is within the project duration
+            if (monthStart >= start && monthEnd <= end) {
+              const durationMonths = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30)));
+              totalRevenue += Number(project.agreed_fee_value) / durationMonths;
+            }
           }
         });
 
+        // Calculate opportunity revenue
         opportunities?.forEach(opp => {
           const phasing = Array.isArray(opp.opportunity_monthly_phasing) ? opp.opportunity_monthly_phasing : [];
           const monthPhasing = phasing.find((p: any) => p.year === year && p.month === monthNum);
           
-          if (monthPhasing) {
-            totalRevenue += Number(monthPhasing.revenue_amount) || 0;
+          if (monthPhasing?.revenue_amount) {
+            // Use manual phasing if available
+            totalRevenue += Number(monthPhasing.revenue_amount);
           } else if (opp.expected_fee_value && opp.expected_start_date && opp.expected_end_date) {
+            // Only distribute if no phasing AND we have dates
             const start = new Date(opp.expected_start_date);
             const end = new Date(opp.expected_end_date);
-            const durationMonths = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30)));
-            totalRevenue += Number(opp.expected_fee_value) / durationMonths;
+            
+            // Check if this month is within the opportunity duration
+            if (monthStart >= start && monthEnd <= end) {
+              const durationMonths = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30)));
+              totalRevenue += Number(opp.expected_fee_value) / durationMonths;
+            }
           }
         });
       }
@@ -145,7 +159,7 @@ function AdminDashboardContent() {
       if (isPastMonth) {
         const { data: timesheets } = await supabase
           .from("timesheets")
-          .select("hours, profiles!inner(default_hourly_cost_rate)")
+          .select("hours, profiles!timesheets_user_id_fkey(default_hourly_cost_rate)")
           .gte("date", format(monthStart, "yyyy-MM-dd"))
           .lte("date", format(monthEnd, "yyyy-MM-dd"));
 
@@ -188,7 +202,7 @@ function AdminDashboardContent() {
     }
 
     // Calculate year-end forecast
-    const forecastTotalCost = FIXED_MONTHLY_COST * 12; // £160k × 12 months
+    const forecastTotalCost = FIXED_MONTHLY_COST * 12;
     const forecastMargin = totalYearRevenue - forecastTotalCost;
     const forecastMarginPercent = totalYearRevenue > 0 
       ? (forecastMargin / totalYearRevenue) * 100 
