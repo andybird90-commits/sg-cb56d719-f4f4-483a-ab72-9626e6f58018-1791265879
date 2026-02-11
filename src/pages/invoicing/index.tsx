@@ -3,6 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Layout } from "@/components/Layout";
 import { RequireAuth } from "@/components/RequireAuth";
 import { invoicingService } from "@/services/invoicingService";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -344,24 +345,12 @@ export default function InvoicingPage() {
   };
 
   async function handleSyncProjects() {
+    if (!invoiceMonth) return;
+
     try {
-      setSyncing(true);
+      setLoading(true);
 
-      // Fetch current month projects with their existing descriptions
-      const { data: existingInvoices } = await supabase
-        .from("monthly_invoices")
-        .select("project_id, invoicing_description")
-        .eq("year", selectedYear)
-        .eq("month", selectedMonth);
-
-      // Create a map of existing descriptions
-      const descriptionMap = new Map<string, string>();
-      existingInvoices?.forEach(inv => {
-        if (inv.invoicing_description) {
-          descriptionMap.set(inv.project_id, inv.invoicing_description);
-        }
-      });
-
+      // 1. Get all active projects for this period
       const { data: projects, error: projectsError } = await supabase
         .from("projects")
         .select(`
@@ -370,10 +359,7 @@ export default function InvoicingPage() {
           name,
           agreed_fee_value,
           start_date,
-          end_date,
-          companies!projects_client_company_id_fkey (
-            name
-          )
+          end_date
         `)
         .eq("status", "live")
         .eq("archived", false);
@@ -383,6 +369,7 @@ export default function InvoicingPage() {
       const startOfMonth = new Date(selectedYear, selectedMonth - 1, 1);
       const endOfMonth = new Date(selectedYear, selectedMonth, 0);
 
+      // Filter for projects active in this month
       const activeProjects = (projects || []).filter(p => {
         if (!p.start_date || !p.end_date) return false;
         const start = new Date(p.start_date);
@@ -390,7 +377,15 @@ export default function InvoicingPage() {
         return !(end < startOfMonth || start > endOfMonth);
       });
 
-      const updatedProjects = activeProjects.map(p => {
+      // 2. Get existing invoice items to preserve descriptions
+      const existingItemsMap = new Map<string, InvoiceItem>();
+      invoiceItems.forEach(item => {
+        existingItemsMap.set(item.project_id, item);
+      });
+
+      // 3. Process each project
+      for (const p of activeProjects) {
+        // Calculate monthly revenue from phasing or spread
         const { data: phasingData } = await supabase
           .from("project_monthly_phasing")
           .select("revenue_amount")
@@ -401,7 +396,7 @@ export default function InvoicingPage() {
 
         let monthlyRevenue = 0;
         if (phasingData?.revenue_amount) {
-          monthlyRevenue = phasingData.revenue_amount;
+          monthlyRevenue = Number(phasingData.revenue_amount);
         } else if (p.start_date && p.end_date) {
           const start = new Date(p.start_date);
           const end = new Date(p.end_date);
@@ -409,25 +404,46 @@ export default function InvoicingPage() {
             (end.getFullYear() - start.getFullYear()) * 12 +
             (end.getMonth() - start.getMonth()) + 1
           );
-          monthlyRevenue = (p.agreed_fee_value || 0) / durationMonths;
+          monthlyRevenue = (Number(p.agreed_fee_value) || 0) / durationMonths;
         }
 
-        return {
-          project_id: p.id,
-          project_code: p.code || "—",
-          project_name: p.name,
-          client_name: p.companies?.name || "—",
-          revenue: monthlyRevenue,
-          invoicing_description: descriptionMap.get(p.id) || "", // Preserve existing description
-        };
+        const existingItem = existingItemsMap.get(p.id);
+
+        if (existingItem) {
+          // UPDATE: Only update value, PRESERVE description
+          await invoicingService.updateInvoiceItem(existingItem.id, {
+            invoice_value: monthlyRevenue,
+            // Explicitly do NOT update description here
+          });
+        } else {
+          // CREATE: New item for this project
+          await supabase.from("invoice_items").insert({
+            invoice_month_id: invoiceMonth.id,
+            project_id: p.id,
+            invoice_value: monthlyRevenue,
+            description: "", // New items start empty
+            excluded_this_month: false
+          });
+        }
+      }
+
+      toast({
+        title: "Synced",
+        description: "Projects synced successfully. Descriptions preserved.",
       });
 
-      setMonthProjects(updatedProjects);
-      await fetchInvoicingData(); // Refresh to get any new data
+      // Refresh list
+      await loadInvoiceData();
+
     } catch (err) {
       console.error("Failed to sync projects", err);
+      toast({
+        title: "Error",
+        description: "Failed to sync projects",
+        variant: "destructive",
+      });
     } finally {
-      setSyncing(false);
+      setLoading(false);
     }
   }
 
