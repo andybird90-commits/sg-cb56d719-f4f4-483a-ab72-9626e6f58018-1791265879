@@ -400,6 +400,8 @@ export type Database = {
           created_at: string
           id: string
           month: number
+          overhead: number | null
+          total_staff_cost: number | null
           updated_at: string
           year: number
         }
@@ -409,6 +411,8 @@ export type Database = {
           created_at?: string
           id?: string
           month: number
+          overhead?: number | null
+          total_staff_cost?: number | null
           updated_at?: string
           year: number
         }
@@ -418,6 +422,8 @@ export type Database = {
           created_at?: string
           id?: string
           month?: number
+          overhead?: number | null
+          total_staff_cost?: number | null
           updated_at?: string
           year?: number
         }

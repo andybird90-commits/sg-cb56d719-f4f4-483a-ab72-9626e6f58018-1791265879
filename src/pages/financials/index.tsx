@@ -37,6 +37,9 @@ function FinancialsContent() {
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [totalInternalCost, setTotalInternalCost] = useState(0);
   const [totalSubcontractorCost, setTotalSubcontractorCost] = useState(0);
+  const [overhead, setOverhead] = useState(0);
+  const [totalStaffCost, setTotalStaffCost] = useState(0);
+  const [staffSuspenseCost, setStaffSuspenseCost] = useState(0);
   const [budgetRevenue, setBudgetRevenue] = useState<number | null>(null);
   const [budgetCost, setBudgetCost] = useState<number | null>(null);
   
@@ -51,7 +54,7 @@ function FinancialsContent() {
       setLoading(true);
       setError(null);
 
-      // Fetch budget for selected month
+      // Fetch budget data including overhead and total staff cost
       const { data: budgetData, error: budgetError } = await supabase
         .from("monthly_budgets")
         .select("*")
@@ -63,6 +66,8 @@ function FinancialsContent() {
 
       setBudgetRevenue(budgetData?.budget_revenue || null);
       setBudgetCost(budgetData?.budget_cost || null);
+      setOverhead(budgetData?.overhead || 0);
+      setTotalStaffCost(budgetData?.total_staff_cost || 0);
 
       // Define the target month date range
       const startOfMonth = new Date(selectedYear, selectedMonth - 1, 1);
@@ -271,6 +276,11 @@ function FinancialsContent() {
       setTotalRevenue(totalRev);
       setTotalInternalCost(totalIntCost);
       setTotalSubcontractorCost(totalSubCost);
+      
+      // Calculate staff suspense cost
+      const suspense = Math.max(0, (budgetData?.total_staff_cost || 0) - totalIntCost);
+      setStaffSuspenseCost(suspense);
+      
       setProjectFinancials(breakdown);
     } catch (err) {
       console.error("Failed to load financials data", err);
@@ -315,8 +325,10 @@ function FinancialsContent() {
     }
   };
 
-  const totalCost = totalInternalCost + totalSubcontractorCost;
-  const margin = totalRevenue - totalCost;
+  // Calculate total cost including suspense and overhead
+  const totalProjectCost = totalInternalCost + totalSubcontractorCost;
+  const totalCostWithOverhead = totalProjectCost + staffSuspenseCost + overhead;
+  const margin = totalRevenue - totalCostWithOverhead;
   
   const budget = {
     budget_revenue: budgetRevenue,
@@ -400,7 +412,7 @@ function FinancialsContent() {
         ) : (
           <>
             {/* Summary Cards - Stack on mobile, grid on tablet/desktop */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
               <Card>
                 <CardContent className="p-4 sm:p-6">
                   <div className="space-y-2">
@@ -426,15 +438,29 @@ function FinancialsContent() {
               <Card>
                 <CardContent className="p-4 sm:p-6">
                   <div className="space-y-2">
-                    <div className="text-xs sm:text-sm text-slate-600">Internal Cost</div>
+                    <div className="text-xs sm:text-sm text-slate-600">Allocated Staff Cost</div>
                     <div className="text-xl sm:text-2xl font-bold text-slate-900">
                       {formatCurrency(totalInternalCost)}
                     </div>
-                    {budget.budget_cost && (
+                    {totalStaffCost > 0 && (
                       <div className="text-xs text-slate-500">
-                        vs Budget: {formatCurrency(budget.budget_cost)}
+                        of {formatCurrency(totalStaffCost)} total
                       </div>
                     )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-4 sm:p-6">
+                  <div className="space-y-2">
+                    <div className="text-xs sm:text-sm text-slate-600">Staff Suspense Cost</div>
+                    <div className="text-xl sm:text-2xl font-bold text-orange-600">
+                      {formatCurrency(staffSuspenseCost)}
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      Unallocated staff time
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -453,7 +479,21 @@ function FinancialsContent() {
               <Card>
                 <CardContent className="p-4 sm:p-6">
                   <div className="space-y-2">
-                    <div className="text-xs sm:text-sm text-slate-600">Margin</div>
+                    <div className="text-xs sm:text-sm text-slate-600">Overhead</div>
+                    <div className="text-xl sm:text-2xl font-bold text-slate-900">
+                      {formatCurrency(overhead)}
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      Fixed monthly costs
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-4 sm:p-6">
+                  <div className="space-y-2">
+                    <div className="text-xs sm:text-sm text-slate-600">Net Margin</div>
                     <div className={`text-xl sm:text-2xl font-bold ${margin >= 0 ? "text-green-600" : "text-red-600"}`}>
                       {formatCurrency(margin)}
                     </div>
@@ -464,6 +504,37 @@ function FinancialsContent() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Cost Breakdown Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base sm:text-lg">Cost Breakdown</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center py-2 border-b">
+                    <span className="text-sm text-slate-600">Allocated Staff Cost</span>
+                    <span className="font-semibold">{formatCurrency(totalInternalCost)}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b">
+                    <span className="text-sm text-slate-600">Staff Suspense Cost</span>
+                    <span className="font-semibold text-orange-600">{formatCurrency(staffSuspenseCost)}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b">
+                    <span className="text-sm text-slate-600">Subcontractor Cost</span>
+                    <span className="font-semibold">{formatCurrency(totalSubcontractorCost)}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b">
+                    <span className="text-sm text-slate-600">Overhead</span>
+                    <span className="font-semibold">{formatCurrency(overhead)}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-3 bg-slate-50 px-3 rounded">
+                    <span className="text-base font-medium text-slate-900">Total Cost</span>
+                    <span className="text-lg font-bold text-slate-900">{formatCurrency(totalCostWithOverhead)}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Project Breakdown - Cards on mobile, table on desktop */}
             <Card>

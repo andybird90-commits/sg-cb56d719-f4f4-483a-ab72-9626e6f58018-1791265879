@@ -19,6 +19,8 @@ interface MonthlyBudget {
   month: number;
   budget_revenue: number;
   budget_cost: number | null;
+  overhead: number | null;
+  total_staff_cost: number | null;
 }
 
 function AdminBudgetsContent() {
@@ -36,6 +38,8 @@ function AdminBudgetsContent() {
     month: (new Date().getMonth() + 1).toString(),
     budget_revenue: "",
     budget_cost: "",
+    overhead: "",
+    total_staff_cost: "",
   });
 
   const [bulkFormData, setBulkFormData] = useState({
@@ -43,6 +47,8 @@ function AdminBudgetsContent() {
     startMonth: (new Date().getMonth() + 1).toString(),
     budgets: Array(13).fill(""),
     costs: Array(13).fill(""),
+    overheads: Array(13).fill(""),
+    staffCosts: Array(13).fill(""),
   });
 
   const canEdit = profile?.role === "admin" || profile?.role === "director";
@@ -90,6 +96,8 @@ function AdminBudgetsContent() {
           month: parseInt(formData.month),
           budget_revenue: parseFloat(formData.budget_revenue),
           budget_cost: formData.budget_cost ? parseFloat(formData.budget_cost) : null,
+          overhead: formData.overhead ? parseFloat(formData.overhead) : null,
+          total_staff_cost: formData.total_staff_cost ? parseFloat(formData.total_staff_cost) : null,
         })
         .eq("id", editingBudget.id);
 
@@ -105,6 +113,8 @@ function AdminBudgetsContent() {
           month: parseInt(formData.month),
           budget_revenue: parseFloat(formData.budget_revenue),
           budget_cost: formData.budget_cost ? parseFloat(formData.budget_cost) : null,
+          overhead: formData.overhead ? parseFloat(formData.overhead) : null,
+          total_staff_cost: formData.total_staff_cost ? parseFloat(formData.total_staff_cost) : null,
         });
 
       if (error) {
@@ -121,6 +131,8 @@ function AdminBudgetsContent() {
       month: (new Date().getMonth() + 1).toString(),
       budget_revenue: "",
       budget_cost: "",
+      overhead: "",
+      total_staff_cost: "",
     });
   };
 
@@ -135,6 +147,8 @@ function AdminBudgetsContent() {
     for (let i = 0; i < 13; i++) {
       const budgetValue = bulkFormData.budgets[i];
       const costValue = bulkFormData.costs[i];
+      const overheadValue = bulkFormData.overheads[i];
+      const staffCostValue = bulkFormData.staffCosts[i];
 
       if (!budgetValue || parseFloat(budgetValue) <= 0) continue;
 
@@ -147,6 +161,8 @@ function AdminBudgetsContent() {
         month,
         budget_revenue: parseFloat(budgetValue),
         budget_cost: costValue ? parseFloat(costValue) : null,
+        overhead: overheadValue ? parseFloat(overheadValue) : null,
+        total_staff_cost: staffCostValue ? parseFloat(staffCostValue) : null,
       });
     }
 
@@ -181,6 +197,8 @@ function AdminBudgetsContent() {
       startMonth: (new Date().getMonth() + 1).toString(),
       budgets: Array(13).fill(""),
       costs: Array(13).fill(""),
+      overheads: Array(13).fill(""),
+      staffCosts: Array(13).fill(""),
     });
   };
 
@@ -191,6 +209,8 @@ function AdminBudgetsContent() {
       month: budget.month.toString(),
       budget_revenue: budget.budget_revenue.toString(),
       budget_cost: budget.budget_cost?.toString() || "",
+      overhead: budget.overhead?.toString() || "",
+      total_staff_cost: budget.total_staff_cost?.toString() || "",
     });
     setFormOpen(true);
   };
@@ -235,7 +255,7 @@ function AdminBudgetsContent() {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Monthly Budgets</h1>
-            <p className="text-slate-600 mt-1">Set revenue and cost targets</p>
+            <p className="text-slate-600 mt-1">Set revenue targets, overhead, and staff costs</p>
           </div>
           <div className="flex gap-3">
             <Link href="/admin">
@@ -249,13 +269,15 @@ function AdminBudgetsContent() {
                     startMonth: (new Date().getMonth() + 1).toString(),
                     budgets: Array(13).fill(""),
                     costs: Array(13).fill(""),
+                    overheads: Array(13).fill(""),
+                    staffCosts: Array(13).fill(""),
                   });
                 }}>
                   <Calendar className="w-4 h-4" />
                   13-Month Budget
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+              <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Set 13-Month Rolling Budget</DialogTitle>
                 </DialogHeader>
@@ -291,8 +313,15 @@ function AdminBudgetsContent() {
                   <div className="space-y-3">
                     <Label>Monthly Budgets (£)</Label>
                     <div className="grid gap-3">
+                      <div className="grid grid-cols-[120px_1fr_1fr_1fr_1fr] gap-2 items-center font-medium text-sm text-slate-600">
+                        <div>Month</div>
+                        <div>Revenue</div>
+                        <div>Cost</div>
+                        <div>Overhead</div>
+                        <div>Staff Cost</div>
+                      </div>
                       {Array.from({ length: 13 }).map((_, i) => (
-                        <div key={i} className="grid grid-cols-[120px_1fr_1fr] gap-3 items-center">
+                        <div key={i} className="grid grid-cols-[120px_1fr_1fr_1fr_1fr] gap-2 items-center">
                           <div className="text-sm font-medium text-slate-700">
                             {getMonthLabel(
                               parseInt(bulkFormData.startYear),
@@ -304,7 +333,7 @@ function AdminBudgetsContent() {
                             type="number"
                             step="0.01"
                             min="0"
-                            placeholder="Budget"
+                            placeholder="Revenue"
                             value={bulkFormData.budgets[i]}
                             onChange={(e) => {
                               const newBudgets = [...bulkFormData.budgets];
@@ -316,12 +345,36 @@ function AdminBudgetsContent() {
                             type="number"
                             step="0.01"
                             min="0"
-                            placeholder="Cost (optional)"
+                            placeholder="Cost"
                             value={bulkFormData.costs[i]}
                             onChange={(e) => {
                               const newCosts = [...bulkFormData.costs];
                               newCosts[i] = e.target.value;
                               setBulkFormData({ ...bulkFormData, costs: newCosts });
+                            }}
+                          />
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="Overhead"
+                            value={bulkFormData.overheads[i]}
+                            onChange={(e) => {
+                              const newOverheads = [...bulkFormData.overheads];
+                              newOverheads[i] = e.target.value;
+                              setBulkFormData({ ...bulkFormData, overheads: newOverheads });
+                            }}
+                          />
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="Staff Cost"
+                            value={bulkFormData.staffCosts[i]}
+                            onChange={(e) => {
+                              const newStaffCosts = [...bulkFormData.staffCosts];
+                              newStaffCosts[i] = e.target.value;
+                              setBulkFormData({ ...bulkFormData, staffCosts: newStaffCosts });
                             }}
                           />
                         </div>
@@ -347,6 +400,8 @@ function AdminBudgetsContent() {
                     month: (new Date().getMonth() + 1).toString(),
                     budget_revenue: "",
                     budget_cost: "",
+                    overhead: "",
+                    total_staff_cost: "",
                   });
                 }}>
                   <Plus className="w-4 h-4" />
@@ -387,7 +442,7 @@ function AdminBudgetsContent() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="budget_revenue">Budget (£) *</Label>
+                    <Label htmlFor="budget_revenue">Revenue Budget (£) *</Label>
                     <Input
                       id="budget_revenue"
                       type="number"
@@ -400,7 +455,7 @@ function AdminBudgetsContent() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="budget_cost">Budget Cost (£)</Label>
+                    <Label htmlFor="budget_cost">Cost Budget (£)</Label>
                     <Input
                       id="budget_cost"
                       type="number"
@@ -408,6 +463,32 @@ function AdminBudgetsContent() {
                       min="0"
                       value={formData.budget_cost}
                       onChange={(e) => setFormData({ ...formData, budget_cost: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="overhead">Monthly Overhead (£)</Label>
+                    <Input
+                      id="overhead"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.overhead}
+                      onChange={(e) => setFormData({ ...formData, overhead: e.target.value })}
+                      placeholder="Fixed monthly overhead costs"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="total_staff_cost">Total Staff Cost (£)</Label>
+                    <Input
+                      id="total_staff_cost"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.total_staff_cost}
+                      onChange={(e) => setFormData({ ...formData, total_staff_cost: e.target.value })}
+                      placeholder="Total monthly staff budget"
                     />
                   </div>
 
@@ -448,21 +529,37 @@ function AdminBudgetsContent() {
                   <div key={budget.id} className="p-4 border rounded-lg">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <div className="font-medium text-slate-900 mb-2">
+                        <div className="font-medium text-slate-900 mb-3">
                           {getMonthName(budget.month)} {budget.year}
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                           <div>
-                            <div className="text-sm text-slate-500">Budget</div>
+                            <div className="text-sm text-slate-500">Revenue Budget</div>
                             <div className="text-lg font-semibold text-slate-900">
                               {formatCurrency(budget.budget_revenue)}
                             </div>
                           </div>
-                          {budget.budget_cost && (
+                          {budget.budget_cost !== null && (
                             <div>
                               <div className="text-sm text-slate-500">Cost Budget</div>
                               <div className="text-lg font-semibold text-slate-900">
                                 {formatCurrency(budget.budget_cost)}
+                              </div>
+                            </div>
+                          )}
+                          {budget.overhead !== null && (
+                            <div>
+                              <div className="text-sm text-slate-500">Overhead</div>
+                              <div className="text-lg font-semibold text-slate-900">
+                                {formatCurrency(budget.overhead)}
+                              </div>
+                            </div>
+                          )}
+                          {budget.total_staff_cost !== null && (
+                            <div>
+                              <div className="text-sm text-slate-500">Total Staff Cost</div>
+                              <div className="text-lg font-semibold text-slate-900">
+                                {formatCurrency(budget.total_staff_cost)}
                               </div>
                             </div>
                           )}
