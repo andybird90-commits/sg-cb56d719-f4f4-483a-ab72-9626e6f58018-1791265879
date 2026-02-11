@@ -308,6 +308,20 @@ export default function InvoicingPage() {
     0
   );
 
+  // Debug logging
+  console.log("📊 Invoice Items Debug:", {
+    totalItems: invoiceItems.length,
+    includedItems: includedItems.length,
+    excludedItems: invoiceItems.filter(i => i.excluded_this_month).length,
+    nullValueItems: invoiceItems.filter(i => i.invoice_value === null).length,
+    calculatedTotal: totalValue,
+    itemBreakdown: includedItems.map(i => ({
+      project: i.project_name,
+      value: i.invoice_value,
+      excluded: i.excluded_this_month
+    }))
+  });
+
   const allIncludedItemsValid = includedItems.every(
     (item) => item.invoice_value && item.invoice_value > 0 && item.description?.trim()
   );
