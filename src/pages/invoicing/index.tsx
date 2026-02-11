@@ -72,6 +72,7 @@ export default function InvoicingPage() {
   const [invoiceMonth, setInvoiceMonth] = useState<InvoiceMonth | null>(null);
   const [invoiceItems, setInvoiceItems] = useState<InvoiceItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(true);
   const [showLockDialog, setShowLockDialog] = useState(false);
   const [editingItems, setEditingItems] = useState<Set<string>>(new Set());
 
@@ -80,11 +81,20 @@ export default function InvoicingPage() {
 
   useEffect(() => {
     console.log("Auth state:", { user: !!user, profile, canEdit });
+    if (user !== null) {
+      // User state is determined (either logged in or not)
+      if (profile !== undefined) {
+        // Profile has loaded (could be null or an object)
+        setProfileLoading(false);
+      }
+    }
   }, [user, profile, canEdit]);
 
   useEffect(() => {
-    loadInvoiceData();
-  }, [selectedYear, selectedMonth]);
+    if (!profileLoading) {
+      loadInvoiceData();
+    }
+  }, [selectedYear, selectedMonth, profileLoading]);
 
   async function loadInvoiceData() {
     try {
@@ -264,7 +274,7 @@ export default function InvoicingPage() {
 
   const years = Array.from({ length: 10 }, (_, i) => currentDate.getFullYear() - 2 + i);
 
-  if (loading) {
+  if (loading || profileLoading) {
     return (
       <RequireAuth>
         <Layout>
