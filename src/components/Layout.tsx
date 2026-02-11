@@ -38,6 +38,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { href: "/projects", icon: Briefcase, label: "Projects" },
     { href: "/timesheets/my", icon: Clock, label: "Timesheets" },
     { href: "/financials", icon: PoundSterling, label: "Financials" },
+    { href: "/invoicing", icon: FileText, label: "Invoicing" },
     { href: "/absences/my", icon: Calendar, label: "Absences" },
     { href: "/archive", icon: Archive, label: "Archive" },
   ];
