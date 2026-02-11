@@ -3,7 +3,7 @@ import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
-import { format, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths, startOfDay } from "date-fns";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -58,9 +58,13 @@ function AdminDashboardContent() {
   }
 
   async function fetchFinancialTrends() {
+    // Get last completed month (not current month in progress)
+    const lastCompletedMonth = startOfMonth(subMonths(new Date(), 1));
+    const startMonth = subMonths(lastCompletedMonth, 11); // 12 months total
+
     const months = eachMonthOfInterval({
-      start: new Date(2026, 0, 1), // January 2026
-      end: new Date()
+      start: startMonth,
+      end: lastCompletedMonth
     });
 
     const monthlyData: MonthlyFinancials[] = [];
@@ -161,9 +165,13 @@ function AdminDashboardContent() {
   }
 
   async function fetchConversions() {
+    // Get last completed month (not current month in progress)
+    const lastCompletedMonth = startOfMonth(subMonths(new Date(), 1));
+    const startMonth = subMonths(lastCompletedMonth, 11); // 12 months total
+
     const months = eachMonthOfInterval({
-      start: new Date(2026, 0, 1), // January 2026
-      end: new Date()
+      start: startMonth,
+      end: lastCompletedMonth
     });
 
     const conversionData: ConversionData[] = [];
