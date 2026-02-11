@@ -46,6 +46,7 @@ type InvoiceItem = {
   invoice_month_id: string;
   project_id: string;
   project_name: string;
+  project_code: string;
   client_name: string;
   invoice_value: number | null;
   description: string;
@@ -527,7 +528,7 @@ export default function InvoicingPage() {
                                 href={`/projects/${item.project_id}`}
                                 className="text-blue-600 hover:underline"
                               >
-                                {item.project_name}
+                                {item.project_code} - {item.project_name}
                               </Link>
                             </td>
                             <td className="px-4 py-3 text-sm">{item.client_name}</td>

@@ -287,6 +287,7 @@ export type Database = {
           invoice_month_id: string
           invoice_reference: string | null
           invoice_value: number | null
+          project_code: string | null
           project_id: string
           project_name: string
           updated_at: string | null
@@ -301,6 +302,7 @@ export type Database = {
           invoice_month_id: string
           invoice_reference?: string | null
           invoice_value?: number | null
+          project_code?: string | null
           project_id: string
           project_name: string
           updated_at?: string | null
@@ -315,6 +317,7 @@ export type Database = {
           invoice_month_id?: string
           invoice_reference?: string | null
           invoice_value?: number | null
+          project_code?: string | null
           project_id?: string
           project_name?: string
           updated_at?: string | null

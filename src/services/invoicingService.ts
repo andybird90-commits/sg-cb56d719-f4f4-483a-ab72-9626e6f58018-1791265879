@@ -98,6 +98,7 @@ export const invoicingService = {
       .from("projects")
       .select(`
         id,
+        code,
         name,
         status,
         agreed_fee_value,
@@ -174,6 +175,7 @@ export const invoicingService = {
       return {
         invoice_month_id: invoiceMonthId,
         project_id: project.id,
+        project_code: project.code || "",
         project_name: project.name,
         client_name: Array.isArray(project.companies) 
           ? project.companies[0]?.name || "Unknown Client"
@@ -320,7 +322,7 @@ export const invoicingService = {
     );
 
     const tableData = includedItems.map(item => [
-      item.project_name,
+      item.project_code ? `${item.project_code} - ${item.project_name}` : item.project_name,
       item.client_name,
       item.description || "",
       `£${(item.invoice_value || 0).toFixed(2)}`
