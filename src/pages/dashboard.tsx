@@ -499,14 +499,6 @@ function DashboardContent() {
 
         const startDate = new Date(proj.start_date);
         const endDate = new Date(proj.end_date);
-        const totalValue = proj.agreed_fee_value;
-
-        // Calculate default monthly value (fallback)
-        const durationMonths = Math.max(1,
-          (endDate.getFullYear() - startDate.getFullYear()) * 12 + (
-          endDate.getMonth() - startDate.getMonth()) + 1
-        );
-        const defaultMonthlyValue = totalValue / durationMonths;
 
         // Add to each relevant month
         monthDates.forEach((monthDate, idx) => {
@@ -517,12 +509,12 @@ function DashboardContent() {
             const yearMonth = format(monthDate, "yyyy-MM");
             const phasingKey = `${proj.id}-${yearMonth}`;
 
-            // Use manual phasing if available, otherwise use default calculation
-            const monthlyValue = projPhasingMap.has(phasingKey)
-              ? projPhasingMap.get(phasingKey)!
-              : defaultMonthlyValue;
-
-            initialData[idx].secured += monthlyValue;
+            // ONLY use manual phasing if available - no fallback calculation
+            if (projPhasingMap.has(phasingKey)) {
+              const monthlyValue = projPhasingMap.get(phasingKey)!;
+              initialData[idx].secured += monthlyValue;
+            }
+            // If no phasing data exists, don't add anything (removed fallback)
           }
         });
       });
