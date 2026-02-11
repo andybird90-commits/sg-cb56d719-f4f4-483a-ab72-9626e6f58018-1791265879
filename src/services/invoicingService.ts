@@ -266,6 +266,7 @@ export const invoicingService = {
         status: "open",
         locked_by: null,
         locked_at: null,
+        pdf_url: null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", invoiceMonthId);

@@ -240,7 +240,7 @@ export default function InvoicingPage() {
 
     try {
       await invoicingService.reopenInvoiceMonth(invoiceMonth.id);
-      setInvoiceMonth({ ...invoiceMonth, status: "open" });
+      setInvoiceMonth({ ...invoiceMonth, status: "open", pdf_url: null });
 
       toast({
         title: "Success",
@@ -253,6 +253,41 @@ export default function InvoicingPage() {
         description: "Failed to reopen invoice period",
         variant: "destructive",
       });
+    }
+  }
+
+  async function handleDownloadPdf() {
+    if (!invoiceMonth) return;
+
+    try {
+      setLoading(true);
+
+      let pdfUrl = invoiceMonth.pdf_url;
+
+      // If no PDF exists yet, generate it
+      if (!pdfUrl) {
+        const currentItems = await invoicingService.getInvoiceItems(invoiceMonth.id);
+        pdfUrl = await invoicingService.generateAndUploadPdf(invoiceMonth, currentItems);
+        await invoicingService.savePdfUrl(invoiceMonth.id, pdfUrl);
+        setInvoiceMonth({ ...invoiceMonth, pdf_url: pdfUrl });
+      }
+
+      // Open PDF in new tab
+      window.open(pdfUrl, "_blank");
+
+      toast({
+        title: "Success",
+        description: "PDF opened in new tab",
+      });
+    } catch (error) {
+      console.error("Error downloading PDF:", error);
+      toast({
+        title: "Error",
+        description: "Failed to generate PDF",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -544,6 +579,27 @@ export default function InvoicingPage() {
                   </span>
                 </div>
                 <div className="flex gap-2">
+                  {invoiceMonth && (
+                    <Button
+                      onClick={handleDownloadPdf}
+                      variant="outline"
+                      disabled={loading}
+                    >
+                      <Download className="mr-2 h-4 w-4" />
+                      {loading ? "Generating..." : "Download PDF"}
+                    </Button>
+                  )}
+                  
+                  {canEdit && invoiceMonth.status === "locked" && (
+                    <Button
+                      onClick={handleReopenMonth}
+                      variant="outline"
+                    >
+                      <LockOpen className="mr-2 h-4 w-4" />
+                      Unlock Invoice
+                    </Button>
+                  )}
+                  
                   {canEdit && invoiceMonth.status === "open" && (
                     <>
                       <Button
