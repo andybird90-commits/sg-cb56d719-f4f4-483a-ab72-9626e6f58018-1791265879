@@ -57,6 +57,17 @@ export const invoicingService = {
     const { data: session } = await supabase.auth.getSession();
     if (!session.session) throw new Error("Not authenticated");
 
+    // First, delete any existing invoice items for this month to prevent duplicates
+    const { error: deleteError } = await supabase
+      .from("invoice_items")
+      .delete()
+      .eq("invoice_month_id", invoiceMonthId);
+
+    if (deleteError) {
+      console.error("Error deleting existing invoice items:", deleteError);
+      throw deleteError;
+    }
+
     // First, get the invoice month to know which year/month we're populating for
     const { data: invoiceMonth, error: monthError } = await supabase
       .from("invoice_months")
