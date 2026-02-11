@@ -88,7 +88,12 @@ export const invoicingService = {
 
     console.log(`📅 Populating for ${invoiceMonth.month}/${invoiceMonth.year}`);
 
-    // Fetch ALL live projects with their details
+    // Calculate the date range for this invoice month
+    const monthStart = new Date(invoiceMonth.year, invoiceMonth.month - 1, 1);
+    const monthEnd = new Date(invoiceMonth.year, invoiceMonth.month, 0);
+    monthEnd.setHours(23, 59, 59, 999);
+
+    // Fetch ONLY live projects that are active during this invoice month
     const { data: projects, error: projectsError } = await supabase
       .from("projects")
       .select(`
@@ -102,7 +107,9 @@ export const invoicingService = {
           name
         )
       `)
-      .in("status", ["live", "Live"]);
+      .in("status", ["live", "Live"])
+      .gte("end_date", monthStart.toISOString().split("T")[0])
+      .lte("start_date", monthEnd.toISOString().split("T")[0]);
 
     if (projectsError) {
       console.error("Error fetching projects:", projectsError);
