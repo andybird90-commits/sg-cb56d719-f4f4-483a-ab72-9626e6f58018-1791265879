@@ -62,12 +62,14 @@ export const invoicingService = {
         id,
         name,
         status,
-        client_companies!projects_client_company_id_fkey(name)
+        client_companies (
+          name
+        )
       `)
       .in("status", ["Live", "In Progress", "Active"]);
 
     if (projectsError) {
-      console.error("Error fetching projects:", error);
+      console.error("Error fetching projects:", projectsError);
       throw projectsError;
     }
 

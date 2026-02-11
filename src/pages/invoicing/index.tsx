@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "@/hooks/useAuth";
-import Layout from "@/components/Layout";
-import RequireAuth from "@/components/RequireAuth";
+import { useAuth } from "@/contexts/AuthContext";
+import { Layout } from "@/components/Layout";
+import { RequireAuth } from "@/components/RequireAuth";
 import { invoicingService } from "@/services/invoicingService";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -86,12 +86,13 @@ export default function InvoicingPage() {
     try {
       setLoading(true);
       const month = await invoicingService.getOrCreateInvoiceMonth(selectedYear, selectedMonth);
-      setInvoiceMonth(month);
-
+      // Ensure status is typed correctly when setting state
       if (month) {
+        setInvoiceMonth(month as InvoiceMonth);
         const items = await invoicingService.getInvoiceItems(month.id);
         setInvoiceItems(items);
       } else {
+        setInvoiceMonth(null);
         setInvoiceItems([]);
       }
     } catch (error) {
@@ -110,7 +111,7 @@ export default function InvoicingPage() {
     try {
       setLoading(true);
       const month = await invoicingService.createInvoiceMonth(selectedYear, selectedMonth);
-      setInvoiceMonth(month);
+      setInvoiceMonth(month as InvoiceMonth);
       
       const items = await invoicingService.getInvoiceItems(month.id);
       setInvoiceItems(items);
