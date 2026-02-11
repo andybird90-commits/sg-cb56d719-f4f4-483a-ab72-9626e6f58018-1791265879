@@ -151,7 +151,7 @@ function FinancialsContent() {
       const allRevenueItems = [
         ...(projectsData || []).map(p => ({
           id: p.id,
-          code: p.code,
+          code: p.code || "—",
           name: p.name,
           client_name: p.companies?.name || "—",
           start_date: p.start_date,
