@@ -350,7 +350,7 @@ export default function InvoicingPage() {
     try {
       setLoading(true);
 
-      // 1. Get all active projects for this period
+      // 1. Get all active projects for this period with client details
       const { data: projects, error: projectsError } = await supabase
         .from("projects")
         .select(`
@@ -359,7 +359,11 @@ export default function InvoicingPage() {
           name,
           agreed_fee_value,
           start_date,
-          end_date
+          end_date,
+          po_number,
+          companies!projects_client_company_id_fkey (
+            name
+          )
         `)
         .eq("status", "live")
         .eq("archived", false);
@@ -408,11 +412,14 @@ export default function InvoicingPage() {
         }
 
         const existingItem = existingItemsMap.get(p.id);
+        const clientName = p.companies?.name || "Unknown Client";
 
         if (existingItem) {
-          // UPDATE: Only update value, PRESERVE description
+          // UPDATE: Only update value and metadata, PRESERVE description
           await invoicingService.updateInvoiceItem(existingItem.id, {
             invoice_value: monthlyRevenue,
+            project_code: p.code || "", // Update code if it changed
+            po_number: p.po_number || existingItem.po_number,
             // Explicitly do NOT update description here
           });
         } else {
@@ -420,9 +427,13 @@ export default function InvoicingPage() {
           await supabase.from("invoice_items").insert({
             invoice_month_id: invoiceMonth.id,
             project_id: p.id,
+            project_name: p.name,
+            project_code: p.code || "",
+            client_name: clientName,
             invoice_value: monthlyRevenue,
             description: "", // New items start empty
-            excluded_this_month: false
+            excluded_this_month: false,
+            po_number: p.po_number
           });
         }
       }
