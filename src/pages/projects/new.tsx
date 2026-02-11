@@ -151,8 +151,9 @@ function NewProjectContent() {
           .update({
             linked_project_id: data.id,
             status: "closed_won",
+            stage: "secured",
             archived: true
-            // DON'T update stage - keep it at whatever stage it was (bid/high_potential/secured)
+            // Update stage to 'secured' to prevent double counting in dashboard
           })
           .eq("id", formData.opportunity_id);
 
