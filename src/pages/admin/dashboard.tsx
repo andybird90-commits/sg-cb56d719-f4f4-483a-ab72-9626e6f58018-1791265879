@@ -134,7 +134,7 @@ function AdminDashboardContent() {
         .select("overhead, total_staff_cost")
         .eq("year", year)
         .eq("month", monthNum)
-        .single();
+        .maybeSingle();
 
       let internalCost = 0;
       timesheets?.forEach(ts => {
@@ -206,7 +206,7 @@ function AdminDashboardContent() {
         id,
         agreed_fee_value,
         opportunity_id,
-        opportunities!inner(added_by_user_id, profiles!inner(full_name))
+        opportunities!projects_opportunity_id_fkey(added_by_user_id, profiles!inner(full_name))
       `)
       .gte("created_at", monthStart.toISOString())
       .lte("created_at", monthEnd.toISOString())
