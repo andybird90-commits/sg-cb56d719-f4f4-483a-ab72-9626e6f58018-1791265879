@@ -59,7 +59,7 @@ function AdminDashboardContent() {
 
   async function fetchFinancialTrends() {
     const months = eachMonthOfInterval({
-      start: subMonths(new Date(), 11),
+      start: new Date(2026, 0, 1), // January 2026
       end: new Date()
     });
 
@@ -162,7 +162,7 @@ function AdminDashboardContent() {
 
   async function fetchConversions() {
     const months = eachMonthOfInterval({
-      start: subMonths(new Date(), 11),
+      start: new Date(2026, 0, 1), // January 2026
       end: new Date()
     });
 
