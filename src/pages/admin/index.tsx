@@ -145,9 +145,14 @@ function AdminContent() {
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Admin Panel</h1>
             <p className="text-sm sm:text-base text-slate-600 mt-1">Manage users and system settings</p>
           </div>
-          <Link href="/admin/budgets">
-            <Button variant="outline" className="w-full sm:w-auto">Monthly Budgets</Button>
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Link href="/admin/dashboard">
+              <Button variant="outline" className="w-full sm:w-auto">Dashboard</Button>
+            </Link>
+            <Link href="/admin/budgets">
+              <Button variant="outline" className="w-full sm:w-auto">Monthly Budgets</Button>
+            </Link>
+          </div>
         </div>
 
         <Card>
