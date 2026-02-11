@@ -25,6 +25,8 @@ interface ProjectFinancials {
   total_cost: number;
   margin: number;
   margin_percent: number;
+  type: "project" | "opportunity";
+  stage: string;
 }
 
 interface PhasingRow {
@@ -121,11 +123,12 @@ function FinancialsContent() {
             name
           )
         `)
-        .eq("status", "live");
+        .eq("status", "live")
+        .eq("archived", false);
 
       if (projectsError) throw projectsError;
 
-      // Fetch all SECURED opportunities (should also count as revenue)
+      // Fetch all SECURED opportunities (matches pipeline logic)
       const { data: opportunitiesData, error: opportunitiesError } = await supabase
         .from("opportunities")
         .select(`
@@ -140,11 +143,45 @@ function FinancialsContent() {
             name
           )
         `)
-        .eq("stage", "secured");
+        .eq("stage", "secured")
+        .eq("archived", false);
 
       if (opportunitiesError) throw opportunitiesError;
 
-      // Combine projects and secured opportunities
+      // Fetch manual phasing for projects
+      const projectIds = (projectsData || []).map(p => p.id);
+      const { data: projPhasingData, error: projPhasingError } = await supabase
+        .from("project_monthly_phasing")
+        .select("project_id, year, month, revenue_amount")
+        .in("project_id", projectIds)
+        .eq("year", selectedYear)
+        .eq("month", selectedMonth);
+
+      if (projPhasingError) throw projPhasingError;
+
+      // Fetch manual phasing for opportunities
+      const opportunityIds = (opportunitiesData || []).map(o => o.id);
+      const { data: oppPhasingData, error: oppPhasingError } = await supabase
+        .from("opportunity_monthly_phasing")
+        .select("opportunity_id, year, month, revenue_amount")
+        .in("opportunity_id", opportunityIds)
+        .eq("year", selectedYear)
+        .eq("month", selectedMonth);
+
+      if (oppPhasingError) throw oppPhasingError;
+
+      // Create phasing lookup maps
+      const projPhasingMap = new Map<string, number>();
+      projPhasingData?.forEach(p => {
+        projPhasingMap.set(p.project_id, p.revenue_amount || 0);
+      });
+
+      const oppPhasingMap = new Map<string, number>();
+      oppPhasingData?.forEach(p => {
+        oppPhasingMap.set(p.opportunity_id, p.revenue_amount || 0);
+      });
+
+      // Combine projects and secured opportunities (same as pipeline)
       const allRevenueItems = [
         ...(projectsData || []).map(p => ({
           id: p.id,
@@ -154,7 +191,8 @@ function FinancialsContent() {
           start_date: p.start_date,
           end_date: p.end_date,
           total_value: p.agreed_fee_value || 0,
-          type: "project" as const
+          type: "project" as const,
+          stage: "secured" as const,
         })),
         ...(opportunitiesData || []).map(o => ({
           id: o.id,
@@ -164,21 +202,12 @@ function FinancialsContent() {
           start_date: o.expected_start_date,
           end_date: o.expected_end_date,
           total_value: o.expected_fee_value || 0,
-          type: "opportunity" as const
+          type: "opportunity" as const,
+          stage: o.stage as const,
         }))
       ];
 
-      console.log("=== FINANCIALS DEBUG ===");
-      console.log("Selected Month:", selectedMonth, "Selected Year:", selectedYear);
-      console.log("Start of Month:", startOfMonth);
-      console.log("End of Month:", endOfMonth);
-      console.log("Projects Data:", projectsData);
-      console.log("Opportunities Data:", opportunitiesData);
-      console.log("All Revenue Items:", allRevenueItems);
-
-      // Fetch timesheets for internal cost
-      const projectIds = (projectsData || []).map(p => p.id);
-
+      // Fetch timesheets for internal cost (only for projects)
       const { data: timesheetsData, error: timesheetsError } = await supabase
         .from("timesheets")
         .select(`
@@ -203,7 +232,7 @@ function FinancialsContent() {
         );
       });
 
-      // Fetch subcontractor costs
+      // Fetch subcontractor costs (only for projects)
       const { data: costsData, error: costsError } = await supabase
         .from("subcontractor_costs")
         .select("project_id, cost_amount")
@@ -221,7 +250,7 @@ function FinancialsContent() {
         );
       });
 
-      // Calculate revenue for each item using date-based distribution
+      // Calculate revenue for each item using date-based distribution (same logic as pipeline)
       const breakdown: ProjectFinancials[] = [];
       let totalRev = 0;
       let totalIntCost = 0;
@@ -233,27 +262,23 @@ function FinancialsContent() {
         const startDate = new Date(item.start_date);
         const endDate = new Date(item.end_date);
 
-        console.log("Processing item:", item.name);
-        console.log("  Start:", startDate, "End:", endDate);
-        console.log("  Overlap check: endDate < startOfMonth?", endDate < startOfMonth);
-        console.log("  Overlap check: startDate > endOfMonth?", startDate > endOfMonth);
-
-        // Check if this item overlaps with the selected month
+        // Check if this item overlaps with the selected month (same as pipeline)
         if (endDate < startOfMonth || startDate > endOfMonth) continue;
 
-        console.log("  ✓ Item overlaps selected month!");
-
-        // Calculate the monthly revenue using same logic as dashboard/pipeline
-        const durationMonths = Math.max(1,
-          (endDate.getFullYear() - startDate.getFullYear()) * 12 +
-          (endDate.getMonth() - startDate.getMonth()) + 1
-        );
-
-        const monthlyRevenue = item.total_value / durationMonths;
-
-        console.log("  Duration months:", durationMonths);
-        console.log("  Total value:", item.total_value);
-        console.log("  Monthly revenue:", monthlyRevenue);
+        // Check for manual phasing first
+        let monthlyRevenue: number;
+        if (item.type === "project" && projPhasingMap.has(item.id)) {
+          monthlyRevenue = projPhasingMap.get(item.id)!;
+        } else if (item.type === "opportunity" && oppPhasingMap.has(item.id)) {
+          monthlyRevenue = oppPhasingMap.get(item.id)!;
+        } else {
+          // Calculate fallback using same logic as pipeline
+          const durationMonths = Math.max(1,
+            (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+            (endDate.getMonth() - startDate.getMonth()) + 1
+          );
+          monthlyRevenue = item.total_value / durationMonths;
+        }
 
         // Get costs (only for projects, not opportunities)
         const internalCost = item.type === "project" ? (timesheetsByProject.get(item.id) || 0) : 0;
@@ -273,18 +298,14 @@ function FinancialsContent() {
           total_cost: totalCost,
           margin,
           margin_percent: marginPercent,
+          type: item.type,
+          stage: item.stage,
         });
 
         totalRev += monthlyRevenue;
         totalIntCost += internalCost;
         totalSubCost += subcontractorCost;
       }
-
-      console.log("=== FINAL TOTALS ===");
-      console.log("Total Revenue:", totalRev);
-      console.log("Total Internal Cost:", totalIntCost);
-      console.log("Total Subcontractor Cost:", totalSubCost);
-      console.log("Project Financials breakdown:", breakdown);
 
       setTotalRevenue(totalRev);
       setTotalInternalCost(totalIntCost);
@@ -344,6 +365,32 @@ function FinancialsContent() {
     return new Date(2000, month - 1, 1).toLocaleDateString("en-GB", { month: "long" });
   };
 
+  const formatStage = (stage: string) => {
+    switch (stage) {
+      case "secured":
+        return "Secured";
+      case "high_potential":
+        return "High Potential";
+      case "bid":
+        return "Bid";
+      default:
+        return stage;
+    }
+  };
+
+  const getStageBadgeColor = (stage: string) => {
+    switch (stage) {
+      case "secured":
+        return "bg-green-100 text-green-700";
+      case "high_potential":
+        return "bg-orange-100 text-orange-700";
+      case "bid":
+        return "bg-blue-100 text-blue-700";
+      default:
+        return "bg-slate-100 text-slate-700";
+    }
+  };
+
   const totalCost = totalInternalCost + totalSubcontractorCost;
   const margin = totalRevenue - totalCost;
   
@@ -359,7 +406,7 @@ function FinancialsContent() {
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Financials</h1>
-            <p className="text-sm sm:text-base text-slate-600 mt-1">Monthly financial overview</p>
+            <p className="text-sm sm:text-base text-slate-600 mt-1">Monthly financial overview (includes secured opportunities)</p>
           </div>
         </div>
 
@@ -546,14 +593,25 @@ function FinancialsContent() {
                             <Card 
                               key={pf.project_id}
                               className="cursor-pointer hover:shadow-md transition-shadow"
-                              onClick={() => router.push(`/projects/${pf.project_id}`)}
+                              onClick={() => {
+                                if (pf.type === "project") {
+                                  router.push(`/projects/${pf.project_id}`);
+                                } else {
+                                  router.push(`/opportunities/${pf.project_id}`);
+                                }
+                              }}
                             >
                               <CardContent className="p-4">
                                 <div className="space-y-2">
                                   <div className="flex items-start justify-between gap-2">
                                     <div className="flex-1 min-w-0">
-                                      <div className="font-mono text-xs text-slate-500 mb-1">
-                                        {pf.project_code}
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <div className="font-mono text-xs text-slate-500">
+                                          {pf.project_code}
+                                        </div>
+                                        <Badge className={`text-[10px] px-1.5 py-0.5 ${getStageBadgeColor(pf.stage)}`}>
+                                          {pf.type === "opportunity" ? "Opp" : "Project"}
+                                        </Badge>
                                       </div>
                                       <div className="font-semibold text-sm text-slate-900 truncate">
                                         {pf.project_name}
@@ -604,6 +662,7 @@ function FinancialsContent() {
                                 <th className="text-left p-3 text-sm font-medium text-slate-600">Code</th>
                                 <th className="text-left p-3 text-sm font-medium text-slate-600">Project</th>
                                 <th className="text-left p-3 text-sm font-medium text-slate-600">Client</th>
+                                <th className="text-center p-3 text-sm font-medium text-slate-600">Type</th>
                                 <th className="text-right p-3 text-sm font-medium text-slate-600">Revenue</th>
                                 <th className="text-right p-3 text-sm font-medium text-slate-600">Internal Cost</th>
                                 <th className="text-right p-3 text-sm font-medium text-slate-600">Subbie Cost</th>
@@ -617,11 +676,22 @@ function FinancialsContent() {
                                 <tr
                                   key={pf.project_id}
                                   className="border-b hover:bg-slate-50 cursor-pointer"
-                                  onClick={() => router.push(`/projects/${pf.project_id}`)}
+                                  onClick={() => {
+                                    if (pf.type === "project") {
+                                      router.push(`/projects/${pf.project_id}`);
+                                    } else {
+                                      router.push(`/opportunities/${pf.project_id}`);
+                                    }
+                                  }}
                                 >
                                   <td className="p-3 text-sm font-mono text-slate-600">{pf.project_code}</td>
                                   <td className="p-3 text-sm font-medium text-slate-900">{pf.project_name}</td>
                                   <td className="p-3 text-sm text-slate-600">{pf.client_name}</td>
+                                  <td className="p-3 text-center">
+                                    <Badge className={`text-[10px] px-2 py-0.5 ${getStageBadgeColor(pf.stage)}`}>
+                                      {pf.type === "opportunity" ? "Opp" : "Project"}
+                                    </Badge>
+                                  </td>
                                   <td className="p-3 text-sm text-right font-medium">{formatCurrency(pf.revenue)}</td>
                                   <td className="p-3 text-sm text-right">{formatCurrency(pf.internal_cost)}</td>
                                   <td className="p-3 text-sm text-right">{formatCurrency(pf.subcontractor_cost)}</td>

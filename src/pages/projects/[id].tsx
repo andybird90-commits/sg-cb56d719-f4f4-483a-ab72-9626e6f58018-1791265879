@@ -30,6 +30,7 @@ interface Project {
   start_date?: string;
   end_date?: string;
   agreed_fee_value?: number;
+  po_number?: string;
   notes?: string;
   archived?: boolean;
   companies?: {
@@ -52,6 +53,7 @@ interface Activity {
 
 interface Variation {
   id: string;
+  code: string;
   description: string;
   value: number;
   status: string;
@@ -102,9 +104,9 @@ type ProjectForm = {
   status: string;
   start_date: string;
   end_date: string;
-  agreed_fee_value?: number;
-  po_number?: string;
-  notes?: string;
+  agreed_fee_value: string;
+  po_number: string;
+  notes: string;
 };
 
 function ProjectDetailContent() {
@@ -323,6 +325,7 @@ function ProjectDetailContent() {
         start_date: projectForm.start_date || null,
         end_date: projectForm.end_date || null,
         agreed_fee_value: projectForm.agreed_fee_value ? parseFloat(projectForm.agreed_fee_value) : null,
+        po_number: projectForm.po_number || null,
         notes: projectForm.notes || null,
       };
 
@@ -726,6 +729,7 @@ function ProjectDetailContent() {
     }
 
     try {
+      // Note: code is auto-generated, so we don't need to provide it
       const { error } = await supabase.from("variations").insert({
         project_id: project.id,
         description: variationForm.description,
@@ -747,9 +751,9 @@ function ProjectDetailContent() {
         if (updateError) throw updateError;
       }
 
-      setShowVariationDialog(false);
+      setVariationFormOpen(false);
       setVariationForm({ description: "", value: "", status: "pending", po_number: "" });
-      loadProjectData();
+      await fetchProjectData(id as string);
 
       toast({
         title: "Success",
@@ -810,7 +814,7 @@ function ProjectDetailContent() {
 
       if (error) throw error;
 
-      loadProjectData();
+      await fetchProjectData(id as string);
 
       toast({
         title: "Success",
@@ -829,10 +833,10 @@ function ProjectDetailContent() {
   const handleEditVariation = (variation: Variation) => {
     setEditingVariation(variation);
     setVariationForm({
-      code: variation.code,
       description: variation.description || "",
       value: variation.value.toString(),
       status: variation.status,
+      po_number: variation.po_number || "",
     });
     setVariationFormOpen(true);
   };
@@ -1175,7 +1179,7 @@ function ProjectDetailContent() {
                       />
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="edit-start-date">Start Date</Label>
                         <Input
@@ -1195,7 +1199,9 @@ function ProjectDetailContent() {
                           onChange={(e) => setProjectForm({ ...projectForm, end_date: e.target.value })}
                         />
                       </div>
+                    </div>
 
+                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="edit-fee">Agreed Fee (£)</Label>
                         <Input
@@ -1205,6 +1211,17 @@ function ProjectDetailContent() {
                           min="0"
                           value={projectForm.agreed_fee_value}
                           onChange={(e) => setProjectForm({ ...projectForm, agreed_fee_value: e.target.value })}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-po-number">PO Number</Label>
+                        <Input
+                          id="edit-po-number"
+                          type="text"
+                          placeholder="Purchase Order Number"
+                          value={projectForm.po_number}
+                          onChange={(e) => setProjectForm({ ...projectForm, po_number: e.target.value })}
                         />
                       </div>
                     </div>
@@ -1256,6 +1273,15 @@ function ProjectDetailContent() {
                           <div className="text-sm font-medium text-slate-500 mb-1">Agreed Fee</div>
                           <div className="text-slate-900 font-semibold">
                             {formatCurrency(project.agreed_fee_value)}
+                          </div>
+                        </div>
+                      )}
+
+                      {project.po_number && (
+                        <div>
+                          <div className="text-sm font-medium text-slate-500 mb-1">PO Number</div>
+                          <div className="text-slate-900">
+                            {project.po_number}
                           </div>
                         </div>
                       )}
@@ -1491,10 +1517,10 @@ function ProjectDetailContent() {
                           <Button size="sm" className="gap-2" onClick={() => {
                             setEditingVariation(null);
                             setVariationForm({
-                              code: "",
                               description: "",
                               value: "",
                               status: "proposed",
+                              po_number: "",
                             });
                           }}>
                             <Plus className="w-4 h-4" />
@@ -1565,7 +1591,7 @@ function ProjectDetailContent() {
                                 type="button"
                                 variant="outline"
                                 onClick={() => {
-                                  setShowVariationDialog(false);
+                                  setVariationFormOpen(false);
                                   setVariationForm({ description: "", value: "", status: "pending", po_number: "" });
                                 }}
                               >
@@ -1588,6 +1614,7 @@ function ProjectDetailContent() {
                         <table className="w-full">
                           <thead className="bg-gray-50 border-b">
                             <tr>
+                              <th className="px-4 py-3 text-left text-sm font-medium">Code</th>
                               <th className="px-4 py-3 text-left text-sm font-medium">Description</th>
                               <th className="px-4 py-3 text-left text-sm font-medium">Value</th>
                               <th className="px-4 py-3 text-left text-sm font-medium">PO Number</th>
@@ -1599,6 +1626,9 @@ function ProjectDetailContent() {
                           <tbody className="divide-y">
                             {variations.map((variation) => (
                               <tr key={variation.id}>
+                                <td className="px-4 py-3 text-sm font-mono text-gray-600">
+                                  {variation.code}
+                                </td>
                                 <td className="px-4 py-3">
                                   <Textarea
                                     value={variation.description}

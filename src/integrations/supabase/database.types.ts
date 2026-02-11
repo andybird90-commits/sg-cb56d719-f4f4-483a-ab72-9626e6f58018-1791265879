@@ -1124,7 +1124,7 @@ export type Database = {
       }
       variations: {
         Row: {
-          code: string
+          code: string | null
           created_at: string
           description: string
           id: string
@@ -1135,7 +1135,7 @@ export type Database = {
           value: number
         }
         Insert: {
-          code: string
+          code?: string | null
           created_at?: string
           description: string
           id?: string
@@ -1146,7 +1146,7 @@ export type Database = {
           value: number
         }
         Update: {
-          code?: string
+          code?: string | null
           created_at?: string
           description?: string
           id?: string
