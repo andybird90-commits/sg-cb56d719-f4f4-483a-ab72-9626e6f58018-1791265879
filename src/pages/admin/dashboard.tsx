@@ -75,10 +75,10 @@ function AdminDashboardContent() {
 
     const monthlyData: MonthlyFinancials[] = [];
     const today = new Date();
-    let yearToDateRevenue = 0;
-    let yearToDateCost = 0;
-    let futureRevenue = 0;
-    const costSamples: number[] = [];
+    
+    // Fixed monthly cost
+    const FIXED_MONTHLY_COST = 160000;
+    let totalYearRevenue = 0;
 
     for (const month of months) {
       const year = month.getFullYear();
@@ -90,15 +90,19 @@ function AdminDashboardContent() {
       let totalRevenue = 0;
       let totalCost = 0;
 
+      // Calculate revenue for ALL months (past and future) based on secured work
       if (year === 2026 && monthNum === 1) {
+        // Hardcoded January revenue
         totalRevenue = 120000;
       } else {
+        // Get revenue from live projects
         const { data: projects } = await supabase
           .from("projects")
           .select("id, agreed_fee_value, start_date, end_date, project_monthly_phasing(revenue_amount, year, month)")
           .eq("status", "live")
           .or(`and(start_date.lte.${format(monthEnd, "yyyy-MM-dd")},end_date.gte.${format(monthStart, "yyyy-MM-dd")}),start_date.is.null,end_date.is.null`);
 
+        // Get revenue from secured opportunities
         const { data: opportunities } = await supabase
           .from("opportunities")
           .select("id, expected_fee_value, expected_start_date, expected_end_date, opportunity_monthly_phasing(revenue_amount, year, month)")
@@ -134,6 +138,10 @@ function AdminDashboardContent() {
         });
       }
 
+      // Add to year total
+      totalYearRevenue += totalRevenue;
+
+      // For past months, get actual costs. For future months, use fixed cost
       if (isPastMonth) {
         const { data: timesheets } = await supabase
           .from("timesheets")
@@ -166,45 +174,28 @@ function AdminDashboardContent() {
         const staffSuspense = Math.max(0, totalStaffCost - internalCost);
 
         totalCost = internalCost + subcontractorCost + staffSuspense + overhead;
-        costSamples.push(totalCost);
-
-        yearToDateRevenue += totalRevenue;
-        yearToDateCost += totalCost;
-
-        monthlyData.push({
-          month: format(month, "MMM yy"),
-          revenue: totalRevenue,
-          cost: totalCost,
-          margin: totalRevenue - totalCost
-        });
       } else {
-        futureRevenue += totalRevenue;
-        monthlyData.push({
-          month: format(month, "MMM yy"),
-          revenue: 0,
-          cost: 0,
-          margin: 0
-        });
+        // Future months: use fixed cost
+        totalCost = FIXED_MONTHLY_COST;
       }
+
+      monthlyData.push({
+        month: format(month, "MMM yy"),
+        revenue: totalRevenue,
+        cost: totalCost,
+        margin: totalRevenue - totalCost
+      });
     }
 
     // Calculate year-end forecast
-    const avgMonthlyCost = costSamples.length > 0
-      ? costSamples.reduce((a, b) => a + b, 0) / costSamples.length
-      : 0;
-
-    const remainingMonths = 12 - costSamples.length;
-    const projectedFutureCost = avgMonthlyCost * remainingMonths;
-
-    const forecastTotalRevenue = yearToDateRevenue + futureRevenue;
-    const forecastTotalCost = yearToDateCost + projectedFutureCost;
-    const forecastMargin = forecastTotalRevenue - forecastTotalCost;
-    const forecastMarginPercent = forecastTotalRevenue > 0 
-      ? (forecastMargin / forecastTotalRevenue) * 100 
+    const forecastTotalCost = FIXED_MONTHLY_COST * 12; // £160k × 12 months
+    const forecastMargin = totalYearRevenue - forecastTotalCost;
+    const forecastMarginPercent = totalYearRevenue > 0 
+      ? (forecastMargin / totalYearRevenue) * 100 
       : 0;
 
     setYearEndForecast({
-      totalRevenue: forecastTotalRevenue,
+      totalRevenue: totalYearRevenue,
       totalCost: forecastTotalCost,
       totalMargin: forecastMargin,
       marginPercent: forecastMarginPercent
@@ -358,7 +349,7 @@ function AdminDashboardContent() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Financial Trends (Last 12 Months)</CardTitle>
+              <CardTitle>Financial Trends (2026)</CardTitle>
               <CardDescription>Revenue, costs, and margin over time</CardDescription>
             </CardHeader>
             <CardContent>
@@ -428,7 +419,7 @@ function AdminDashboardContent() {
                         {formatCurrency(yearEndForecast.totalCost)}
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Current rate projected
+                        £160k/month × 12 months
                       </p>
                     </CardContent>
                   </Card>
