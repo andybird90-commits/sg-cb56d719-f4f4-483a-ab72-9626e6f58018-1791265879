@@ -57,18 +57,22 @@ export const invoicingService = {
     const { data: session } = await supabase.auth.getSession();
     if (!session.session) throw new Error("Not authenticated");
 
+    console.log("🗑️ Starting populateInvoiceItems for month:", invoiceMonthId);
+
     // First, delete any existing invoice items for this month to prevent duplicates
-    console.log("Deleting existing invoice items for month:", invoiceMonthId);
-    const { error: deleteError } = await supabase
+    console.log("Deleting existing invoice items...");
+    const { data: deletedData, error: deleteError } = await supabase
       .from("invoice_items")
       .delete()
-      .eq("invoice_month_id", invoiceMonthId);
+      .eq("invoice_month_id", invoiceMonthId)
+      .select();
 
     if (deleteError) {
-      console.error("Error deleting existing invoice items:", deleteError);
+      console.error("❌ Error deleting existing invoice items:", deleteError);
       throw deleteError;
     }
-    console.log("Successfully deleted existing invoice items");
+    
+    console.log(`✅ Deleted ${deletedData?.length || 0} existing invoice items`);
 
     // Get the invoice month to know which year/month we're populating for
     const { data: invoiceMonth, error: monthError } = await supabase
@@ -81,6 +85,8 @@ export const invoicingService = {
       console.error("Error fetching invoice month:", monthError);
       throw monthError;
     }
+
+    console.log(`📅 Populating for ${invoiceMonth.month}/${invoiceMonth.year}`);
 
     // Fetch ALL live projects with their details
     const { data: projects, error: projectsError } = await supabase
@@ -108,6 +114,8 @@ export const invoicingService = {
       return;
     }
 
+    console.log(`📊 Found ${projects.length} live projects`);
+
     // Fetch ALL monthly phasing data for these projects for this specific month
     const projectIds = projects.map(p => p.id);
     const { data: phasingData, error: phasingError } = await supabase
@@ -121,6 +129,8 @@ export const invoicingService = {
       console.error("Error fetching phasing data:", phasingError);
       throw phasingError;
     }
+
+    console.log(`📈 Found ${phasingData?.length || 0} projects with manual phasing for this month`);
 
     // Create a map of project_id -> revenue_amount for quick lookup
     const phasingMap = new Map<string, number>();
@@ -136,6 +146,7 @@ export const invoicingService = {
       if (phasingMap.has(project.id)) {
         // Use manual phasing value
         invoiceValue = phasingMap.get(project.id)!;
+        console.log(`  ✓ ${project.name}: £${invoiceValue} (from phasing)`);
       } else {
         // Calculate fallback: total fee ÷ duration in months
         if (project.agreed_fee_value && project.start_date && project.end_date) {
@@ -147,6 +158,9 @@ export const invoicingService = {
             (end.getMonth() - start.getMonth()) + 1
           );
           invoiceValue = project.agreed_fee_value / durationMonths;
+          console.log(`  ↻ ${project.name}: £${invoiceValue} (calculated fallback)`);
+        } else {
+          console.log(`  ⚠️ ${project.name}: No value (missing fee/dates)`);
         }
       }
       
@@ -169,9 +183,12 @@ export const invoicingService = {
       .insert(invoiceItems);
 
     if (insertError) {
-      console.error("Error creating invoice items:", insertError);
+      console.error("❌ Error creating invoice items:", insertError);
       throw insertError;
     }
+
+    const total = invoiceItems.reduce((sum, item) => sum + (item.invoice_value || 0), 0);
+    console.log(`✅ Created ${invoiceItems.length} invoice items, total: £${total.toFixed(2)}`);
   },
 
   // Get invoice items for a given month
