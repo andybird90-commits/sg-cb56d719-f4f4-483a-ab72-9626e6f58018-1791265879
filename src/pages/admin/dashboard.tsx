@@ -3,7 +3,7 @@ import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
-import { format, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachMonthOfInterval } from "date-fns";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -16,6 +16,10 @@ interface MonthlyFinancials {
   revenue: number;
   cost: number;
   margin: number;
+  revenueForecast?: number;
+  costForecast?: number;
+  marginForecast?: number;
+  isForecast?: boolean;
 }
 
 interface ConversionData {
@@ -57,13 +61,8 @@ function AdminDashboardContent() {
   }
 
   async function fetchFinancialTrends() {
-    // Start from January 2026 as requested
-    const startMonth = new Date(2026, 0, 1); // January 2026
-    const endMonth = new Date();
-    // Ensure we show at least 12 months or up to current date
-    if (endMonth.getTime() < new Date(2026, 11, 31).getTime()) {
-        endMonth.setTime(new Date(2026, 11, 31).getTime());
-    }
+    const startMonth = new Date(2026, 0, 1);
+    const endMonth = new Date(2026, 11, 31);
 
     const months = eachMonthOfInterval({
       start: startMonth,
@@ -71,114 +70,173 @@ function AdminDashboardContent() {
     });
 
     const monthlyData: MonthlyFinancials[] = [];
+    const today = new Date();
+    const costSamples: number[] = [];
 
     for (const month of months) {
       const year = month.getFullYear();
       const monthNum = month.getMonth() + 1;
       const monthStart = startOfMonth(month);
       const monthEnd = endOfMonth(month);
+      const isFutureMonth = monthStart > today;
 
       let totalRevenue = 0;
+      let totalCost = 0;
 
-      // Special handling for January 2026
-      if (year === 2026 && monthNum === 1) {
-        totalRevenue = 120000; // Hardcoded January revenue
-      } else {
-        // Get revenue from live projects and secured opportunities
-        const { data: projects } = await supabase
+      if (!isFutureMonth) {
+        if (year === 2026 && monthNum === 1) {
+          totalRevenue = 120000;
+        } else {
+          const { data: projects } = await supabase
             .from("projects")
             .select("id, agreed_fee_value, start_date, end_date, project_monthly_phasing(revenue_amount, year, month)")
             .eq("status", "live")
             .or(`and(start_date.lte.${format(monthEnd, "yyyy-MM-dd")},end_date.gte.${format(monthStart, "yyyy-MM-dd")}),start_date.is.null,end_date.is.null`);
 
-        const { data: opportunities } = await supabase
+          const { data: opportunities } = await supabase
             .from("opportunities")
             .select("id, expected_fee_value, expected_start_date, expected_end_date, opportunity_monthly_phasing(revenue_amount, year, month)")
             .eq("stage", "secured")
             .or(`and(expected_start_date.lte.${format(monthEnd, "yyyy-MM-dd")},expected_end_date.gte.${format(monthStart, "yyyy-MM-dd")}),expected_start_date.is.null,expected_end_date.is.null`);
 
-        // Calculate project revenue
-        projects?.forEach(project => {
+          projects?.forEach(project => {
             const phasing = Array.isArray(project.project_monthly_phasing) ? project.project_monthly_phasing : [];
             const monthPhasing = phasing.find((p: any) => p.year === year && p.month === monthNum);
             
             if (monthPhasing) {
-            totalRevenue += Number(monthPhasing.revenue_amount) || 0;
+              totalRevenue += Number(monthPhasing.revenue_amount) || 0;
             } else if (project.agreed_fee_value && project.start_date && project.end_date) {
-            const start = new Date(project.start_date);
-            const end = new Date(project.end_date);
-            const durationMonths = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30)));
-            totalRevenue += Number(project.agreed_fee_value) / durationMonths;
+              const start = new Date(project.start_date);
+              const end = new Date(project.end_date);
+              const durationMonths = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30)));
+              totalRevenue += Number(project.agreed_fee_value) / durationMonths;
             }
-        });
+          });
 
-        // Calculate opportunity revenue
-        opportunities?.forEach(opp => {
+          opportunities?.forEach(opp => {
             const phasing = Array.isArray(opp.opportunity_monthly_phasing) ? opp.opportunity_monthly_phasing : [];
             const monthPhasing = phasing.find((p: any) => p.year === year && p.month === monthNum);
             
             if (monthPhasing) {
-            totalRevenue += Number(monthPhasing.revenue_amount) || 0;
+              totalRevenue += Number(monthPhasing.revenue_amount) || 0;
             } else if (opp.expected_fee_value && opp.expected_start_date && opp.expected_end_date) {
+              const start = new Date(opp.expected_start_date);
+              const end = new Date(opp.expected_end_date);
+              const durationMonths = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30)));
+              totalRevenue += Number(opp.expected_fee_value) / durationMonths;
+            }
+          });
+        }
+
+        const { data: timesheets } = await supabase
+          .from("timesheets")
+          .select("hours, profiles!inner(default_hourly_cost_rate)")
+          .gte("date", format(monthStart, "yyyy-MM-dd"))
+          .lte("date", format(monthEnd, "yyyy-MM-dd"));
+
+        const { data: subcontractors } = await supabase
+          .from("subcontractor_costs")
+          .select("cost_amount")
+          .gte("cost_date", format(monthStart, "yyyy-MM-dd"))
+          .lte("cost_date", format(monthEnd, "yyyy-MM-dd"));
+
+        const { data: budget } = await supabase
+          .from("monthly_budgets")
+          .select("overhead, total_staff_cost")
+          .eq("year", year)
+          .eq("month", monthNum)
+          .maybeSingle();
+
+        let internalCost = 0;
+        timesheets?.forEach(ts => {
+          const rate = ts.profiles?.default_hourly_cost_rate || 0;
+          internalCost += Number(ts.hours) * Number(rate);
+        });
+
+        const subcontractorCost = subcontractors?.reduce((sum, sc) => sum + Number(sc.cost_amount), 0) || 0;
+        const overhead = Number(budget?.overhead) || 0;
+        const totalStaffCost = Number(budget?.total_staff_cost) || 0;
+        const staffSuspense = Math.max(0, totalStaffCost - internalCost);
+
+        totalCost = internalCost + subcontractorCost + staffSuspense + overhead;
+
+        if (monthEnd < today) {
+          costSamples.push(totalCost);
+        }
+
+        monthlyData.push({
+          month: format(month, "MMM yy"),
+          revenue: totalRevenue,
+          cost: totalCost,
+          margin: totalRevenue - totalCost,
+          isForecast: false
+        });
+      } else {
+        const { data: projects } = await supabase
+          .from("projects")
+          .select("id, agreed_fee_value, start_date, end_date, project_monthly_phasing(revenue_amount, year, month)")
+          .eq("status", "live")
+          .or(`and(start_date.lte.${format(monthEnd, "yyyy-MM-dd")},end_date.gte.${format(monthStart, "yyyy-MM-dd")}),start_date.is.null,end_date.is.null`);
+
+        const { data: opportunities } = await supabase
+          .from("opportunities")
+          .select("id, expected_fee_value, expected_start_date, expected_end_date, opportunity_monthly_phasing(revenue_amount, year, month)")
+          .eq("stage", "secured")
+          .or(`and(expected_start_date.lte.${format(monthEnd, "yyyy-MM-dd")},expected_end_date.gte.${format(monthStart, "yyyy-MM-dd")}),expected_start_date.is.null,expected_end_date.is.null`);
+
+        projects?.forEach(project => {
+          const phasing = Array.isArray(project.project_monthly_phasing) ? project.project_monthly_phasing : [];
+          const monthPhasing = phasing.find((p: any) => p.year === year && p.month === monthNum);
+          
+          if (monthPhasing) {
+            totalRevenue += Number(monthPhasing.revenue_amount) || 0;
+          } else if (project.agreed_fee_value && project.start_date && project.end_date) {
+            const start = new Date(project.start_date);
+            const end = new Date(project.end_date);
+            const durationMonths = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30)));
+            totalRevenue += Number(project.agreed_fee_value) / durationMonths;
+          }
+        });
+
+        opportunities?.forEach(opp => {
+          const phasing = Array.isArray(opp.opportunity_monthly_phasing) ? opp.opportunity_monthly_phasing : [];
+          const monthPhasing = phasing.find((p: any) => p.year === year && p.month === monthNum);
+          
+          if (monthPhasing) {
+            totalRevenue += Number(monthPhasing.revenue_amount) || 0;
+          } else if (opp.expected_fee_value && opp.expected_start_date && opp.expected_end_date) {
             const start = new Date(opp.expected_start_date);
             const end = new Date(opp.expected_end_date);
             const durationMonths = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30)));
             totalRevenue += Number(opp.expected_fee_value) / durationMonths;
-            }
+          }
+        });
+
+        const avgCost = costSamples.length > 0 
+          ? costSamples.slice(-3).reduce((a, b) => a + b, 0) / Math.min(3, costSamples.length)
+          : 0;
+
+        monthlyData.push({
+          month: format(month, "MMM yy"),
+          revenue: 0,
+          cost: 0,
+          margin: 0,
+          revenueForecast: totalRevenue,
+          costForecast: avgCost,
+          marginForecast: totalRevenue - avgCost,
+          isForecast: true
         });
       }
-
-      // Get costs
-      const { data: timesheets } = await supabase
-        .from("timesheets")
-        .select("hours, profiles!inner(default_hourly_cost_rate)")
-        .gte("date", format(monthStart, "yyyy-MM-dd"))
-        .lte("date", format(monthEnd, "yyyy-MM-dd"));
-
-      const { data: subcontractors } = await supabase
-        .from("subcontractor_costs")
-        .select("cost_amount")
-        .gte("cost_date", format(monthStart, "yyyy-MM-dd"))
-        .lte("cost_date", format(monthEnd, "yyyy-MM-dd"));
-
-      const { data: budget } = await supabase
-        .from("monthly_budgets")
-        .select("overhead, total_staff_cost")
-        .eq("year", year)
-        .eq("month", monthNum)
-        .maybeSingle();
-
-      let internalCost = 0;
-      timesheets?.forEach(ts => {
-        const rate = ts.profiles?.default_hourly_cost_rate || 0;
-        internalCost += Number(ts.hours) * Number(rate);
-      });
-
-      const subcontractorCost = subcontractors?.reduce((sum, sc) => sum + Number(sc.cost_amount), 0) || 0;
-      const overhead = Number(budget?.overhead) || 0;
-      const totalStaffCost = Number(budget?.total_staff_cost) || 0;
-      const staffSuspense = Math.max(0, totalStaffCost - internalCost);
-
-      const totalCost = internalCost + subcontractorCost + staffSuspense + overhead;
-
-      monthlyData.push({
-        month: format(month, "MMM yy"),
-        revenue: totalRevenue,
-        cost: totalCost,
-        margin: totalRevenue - totalCost
-      });
     }
 
     setFinancials(monthlyData);
   }
 
   async function fetchConversions() {
-    // Start from January 2026
-    const startMonth = new Date(2026, 0, 1); // January 2026
+    const startMonth = new Date(2026, 0, 1);
     const endMonth = new Date();
-    // Ensure we show at least 12 months or up to current date
     if (endMonth.getTime() < new Date(2026, 11, 31).getTime()) {
-        endMonth.setTime(new Date(2026, 11, 31).getTime());
+      endMonth.setTime(new Date(2026, 11, 31).getTime());
     }
 
     const months = eachMonthOfInterval({
@@ -192,7 +250,6 @@ function AdminDashboardContent() {
       const monthStart = startOfMonth(month);
       const monthEnd = endOfMonth(month);
 
-      // Find projects created in this month that are linked to opportunities
       const { data: projects } = await supabase
         .from("projects")
         .select("id, agreed_fee_value, opportunity_id, opportunities!projects_opportunity_id_fkey!inner(stage)")
@@ -214,10 +271,8 @@ function AdminDashboardContent() {
   }
 
   async function fetchTeamStats() {
-    // Start from Jan 1, 2026
     const startDate = "2026-01-01";
 
-    // Get projects created since Jan 2026 with their opportunities
     const { data: projects } = await supabase
       .from("projects")
       .select(`
@@ -229,7 +284,6 @@ function AdminDashboardContent() {
       .gte("created_at", startDate)
       .not("opportunity_id", "is", null);
 
-    // Group by user
     const userMap = new Map<string, TeamMemberStats>();
 
     projects?.forEach(project => {
@@ -252,7 +306,6 @@ function AdminDashboardContent() {
       stats.totalValue += Number(project.agreed_fee_value) || 0;
     });
 
-    // Get projects without opportunities (anonymous)
     const { data: orphanProjects } = await supabase
       .from("projects")
       .select("id, agreed_fee_value")
@@ -322,11 +375,12 @@ function AdminDashboardContent() {
         </div>
 
         <div className="space-y-6">
-          {/* Financial Trends */}
           <Card>
             <CardHeader>
-              <CardTitle>Financial Trends (Last 12 Months)</CardTitle>
-              <CardDescription>Revenue, costs, and margin over time</CardDescription>
+              <CardTitle>Financial Trends (2026 Full Year)</CardTitle>
+              <CardDescription>
+                Actuals (solid lines) and forecast (dashed lines) based on secured work only
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={400}>
@@ -345,28 +399,57 @@ function AdminDashboardContent() {
                     dataKey="revenue"
                     stroke="#10b981"
                     strokeWidth={2}
-                    name="Revenue"
+                    name="Revenue (Actual)"
+                    connectNulls
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="revenueForecast"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                    name="Revenue (Forecast)"
+                    connectNulls
                   />
                   <Line
                     type="monotone"
                     dataKey="cost"
                     stroke="#ef4444"
                     strokeWidth={2}
-                    name="Cost"
+                    name="Cost (Actual)"
+                    connectNulls
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="costForecast"
+                    stroke="#ef4444"
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                    name="Cost (Forecast)"
+                    connectNulls
                   />
                   <Line
                     type="monotone"
                     dataKey="margin"
                     stroke="#3b82f6"
                     strokeWidth={2}
-                    name="Margin"
+                    name="Margin (Actual)"
+                    connectNulls
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="marginForecast"
+                    stroke="#3b82f6"
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                    name="Margin (Forecast)"
+                    connectNulls
                   />
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
 
-          {/* Opportunity Conversions */}
           <Card>
             <CardHeader>
               <CardTitle>Opportunities Converted to Projects</CardTitle>
@@ -411,7 +494,6 @@ function AdminDashboardContent() {
             </CardContent>
           </Card>
 
-          {/* Team Performance */}
           <Card>
             <CardHeader>
               <CardTitle>Work Secured by Team Member</CardTitle>
