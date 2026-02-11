@@ -428,8 +428,9 @@ function PipelineMonthlyContent() {
       const currentStart = new Date(project.start_date);
       const currentEnd = new Date(project.end_date);
       
-      const newStart = new Date(currentStart.setMonth(currentStart.getMonth() + monthDiff));
-      const newEnd = new Date(currentEnd.setMonth(currentEnd.getMonth() + monthDiff));
+      // Create new dates without mutating the original - use proper date constructor
+      const newStart = new Date(currentStart.getFullYear(), currentStart.getMonth() + monthDiff, currentStart.getDate());
+      const newEnd = new Date(currentEnd.getFullYear(), currentEnd.getMonth() + monthDiff, currentEnd.getDate());
 
       if (project.type === "opportunity") {
         const { error: updateError } = await supabase
