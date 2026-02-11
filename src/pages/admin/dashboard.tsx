@@ -185,7 +185,7 @@ function AdminDashboardContent() {
       // Find projects created in this month that are linked to opportunities
       const { data: projects } = await supabase
         .from("projects")
-        .select("id, agreed_fee_value, opportunity_id, opportunities!inner(stage)")
+        .select("id, agreed_fee_value, opportunity_id, opportunities!projects_opportunity_id_fkey!inner(stage)")
         .gte("created_at", monthStart.toISOString())
         .lte("created_at", monthEnd.toISOString())
         .not("opportunity_id", "is", null);
@@ -216,7 +216,7 @@ function AdminDashboardContent() {
         id,
         agreed_fee_value,
         opportunity_id,
-        opportunities!projects_opportunity_id_fkey(added_by_user_id, profiles!inner(full_name))
+        opportunities!projects_opportunity_id_fkey(added_by_user_id, profiles!opportunities_added_by_user_id_fkey(full_name))
       `)
       .gte("created_at", monthStart.toISOString())
       .lte("created_at", monthEnd.toISOString())
