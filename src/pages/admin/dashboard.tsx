@@ -8,7 +8,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, TrendingUp, DollarSign, Percent } from "lucide-react";
 import Link from "next/link";
 
 interface MonthlyFinancials {
@@ -16,10 +16,13 @@ interface MonthlyFinancials {
   revenue: number;
   cost: number;
   margin: number;
-  revenueForecast?: number;
-  costForecast?: number;
-  marginForecast?: number;
-  isForecast?: boolean;
+}
+
+interface YearEndForecast {
+  totalRevenue: number;
+  totalCost: number;
+  totalMargin: number;
+  marginPercent: number;
 }
 
 interface ConversionData {
@@ -37,6 +40,7 @@ interface TeamMemberStats {
 
 function AdminDashboardContent() {
   const [financials, setFinancials] = useState<MonthlyFinancials[]>([]);
+  const [yearEndForecast, setYearEndForecast] = useState<YearEndForecast | null>(null);
   const [conversions, setConversions] = useState<ConversionData[]>([]);
   const [teamStats, setTeamStats] = useState<TeamMemberStats[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,6 +75,9 @@ function AdminDashboardContent() {
 
     const monthlyData: MonthlyFinancials[] = [];
     const today = new Date();
+    let yearToDateRevenue = 0;
+    let yearToDateCost = 0;
+    let futureRevenue = 0;
     const costSamples: number[] = [];
 
     for (const month of months) {
@@ -78,99 +85,13 @@ function AdminDashboardContent() {
       const monthNum = month.getMonth() + 1;
       const monthStart = startOfMonth(month);
       const monthEnd = endOfMonth(month);
-      const isFutureMonth = monthStart > today;
+      const isPastMonth = monthEnd < today;
 
       let totalRevenue = 0;
       let totalCost = 0;
 
-      if (!isFutureMonth) {
-        if (year === 2026 && monthNum === 1) {
-          totalRevenue = 120000;
-        } else {
-          const { data: projects } = await supabase
-            .from("projects")
-            .select("id, agreed_fee_value, start_date, end_date, project_monthly_phasing(revenue_amount, year, month)")
-            .eq("status", "live")
-            .or(`and(start_date.lte.${format(monthEnd, "yyyy-MM-dd")},end_date.gte.${format(monthStart, "yyyy-MM-dd")}),start_date.is.null,end_date.is.null`);
-
-          const { data: opportunities } = await supabase
-            .from("opportunities")
-            .select("id, expected_fee_value, expected_start_date, expected_end_date, opportunity_monthly_phasing(revenue_amount, year, month)")
-            .eq("stage", "secured")
-            .or(`and(expected_start_date.lte.${format(monthEnd, "yyyy-MM-dd")},expected_end_date.gte.${format(monthStart, "yyyy-MM-dd")}),expected_start_date.is.null,expected_end_date.is.null`);
-
-          projects?.forEach(project => {
-            const phasing = Array.isArray(project.project_monthly_phasing) ? project.project_monthly_phasing : [];
-            const monthPhasing = phasing.find((p: any) => p.year === year && p.month === monthNum);
-            
-            if (monthPhasing) {
-              totalRevenue += Number(monthPhasing.revenue_amount) || 0;
-            } else if (project.agreed_fee_value && project.start_date && project.end_date) {
-              const start = new Date(project.start_date);
-              const end = new Date(project.end_date);
-              const durationMonths = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30)));
-              totalRevenue += Number(project.agreed_fee_value) / durationMonths;
-            }
-          });
-
-          opportunities?.forEach(opp => {
-            const phasing = Array.isArray(opp.opportunity_monthly_phasing) ? opp.opportunity_monthly_phasing : [];
-            const monthPhasing = phasing.find((p: any) => p.year === year && p.month === monthNum);
-            
-            if (monthPhasing) {
-              totalRevenue += Number(monthPhasing.revenue_amount) || 0;
-            } else if (opp.expected_fee_value && opp.expected_start_date && opp.expected_end_date) {
-              const start = new Date(opp.expected_start_date);
-              const end = new Date(opp.expected_end_date);
-              const durationMonths = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30)));
-              totalRevenue += Number(opp.expected_fee_value) / durationMonths;
-            }
-          });
-        }
-
-        const { data: timesheets } = await supabase
-          .from("timesheets")
-          .select("hours, profiles!inner(default_hourly_cost_rate)")
-          .gte("date", format(monthStart, "yyyy-MM-dd"))
-          .lte("date", format(monthEnd, "yyyy-MM-dd"));
-
-        const { data: subcontractors } = await supabase
-          .from("subcontractor_costs")
-          .select("cost_amount")
-          .gte("cost_date", format(monthStart, "yyyy-MM-dd"))
-          .lte("cost_date", format(monthEnd, "yyyy-MM-dd"));
-
-        const { data: budget } = await supabase
-          .from("monthly_budgets")
-          .select("overhead, total_staff_cost")
-          .eq("year", year)
-          .eq("month", monthNum)
-          .maybeSingle();
-
-        let internalCost = 0;
-        timesheets?.forEach(ts => {
-          const rate = ts.profiles?.default_hourly_cost_rate || 0;
-          internalCost += Number(ts.hours) * Number(rate);
-        });
-
-        const subcontractorCost = subcontractors?.reduce((sum, sc) => sum + Number(sc.cost_amount), 0) || 0;
-        const overhead = Number(budget?.overhead) || 0;
-        const totalStaffCost = Number(budget?.total_staff_cost) || 0;
-        const staffSuspense = Math.max(0, totalStaffCost - internalCost);
-
-        totalCost = internalCost + subcontractorCost + staffSuspense + overhead;
-
-        if (monthEnd < today) {
-          costSamples.push(totalCost);
-        }
-
-        monthlyData.push({
-          month: format(month, "MMM yy"),
-          revenue: totalRevenue,
-          cost: totalCost,
-          margin: totalRevenue - totalCost,
-          isForecast: false
-        });
+      if (year === 2026 && monthNum === 1) {
+        totalRevenue = 120000;
       } else {
         const { data: projects } = await supabase
           .from("projects")
@@ -211,23 +132,83 @@ function AdminDashboardContent() {
             totalRevenue += Number(opp.expected_fee_value) / durationMonths;
           }
         });
+      }
 
-        const avgCost = costSamples.length > 0 
-          ? costSamples.slice(-3).reduce((a, b) => a + b, 0) / Math.min(3, costSamples.length)
-          : 0;
+      if (isPastMonth) {
+        const { data: timesheets } = await supabase
+          .from("timesheets")
+          .select("hours, profiles!inner(default_hourly_cost_rate)")
+          .gte("date", format(monthStart, "yyyy-MM-dd"))
+          .lte("date", format(monthEnd, "yyyy-MM-dd"));
 
+        const { data: subcontractors } = await supabase
+          .from("subcontractor_costs")
+          .select("cost_amount")
+          .gte("cost_date", format(monthStart, "yyyy-MM-dd"))
+          .lte("cost_date", format(monthEnd, "yyyy-MM-dd"));
+
+        const { data: budget } = await supabase
+          .from("monthly_budgets")
+          .select("overhead, total_staff_cost")
+          .eq("year", year)
+          .eq("month", monthNum)
+          .maybeSingle();
+
+        let internalCost = 0;
+        timesheets?.forEach(ts => {
+          const rate = ts.profiles?.default_hourly_cost_rate || 0;
+          internalCost += Number(ts.hours) * Number(rate);
+        });
+
+        const subcontractorCost = subcontractors?.reduce((sum, sc) => sum + Number(sc.cost_amount), 0) || 0;
+        const overhead = Number(budget?.overhead) || 0;
+        const totalStaffCost = Number(budget?.total_staff_cost) || 0;
+        const staffSuspense = Math.max(0, totalStaffCost - internalCost);
+
+        totalCost = internalCost + subcontractorCost + staffSuspense + overhead;
+        costSamples.push(totalCost);
+
+        yearToDateRevenue += totalRevenue;
+        yearToDateCost += totalCost;
+
+        monthlyData.push({
+          month: format(month, "MMM yy"),
+          revenue: totalRevenue,
+          cost: totalCost,
+          margin: totalRevenue - totalCost
+        });
+      } else {
+        futureRevenue += totalRevenue;
         monthlyData.push({
           month: format(month, "MMM yy"),
           revenue: 0,
           cost: 0,
-          margin: 0,
-          revenueForecast: totalRevenue,
-          costForecast: avgCost,
-          marginForecast: totalRevenue - avgCost,
-          isForecast: true
+          margin: 0
         });
       }
     }
+
+    // Calculate year-end forecast
+    const avgMonthlyCost = costSamples.length > 0
+      ? costSamples.reduce((a, b) => a + b, 0) / costSamples.length
+      : 0;
+
+    const remainingMonths = 12 - costSamples.length;
+    const projectedFutureCost = avgMonthlyCost * remainingMonths;
+
+    const forecastTotalRevenue = yearToDateRevenue + futureRevenue;
+    const forecastTotalCost = yearToDateCost + projectedFutureCost;
+    const forecastMargin = forecastTotalRevenue - forecastTotalCost;
+    const forecastMarginPercent = forecastTotalRevenue > 0 
+      ? (forecastMargin / forecastTotalRevenue) * 100 
+      : 0;
+
+    setYearEndForecast({
+      totalRevenue: forecastTotalRevenue,
+      totalCost: forecastTotalCost,
+      totalMargin: forecastMargin,
+      marginPercent: forecastMarginPercent
+    });
 
     setFinancials(monthlyData);
   }
@@ -377,10 +358,8 @@ function AdminDashboardContent() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Financial Trends (2026 Full Year)</CardTitle>
-              <CardDescription>
-                Actuals (solid lines) and forecast (dashed lines) based on secured work only
-              </CardDescription>
+              <CardTitle>Financial Trends (Last 12 Months)</CardTitle>
+              <CardDescription>Revenue, costs, and margin over time</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={400}>
@@ -399,54 +378,96 @@ function AdminDashboardContent() {
                     dataKey="revenue"
                     stroke="#10b981"
                     strokeWidth={2}
-                    name="Revenue (Actual)"
-                    connectNulls
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="revenueForecast"
-                    stroke="#10b981"
-                    strokeWidth={2}
-                    strokeDasharray="5 5"
-                    name="Revenue (Forecast)"
-                    connectNulls
+                    name="Revenue"
                   />
                   <Line
                     type="monotone"
                     dataKey="cost"
                     stroke="#ef4444"
                     strokeWidth={2}
-                    name="Cost (Actual)"
-                    connectNulls
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="costForecast"
-                    stroke="#ef4444"
-                    strokeWidth={2}
-                    strokeDasharray="5 5"
-                    name="Cost (Forecast)"
-                    connectNulls
+                    name="Cost"
                   />
                   <Line
                     type="monotone"
                     dataKey="margin"
                     stroke="#3b82f6"
                     strokeWidth={2}
-                    name="Margin (Actual)"
-                    connectNulls
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="marginForecast"
-                    stroke="#3b82f6"
-                    strokeWidth={2}
-                    strokeDasharray="5 5"
-                    name="Margin (Forecast)"
-                    connectNulls
+                    name="Margin"
                   />
                 </LineChart>
               </ResponsiveContainer>
+
+              {yearEndForecast && (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4 text-green-600" />
+                        Year-End Revenue
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-green-600">
+                        {formatCurrency(yearEndForecast.totalRevenue)}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Secured work only
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <DollarSign className="h-4 w-4 text-red-600" />
+                        Year-End Costs
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-red-600">
+                        {formatCurrency(yearEndForecast.totalCost)}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Current rate projected
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4 text-blue-600" />
+                        Year-End Margin
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className={`text-2xl font-bold ${yearEndForecast.totalMargin >= 0 ? "text-blue-600" : "text-red-600"}`}>
+                        {formatCurrency(yearEndForecast.totalMargin)}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Revenue - Costs
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <Percent className="h-4 w-4 text-purple-600" />
+                        Margin %
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className={`text-2xl font-bold ${yearEndForecast.marginPercent >= 0 ? "text-purple-600" : "text-red-600"}`}>
+                        {yearEndForecast.marginPercent.toFixed(1)}%
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Profit margin
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
             </CardContent>
           </Card>
 
