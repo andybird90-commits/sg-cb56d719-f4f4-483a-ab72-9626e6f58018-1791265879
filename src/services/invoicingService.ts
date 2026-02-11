@@ -57,8 +57,19 @@ export const invoicingService = {
     const { data: session } = await supabase.auth.getSession();
     if (!session.session) throw new Error("Not authenticated");
 
-    // Fetch all live projects
-    // Using correct lowercase status 'live' based on database constraint
+    // First, get the invoice month to know which year/month we're populating for
+    const { data: invoiceMonth, error: monthError } = await supabase
+      .from("invoice_months")
+      .select("year, month")
+      .eq("id", invoiceMonthId)
+      .single();
+
+    if (monthError) {
+      console.error("Error fetching invoice month:", monthError);
+      throw monthError;
+    }
+
+    // Fetch all live projects with their monthly phasing for this specific month
     const { data: projects, error: projectsError } = await supabase
       .from("projects")
       .select(`
@@ -67,9 +78,14 @@ export const invoicingService = {
         status,
         companies!projects_client_company_id_fkey (
           name
+        ),
+        project_monthly_phasing!inner (
+          revenue_amount
         )
       `)
-      .in("status", ["live", "Live"]); // Handle both cases to be safe
+      .in("status", ["live", "Live"])
+      .eq("project_monthly_phasing.year", invoiceMonth.year)
+      .eq("project_monthly_phasing.month", invoiceMonth.month);
 
     if (projectsError) {
       console.error("Error fetching projects:", projectsError);
@@ -77,23 +93,29 @@ export const invoicingService = {
     }
 
     if (!projects || projects.length === 0) {
-      console.log("No live projects found");
+      console.log("No live projects found with phasing for this month");
       return;
     }
 
-    // Create invoice items for each project
-    const invoiceItems: InvoiceItemInsert[] = projects.map((project) => ({
-      invoice_month_id: invoiceMonthId,
-      project_id: project.id,
-      project_name: project.name,
-      client_name: Array.isArray(project.companies) 
-        ? project.companies[0]?.name || "Unknown Client"
-        : (project.companies as any)?.name || "Unknown Client",
-      invoice_value: null,
-      description: "",
-      excluded_this_month: false,
-      created_by: session.session.user.id,
-    }));
+    // Create invoice items for each project with the phased revenue amount
+    const invoiceItems: InvoiceItemInsert[] = projects.map((project) => {
+      const phasingData = Array.isArray(project.project_monthly_phasing)
+        ? project.project_monthly_phasing[0]
+        : project.project_monthly_phasing;
+      
+      return {
+        invoice_month_id: invoiceMonthId,
+        project_id: project.id,
+        project_name: project.name,
+        client_name: Array.isArray(project.companies) 
+          ? project.companies[0]?.name || "Unknown Client"
+          : (project.companies as any)?.name || "Unknown Client",
+        invoice_value: phasingData?.revenue_amount || 0,
+        description: "",
+        excluded_this_month: false,
+        created_by: session.session.user.id,
+      };
+    });
 
     const { error: insertError } = await supabase
       .from("invoice_items")
