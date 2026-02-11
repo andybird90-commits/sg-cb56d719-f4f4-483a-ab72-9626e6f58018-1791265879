@@ -343,27 +343,93 @@ export default function InvoicingPage() {
     }
   };
 
-  const handleSyncProjects = async () => {
-    if (!invoiceMonth) return;
-
+  async function handleSyncProjects() {
     try {
-      await invoicingService.populateInvoiceItems(invoiceMonth.id);
-      
-      toast({
-        title: "Success",
-        description: "Invoice items synced from live projects.",
+      setSyncing(true);
+
+      // Fetch current month projects with their existing descriptions
+      const { data: existingInvoices } = await supabase
+        .from("monthly_invoices")
+        .select("project_id, invoicing_description")
+        .eq("year", selectedYear)
+        .eq("month", selectedMonth);
+
+      // Create a map of existing descriptions
+      const descriptionMap = new Map<string, string>();
+      existingInvoices?.forEach(inv => {
+        if (inv.invoicing_description) {
+          descriptionMap.set(inv.project_id, inv.invoicing_description);
+        }
       });
 
-      loadInvoiceData();
-    } catch (error) {
-      console.error("Error syncing projects:", error);
-      toast({
-        title: "Error",
-        description: "Failed to sync projects.",
-        variant: "destructive",
+      const { data: projects, error: projectsError } = await supabase
+        .from("projects")
+        .select(`
+          id,
+          code,
+          name,
+          agreed_fee_value,
+          start_date,
+          end_date,
+          companies!projects_client_company_id_fkey (
+            name
+          )
+        `)
+        .eq("status", "live")
+        .eq("archived", false);
+
+      if (projectsError) throw projectsError;
+
+      const startOfMonth = new Date(selectedYear, selectedMonth - 1, 1);
+      const endOfMonth = new Date(selectedYear, selectedMonth, 0);
+
+      const activeProjects = (projects || []).filter(p => {
+        if (!p.start_date || !p.end_date) return false;
+        const start = new Date(p.start_date);
+        const end = new Date(p.end_date);
+        return !(end < startOfMonth || start > endOfMonth);
       });
+
+      const updatedProjects = activeProjects.map(p => {
+        const { data: phasingData } = await supabase
+          .from("project_monthly_phasing")
+          .select("revenue_amount")
+          .eq("project_id", p.id)
+          .eq("year", selectedYear)
+          .eq("month", selectedMonth)
+          .maybeSingle();
+
+        let monthlyRevenue = 0;
+        if (phasingData?.revenue_amount) {
+          monthlyRevenue = phasingData.revenue_amount;
+        } else if (p.start_date && p.end_date) {
+          const start = new Date(p.start_date);
+          const end = new Date(p.end_date);
+          const durationMonths = Math.max(1,
+            (end.getFullYear() - start.getFullYear()) * 12 +
+            (end.getMonth() - start.getMonth()) + 1
+          );
+          monthlyRevenue = (p.agreed_fee_value || 0) / durationMonths;
+        }
+
+        return {
+          project_id: p.id,
+          project_code: p.code || "—",
+          project_name: p.name,
+          client_name: p.companies?.name || "—",
+          revenue: monthlyRevenue,
+          invoicing_description: descriptionMap.get(p.id) || "", // Preserve existing description
+        };
+      });
+
+      setMonthProjects(updatedProjects);
+      await fetchInvoicingData(); // Refresh to get any new data
+    } catch (err) {
+      console.error("Failed to sync projects", err);
+    } finally {
+      setSyncing(false);
     }
-  };
+  }
 
   const includedItems = invoiceItems.filter(
     (item) => !item.excluded_this_month && item.invoice_value !== null
