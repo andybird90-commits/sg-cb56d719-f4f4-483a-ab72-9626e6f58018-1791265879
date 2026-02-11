@@ -157,16 +157,12 @@ export default function InvoicingPage() {
       setEditingItems((prev) => new Set(prev).add(itemId));
 
       const updates: any = {};
-      if (field === "invoice_value") {
-        updates.invoice_value = value === "" || value === null ? null : Number(value);
-      } else if (field === "description") {
+      if (field === "description") {
         updates.description = value as string;
       } else if (field === "excluded_this_month") {
         updates.excluded_this_month = value as boolean;
-        if (value === true) {
-          updates.invoice_value = null;
-        }
       }
+      // Note: invoice_value is now read-only from phasing data and cannot be edited here
 
       await invoicingService.updateInvoiceItem(itemId, updates);
 
@@ -455,7 +451,7 @@ export default function InvoicingPage() {
                             Client
                           </th>
                           <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                            Invoice Value (£)
+                            Invoice Value (from Monthly Phasing)
                           </th>
                           <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
                             Description
@@ -487,25 +483,16 @@ export default function InvoicingPage() {
                             </td>
                             <td className="px-4 py-3 text-sm">{item.client_name}</td>
                             <td className="px-4 py-3">
-                              {canEdit && !isLocked && !item.excluded_this_month ? (
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  value={item.invoice_value || ""}
-                                  onChange={(e) =>
-                                    handleUpdateItem(item.id, "invoice_value", e.target.value)
-                                  }
-                                  className="w-32"
-                                  placeholder="0.00"
-                                />
-                              ) : (
-                                <span className="text-sm">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium">
                                   {item.invoice_value
                                     ? `£${item.invoice_value.toFixed(2)}`
                                     : "—"}
                                 </span>
-                              )}
+                                <span className="text-xs text-muted-foreground italic">
+                                  (from phasing)
+                                </span>
+                              </div>
                             </td>
                             <td className="px-4 py-3">
                               {canEdit && !isLocked && !item.excluded_this_month ? (
