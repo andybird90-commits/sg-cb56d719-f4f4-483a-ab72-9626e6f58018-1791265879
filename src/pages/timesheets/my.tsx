@@ -185,6 +185,29 @@ function MyTimesheetsContent() {
     if (!user) return;
 
     try {
+      // Validate daily hour limit (9 hours max per day)
+      const selectedDate = formData.date;
+      const newHours = parseFloat(formData.hours);
+      
+      // Get existing timesheets for this date (excluding the one being edited if applicable)
+      const existingTimesheetsForDate = timesheets.filter(
+        (t) => t.date === selectedDate && t.id !== editingTimesheet?.id
+      );
+      
+      const currentTotalHours = existingTimesheetsForDate.reduce(
+        (sum, t) => sum + t.hours, 
+        0
+      );
+      
+      const newTotalHours = currentTotalHours + newHours;
+      
+      if (newTotalHours > 9) {
+        alert(
+          `Cannot exceed 9 hours per day. Current total for ${new Date(selectedDate).toLocaleDateString("en-GB")}: ${currentTotalHours}h. Adding ${newHours}h would total ${newTotalHours}h.`
+        );
+        return;
+      }
+
       if (editingTimesheet) {
         const { error } = await supabase
           .from("timesheets")
