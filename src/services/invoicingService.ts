@@ -142,23 +142,50 @@ export const invoicingService = {
 
     console.log(`📈 Found ${phasingData?.length || 0} projects with manual phasing for this month`);
 
-    // Create a map of project_id -> revenue_amount for quick lookup
+    // CRITICAL: Also fetch ALL projects that have ANY manual phasing (to determine strategy)
+    const { data: allPhasingData, error: allPhasingError } = await supabase
+      .from("project_monthly_phasing")
+      .select("project_id")
+      .in("project_id", projectIds)
+      .not("revenue_amount", "is", null);
+
+    if (allPhasingError) {
+      console.error("Error fetching all phasing data:", allPhasingError);
+      throw allPhasingError;
+    }
+
+    // Create sets for quick lookup
     const phasingMap = new Map<string, number>();
     phasingData?.forEach(pd => {
       phasingMap.set(pd.project_id, pd.revenue_amount || 0);
     });
 
+    const projectsWithManualPhasing = new Set<string>();
+    allPhasingData?.forEach(pd => {
+      projectsWithManualPhasing.add(pd.project_id);
+    });
+
+    console.log(`🎯 ${projectsWithManualPhasing.size} projects have manual phasing (may or may not include this month)`);
+
     // Create invoice items for each project
     const invoiceItems: InvoiceItemInsert[] = projects.map((project) => {
       let invoiceValue = 0;
 
-      // Check if manual phasing exists for this project/month
+      // CRITICAL LOGIC FIX:
+      // 1. If project has manual phasing for THIS specific month → use it
+      // 2. If project has manual phasing for OTHER months but NOT this month → use £0
+      // 3. If project has NO manual phasing at all → auto-calculate fallback
+      
       if (phasingMap.has(project.id)) {
-        // Use manual phasing value
+        // Case 1: Manual phasing exists for this specific month
         invoiceValue = phasingMap.get(project.id)!;
         console.log(`  ✓ ${project.name}: £${invoiceValue} (from phasing)`);
+      } else if (projectsWithManualPhasing.has(project.id)) {
+        // Case 2: Project has manual phasing, but NOT for this month → use £0
+        invoiceValue = 0;
+        console.log(`  ○ ${project.name}: £0 (has phasing, but not for this month)`);
       } else {
-        // Calculate fallback: total fee ÷ duration in months
+        // Case 3: No manual phasing at all → calculate fallback
         if (project.agreed_fee_value && project.start_date && project.end_date) {
           const start = new Date(project.start_date);
           const end = new Date(project.end_date);
