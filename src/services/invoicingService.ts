@@ -1,419 +1,257 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import "jspdf-autotable";
 
-type InvoiceMonth = Database["public"]["Tables"]["invoice_months"]["Row"];
-type InvoiceItem = Database["public"]["Tables"]["invoice_items"]["Row"];
-type InvoiceMonthInsert = Database["public"]["Tables"]["invoice_months"]["Insert"];
-type InvoiceItemInsert = Database["public"]["Tables"]["invoice_items"]["Insert"];
+type Tables<T extends keyof Database["public"]["Tables"]> =
+  Database["public"]["Tables"][T]["Row"];
+type InvoiceMonth = Tables<"invoice_months">;
+type InvoiceItem = Tables<"invoice_items">;
 
 export const invoicingService = {
-  // Get or create invoice month for a given year/month
-  async getOrCreateInvoiceMonth(year: number, month: number): Promise<InvoiceMonth | null> {
-    const { data, error } = await supabase
+  async getOrCreateInvoiceMonth(
+    year: number,
+    month: number
+  ): Promise<InvoiceMonth | null> {
+    const { data: existing } = await supabase
       .from("invoice_months")
       .select("*")
       .eq("year", year)
       .eq("month", month)
       .maybeSingle();
 
-    if (error) {
-      console.error("Error fetching invoice month:", error);
-      throw error;
-    }
-
-    return data;
+    if (existing) return existing;
+    return null;
   },
 
-  // Create a new invoice month
-  async createInvoiceMonth(year: number, month: number): Promise<InvoiceMonth> {
-    const { data: session } = await supabase.auth.getSession();
-    if (!session.session) throw new Error("Not authenticated");
-
-    const { data, error } = await supabase
+  async createInvoiceMonth(
+    year: number,
+    month: number
+  ): Promise<InvoiceMonth> {
+    const { data: newMonth, error: createError } = await supabase
       .from("invoice_months")
-      .insert({
-        year,
-        month,
-        status: "open",
-      })
+      .insert({ year, month, status: "open" })
       .select()
       .single();
 
-    if (error) {
-      console.error("Error creating invoice month:", error);
-      throw error;
-    }
+    if (createError) throw createError;
 
-    // Auto-populate invoice items for all live projects
-    await this.populateInvoiceItems(data.id);
+    await this.populateInvoiceItems(newMonth.id, year, month);
 
-    return data;
+    return newMonth;
   },
 
-  // Populate invoice items for all live projects
-  async populateInvoiceItems(invoiceMonthId: string): Promise<void> {
-    const { data: session } = await supabase.auth.getSession();
-    if (!session.session) throw new Error("Not authenticated");
+  async populateInvoiceItems(
+    invoiceMonthId: string,
+    year: number,
+    month: number
+  ): Promise<void> {
+    const startOfMonth = new Date(year, month - 1, 1);
+    const endOfMonth = new Date(year, month, 0);
 
-    console.log("🗑️ Starting populateInvoiceItems for month:", invoiceMonthId);
-
-    // First, delete any existing invoice items for this month to prevent duplicates
-    console.log("Deleting existing invoice items...");
-    const { data: deletedData, error: deleteError } = await supabase
-      .from("invoice_items")
-      .delete()
-      .eq("invoice_month_id", invoiceMonthId)
-      .select();
-
-    if (deleteError) {
-      console.error("❌ Error deleting existing invoice items:", deleteError);
-      throw deleteError;
-    }
-    
-    console.log(`✅ Deleted ${deletedData?.length || 0} existing invoice items`);
-
-    // Get the invoice month to know which year/month we're populating for
-    const { data: invoiceMonth, error: monthError } = await supabase
-      .from("invoice_months")
-      .select("year, month")
-      .eq("id", invoiceMonthId)
-      .single();
-
-    if (monthError) {
-      console.error("Error fetching invoice month:", monthError);
-      throw monthError;
-    }
-
-    console.log(`📅 Populating for ${invoiceMonth.month}/${invoiceMonth.year}`);
-
-    // Calculate the date range for this invoice month
-    const monthStart = new Date(invoiceMonth.year, invoiceMonth.month - 1, 1);
-    const monthEnd = new Date(invoiceMonth.year, invoiceMonth.month, 0);
-    monthEnd.setHours(23, 59, 59, 999);
-
-    // Fetch ONLY live projects that are active during this invoice month
     const { data: projects, error: projectsError } = await supabase
       .from("projects")
       .select(`
         id,
         code,
-        project_reference,
         name,
-        status,
         agreed_fee_value,
-        po_number,
         start_date,
         end_date,
+        po_number,
         companies!projects_client_company_id_fkey (
           name
         )
       `)
-      .eq("archived", false)
-      .gte("end_date", monthStart.toISOString().split("T")[0])
-      .lte("start_date", monthEnd.toISOString().split("T")[0]);
+      .eq("archived", false);
 
-    if (projectsError) {
-      console.error("Error fetching projects:", projectsError);
-      throw projectsError;
-    }
+    if (projectsError) throw projectsError;
 
-    if (!projects || projects.length === 0) {
-      console.log("No live projects found");
-      return;
-    }
+    const activeProjects = (projects || []).filter((p) => {
+      if (!p.start_date || !p.end_date) return false;
+      const start = new Date(p.start_date);
+      const end = new Date(p.end_date);
+      return start <= endOfMonth && end >= startOfMonth;
+    });
 
-    console.log(`📊 Found ${projects.length} live projects`);
-
-    // Fetch ALL monthly phasing data for these projects for this specific month
-    const projectIds = projects.map(p => p.id);
     const { data: phasingData, error: phasingError } = await supabase
       .from("project_monthly_phasing")
       .select("project_id, revenue_amount")
-      .in("project_id", projectIds)
-      .eq("year", invoiceMonth.year)
-      .eq("month", invoiceMonth.month);
+      .eq("year", year)
+      .eq("month", month);
 
-    if (phasingError) {
-      console.error("Error fetching phasing data:", phasingError);
-      throw phasingError;
-    }
+    if (phasingError) throw phasingError;
 
-    console.log(`📈 Found ${phasingData?.length || 0} projects with manual phasing for this month`);
-
-    // CRITICAL: Also fetch ALL projects that have ANY manual phasing (to determine strategy)
-    const { data: allPhasingData, error: allPhasingError } = await supabase
-      .from("project_monthly_phasing")
-      .select("project_id")
-      .in("project_id", projectIds)
-      .not("revenue_amount", "is", null);
-
-    if (allPhasingError) {
-      console.error("Error fetching all phasing data:", allPhasingError);
-      throw allPhasingError;
-    }
-
-    // Create sets for quick lookup
     const phasingMap = new Map<string, number>();
-    phasingData?.forEach(pd => {
-      phasingMap.set(pd.project_id, pd.revenue_amount || 0);
+    phasingData?.forEach((p) => {
+      phasingMap.set(p.project_id, p.revenue_amount || 0);
     });
 
-    const projectsWithManualPhasing = new Set<string>();
-    allPhasingData?.forEach(pd => {
-      projectsWithManualPhasing.add(pd.project_id);
-    });
-
-    console.log(`🎯 ${projectsWithManualPhasing.size} projects have manual phasing (may or may not include this month)`);
-
-    // Create invoice items for each project
-    const invoiceItems: InvoiceItemInsert[] = projects.map((project) => {
+    const itemsToInsert = activeProjects.map((project) => {
       let invoiceValue = 0;
 
-      // CRITICAL LOGIC FIX:
-      // 1. If project has manual phasing for THIS specific month → use it
-      // 2. If project has manual phasing for OTHER months but NOT this month → use £0
-      // 3. If project has NO manual phasing at all → auto-calculate fallback
-      
       if (phasingMap.has(project.id)) {
-        // Case 1: Manual phasing exists for this specific month
         invoiceValue = phasingMap.get(project.id)!;
-        console.log(`  ✓ ${project.name}: £${invoiceValue} (from phasing)`);
-      } else if (projectsWithManualPhasing.has(project.id)) {
-        // Case 2: Project has manual phasing, but NOT for this month → use £0
-        invoiceValue = 0;
-        console.log(`  ○ ${project.name}: £0 (has phasing, but not for this month)`);
       } else {
-        // Case 3: No manual phasing at all → calculate fallback
         if (project.agreed_fee_value && project.start_date && project.end_date) {
           const start = new Date(project.start_date);
           const end = new Date(project.end_date);
           const durationMonths = Math.max(
             1,
-            (end.getFullYear() - start.getFullYear()) * 12 + 
-            (end.getMonth() - start.getMonth()) + 1
+            (end.getFullYear() - start.getFullYear()) * 12 +
+              (end.getMonth() - start.getMonth()) +
+              1
           );
-          invoiceValue = project.agreed_fee_value / durationMonths;
-          console.log(`  ↻ ${project.name}: £${invoiceValue} (calculated fallback)`);
-        } else {
-          console.log(`  ⚠️ ${project.name}: No value (missing fee/dates)`);
+          invoiceValue = Number(project.agreed_fee_value) / durationMonths;
         }
       }
-      
+
+      const clientName =
+        project.companies?.name || "Unknown Client";
+
       return {
         invoice_month_id: invoiceMonthId,
         project_id: project.id,
-        project_code: project.code || project.project_reference || "",
         project_name: project.name,
-        client_name: Array.isArray(project.companies) 
-          ? project.companies[0]?.name || "Unknown Client"
-          : (project.companies as any)?.name || "Unknown Client",
+        project_code: project.code || "",
+        client_name: clientName,
         invoice_value: invoiceValue,
-        po_number: project.po_number || null,
         description: "",
         excluded_this_month: false,
-        created_by: session.session.user.id,
+        po_number: project.po_number || null,
       };
     });
 
-    const { error: insertError } = await supabase
-      .from("invoice_items")
-      .insert(invoiceItems);
+    if (itemsToInsert.length > 0) {
+      const { error: insertError } = await supabase
+        .from("invoice_items")
+        .insert(itemsToInsert);
 
-    if (insertError) {
-      console.error("❌ Error creating invoice items:", insertError);
-      throw insertError;
+      if (insertError) throw insertError;
     }
-
-    const total = invoiceItems.reduce((sum, item) => sum + (item.invoice_value || 0), 0);
-    console.log(`✅ Created ${invoiceItems.length} invoice items, total: £${total.toFixed(2)}`);
   },
 
-  // Get invoice items for a given month
   async getInvoiceItems(invoiceMonthId: string): Promise<InvoiceItem[]> {
     const { data, error } = await supabase
       .from("invoice_items")
       .select("*")
       .eq("invoice_month_id", invoiceMonthId)
-      .order("project_name");
+      .order("project_code", { ascending: true });
 
-    if (error) {
-      console.error("Error fetching invoice items:", error);
-      throw error;
-    }
-
+    if (error) throw error;
     return data || [];
   },
 
-  // Update an invoice item
   async updateInvoiceItem(
-    id: string,
-    updates: {
-      invoice_value?: number | null;
-      description?: string;
-      excluded_this_month?: boolean;
-      project_code?: string;
-      po_number?: string | null;
-    }
+    itemId: string,
+    updates: Partial<InvoiceItem>
   ): Promise<void> {
     const { error } = await supabase
       .from("invoice_items")
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id);
+      .update(updates)
+      .eq("id", itemId);
 
-    if (error) {
-      console.error("Error updating invoice item:", error);
-      throw error;
-    }
+    if (error) throw error;
   },
 
-  // Lock invoice month (finish invoicing)
   async lockInvoiceMonth(invoiceMonthId: string): Promise<void> {
-    const { data: session } = await supabase.auth.getSession();
-    if (!session.session) throw new Error("Not authenticated");
-
     const { error } = await supabase
       .from("invoice_months")
-      .update({
+      .update({ 
         status: "locked",
-        locked_by: session.session.user.id,
         locked_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        locked_by: (await supabase.auth.getUser()).data.user?.id || null
       })
       .eq("id", invoiceMonthId);
 
-    if (error) {
-      console.error("Error locking invoice month:", error);
-      throw error;
-    }
+    if (error) throw error;
   },
 
-  // Reopen invoice month (admin only)
   async reopenInvoiceMonth(invoiceMonthId: string): Promise<void> {
     const { error } = await supabase
       .from("invoice_months")
-      .update({
+      .update({ 
         status: "open",
-        locked_by: null,
         locked_at: null,
-        pdf_url: null,
-        updated_at: new Date().toISOString(),
+        locked_by: null,
+        pdf_url: null
       })
       .eq("id", invoiceMonthId);
 
-    if (error) {
-      console.error("Error reopening invoice month:", error);
-      throw error;
-    }
+    if (error) throw error;
   },
 
-  // Save PDF URL to invoice month
-  async savePdfUrl(invoiceMonthId: string, pdfUrl: string): Promise<void> {
-    const { error } = await supabase
-      .from("invoice_months")
-      .update({
-        pdf_url: pdfUrl,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", invoiceMonthId);
-
-    if (error) {
-      console.error("Error saving PDF URL:", error);
-      throw error;
-    }
-  },
-
-  // Generate and Upload PDF
-  async generateAndUploadPdf(invoiceMonth: InvoiceMonth, items: InvoiceItem[]): Promise<string> {
+  async generateAndUploadPdf(
+    invoiceMonth: InvoiceMonth,
+    items: InvoiceItem[]
+  ): Promise<string> {
     const doc = new jsPDF();
-    const MONTHS = [
+    const months = [
       "January", "February", "March", "April", "May", "June",
       "July", "August", "September", "October", "November", "December"
     ];
+    const monthName = months[invoiceMonth.month - 1];
 
-    // --- PDF Content Generation ---
-    // Header
-    doc.setFontSize(22);
-    doc.setTextColor(40, 40, 40);
-    doc.text("Invoicing Summary", 14, 20);
-    
-    doc.setFontSize(14);
-    doc.setTextColor(100, 100, 100);
-    doc.text(`${MONTHS[invoiceMonth.month - 1]} ${invoiceMonth.year}`, 14, 28);
-    
-    doc.setFontSize(10);
-    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 35);
-    
-    // Filter included items
+    doc.setFontSize(18);
+    doc.text(`Invoice Summary - ${monthName} ${invoiceMonth.year}`, 14, 20);
+
+    doc.setFontSize(11);
+    doc.text(`Generated: ${new Date().toLocaleDateString("en-GB")}`, 14, 30);
+
     const includedItems = items.filter(
-      item => !item.excluded_this_month && item.invoice_value !== null
+      (item) => !item.excluded_this_month && item.invoice_value !== null
     );
 
-    const tableData = includedItems.map(item => [
-      item.project_code ? `${item.project_code} - ${item.project_name}` : item.project_name,
+    const tableData = includedItems.map((item) => [
+      item.project_code,
+      item.project_name,
       item.client_name,
       item.po_number || "—",
-      item.description || "",
-      `£${(item.invoice_value || 0).toFixed(2)}`
+      `£${(item.invoice_value || 0).toFixed(2)}`,
+      item.description || "—",
     ]);
 
-    // Table
-    autoTable(doc, {
-      startY: 45,
-      head: [['Project', 'Client', 'PO Number', 'Description', 'Value']],
+    const totalValue = includedItems.reduce(
+      (sum, item) => sum + (item.invoice_value || 0),
+      0
+    );
+
+    (doc as any).autoTable({
+      startY: 40,
+      head: [["Code", "Project", "Client", "PO", "Value", "Description"]],
       body: tableData,
-      theme: 'grid',
-      headStyles: { fillColor: [66, 66, 66] },
-      columnStyles: {
-        0: { cellWidth: 35 }, // Project
-        1: { cellWidth: 30 }, // Client
-        2: { cellWidth: 25 }, // PO Number
-        3: { cellWidth: 'auto' }, // Description
-        4: { cellWidth: 25, halign: 'right' }, // Value
-      },
+      foot: [["", "", "", "TOTAL", `£${totalValue.toFixed(2)}`, ""]],
+      theme: "grid",
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [71, 85, 105] },
+      footStyles: { fillColor: [241, 245, 249], textColor: [0, 0, 0], fontStyle: "bold" },
     });
 
-    // Total
-    const total = includedItems.reduce((sum, item) => sum + (item.invoice_value || 0), 0);
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
-    
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.text(`Total Invoice Value: £${total.toFixed(2)}`, 140, finalY, { align: 'left' });
+    const pdfBlob = doc.output("blob");
+    const fileName = `invoice-${invoiceMonth.year}-${String(invoiceMonth.month).padStart(2, "0")}.pdf`;
 
-    // Footer
-    const pageHeight = doc.internal.pageSize.height;
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(150, 150, 150);
-    doc.text("Generated by ConexaDT - Internal invoicing record", 14, pageHeight - 10);
-    doc.text(`Ref: ${invoiceMonth.id}`, 14, pageHeight - 5);
-
-    // --- Upload to Storage ---
-    const pdfBlob = doc.output('blob');
-    const fileName = `invoices_${invoiceMonth.year}_${invoiceMonth.month}_${invoiceMonth.id}.pdf`;
-
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('invoices')
+    const { error: uploadError } = await supabase.storage
+      .from("invoices")
       .upload(fileName, pdfBlob, {
-        contentType: 'application/pdf',
-        upsert: true
+        contentType: "application/pdf",
+        upsert: true,
       });
 
-    if (uploadError) {
-      console.error("Error uploading PDF:", uploadError);
-      throw uploadError;
-    }
+    if (uploadError) throw uploadError;
 
-    // Get public URL
     const { data: { publicUrl } } = supabase.storage
       .from('invoices')
       .getPublicUrl(fileName);
 
     return publicUrl;
+  },
+
+  async savePdfUrl(invoiceMonthId: string, pdfUrl: string): Promise<void> {
+    const { error } = await supabase
+      .from("invoice_months")
+      .update({ pdf_url: pdfUrl })
+      .eq("id", invoiceMonthId);
+
+    if (error) throw error;
   }
 };
