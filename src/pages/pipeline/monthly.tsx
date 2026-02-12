@@ -400,10 +400,10 @@ function PipelineMonthlyContent() {
                 const manualPhasing = projPhasingMap.get(proj.id);
                 
                 // CRITICAL LOGIC: Match invoicing service exactly
-                // If project has ANY manual phasing entries:
+                // If project has ANY manual phasing entries (hasManualPhasing = true):
                 //   - Use the specific month's phasing value if it exists
-                //   - Use 0 if no value exists for this month (DO NOT use defaultMonthlyTurnover)
-                // If project has NO manual phasing at all:
+                //   - Use 0 if no value exists for this month
+                // If project has NO manual phasing at all (hasManualPhasing = false):
                 //   - Use defaultMonthlyTurnover (calculated fallback)
                 const monthlyTurnover = hasManualPhasing 
                   ? (manualPhasing?.get(phasingKey) ?? 0) 
