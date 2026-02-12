@@ -287,6 +287,14 @@ function PipelineMonthlyContent() {
 
       if (projectsWithAnyPhasingError) throw projectsWithAnyPhasingError;
 
+      // Get all opportunities that have ANY manual phasing entries
+      const { data: oppsWithAnyPhasing, error: oppsWithAnyPhasingError } = await supabase
+        .from("opportunity_monthly_phasing")
+        .select("opportunity_id")
+        .not("revenue_amount", "is", null);
+
+      if (oppsWithAnyPhasingError) throw oppsWithAnyPhasingError;
+
       // Create phasing lookup maps
       const oppPhasingMap = new Map<string, Map<string, number>>();
       oppPhasingData?.forEach((p) => {
@@ -306,9 +314,13 @@ function PipelineMonthlyContent() {
         projPhasingMap.get(p.project_id)!.set(key, p.revenue_amount || 0);
       });
 
-      // Create a set of all projects that have ANY manual phasing
+      // Create sets of all projects/opportunities that have ANY manual phasing
       const projectsWithAnyPhasingSet = new Set(
         projectsWithAnyPhasing?.map((p) => p.project_id) || []
+      );
+
+      const oppsWithAnyPhasingSet = new Set(
+        oppsWithAnyPhasing?.map((o) => o.opportunity_id) || []
       );
 
       // Create 12 months array
@@ -329,7 +341,7 @@ function PipelineMonthlyContent() {
           const endDate = new Date(opp.expected_end_date || "");
 
           if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-            const hasManualPhasing = oppPhasingMap.has(opp.id);
+            const hasManualPhasing = oppsWithAnyPhasingSet.has(opp.id);
             
             // Calculate default monthly turnover (only used if NO manual phasing at all)
             const durationMonths = Math.max(1, 
@@ -348,15 +360,13 @@ function PipelineMonthlyContent() {
                 const phasingKey = `${monthData.month.getFullYear()}-${monthData.month.getMonth() + 1}`;
                 const manualPhasing = oppPhasingMap.get(opp.id);
                 
-                // CRITICAL LOGIC: Match invoicing service exactly
-                // If opportunity has ANY manual phasing entries (hasManualPhasing = true):
-                //   - Use the specific month's phasing value if it exists
-                //   - Use 0 if no value exists for this month (DO NOT use defaultMonthlyTurnover)
-                // If opportunity has NO manual phasing at all (hasManualPhasing = false):
-                //   - Use defaultMonthlyTurnover (calculated fallback)
+                // CRITICAL: If opportunity has ANY manual phasing, use 0 for months without values
+                // If opportunity has NO manual phasing at all, use the calculated fallback
                 const monthlyTurnover = hasManualPhasing 
                   ? (manualPhasing?.get(phasingKey) ?? 0) 
                   : defaultMonthlyTurnover;
+
+                console.log(`Opp ${opp.name} - ${formatMonth(monthData.month)}: hasManualPhasing=${hasManualPhasing}, phasingValue=${manualPhasing?.get(phasingKey)}, monthlyTurnover=${monthlyTurnover}`);
 
                 monthData.projects.push({
                   id: opp.id,
@@ -404,15 +414,13 @@ function PipelineMonthlyContent() {
                 const phasingKey = `${monthData.month.getFullYear()}-${monthData.month.getMonth() + 1}`;
                 const manualPhasing = projPhasingMap.get(proj.id);
                 
-                // CRITICAL LOGIC: Match invoicing service exactly
-                // If project has ANY manual phasing entries (hasManualPhasing = true):
-                //   - Use the specific month's phasing value if it exists
-                //   - Use 0 if no value exists for this month
-                // If project has NO manual phasing at all (hasManualPhasing = false):
-                //   - Use defaultMonthlyTurnover (calculated fallback)
+                // CRITICAL: If project has ANY manual phasing, use 0 for months without values
+                // If project has NO manual phasing at all, use the calculated fallback
                 const monthlyTurnover = hasManualPhasing 
                   ? (manualPhasing?.get(phasingKey) ?? 0) 
                   : defaultMonthlyTurnover;
+
+                console.log(`Project ${proj.code} - ${formatMonth(monthData.month)}: hasManualPhasing=${hasManualPhasing}, phasingValue=${manualPhasing?.get(phasingKey)}, monthlyTurnover=${monthlyTurnover}`);
 
                 monthData.projects.push({
                   id: proj.id,
