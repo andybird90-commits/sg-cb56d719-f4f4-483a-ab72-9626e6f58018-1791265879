@@ -74,6 +74,7 @@ export const invoicingService = {
       return start <= endOfMonth && end >= startOfMonth;
     });
 
+    // Get phasing data for this specific month
     const { data: phasingData, error: phasingError } = await supabase
       .from("project_monthly_phasing")
       .select("project_id, revenue_amount")
@@ -82,17 +83,32 @@ export const invoicingService = {
 
     if (phasingError) throw phasingError;
 
+    // Get all projects that have ANY manual phasing entries
+    const { data: projectsWithPhasing, error: projectsWithPhasingError } = await supabase
+      .from("project_monthly_phasing")
+      .select("project_id")
+      .not("revenue_amount", "is", null);
+
+    if (projectsWithPhasingError) throw projectsWithPhasingError;
+
     const phasingMap = new Map<string, number>();
     phasingData?.forEach((p) => {
       phasingMap.set(p.project_id, p.revenue_amount || 0);
     });
 
+    const projectsWithAnyPhasing = new Set(
+      projectsWithPhasing?.map((p) => p.project_id) || []
+    );
+
     const itemsToInsert = activeProjects.map((project) => {
       let invoiceValue = 0;
 
-      if (phasingMap.has(project.id)) {
-        invoiceValue = phasingMap.get(project.id)!;
+      // Check if this project has ANY manual phasing entries
+      if (projectsWithAnyPhasing.has(project.id)) {
+        // Project has manual phasing - use the value for this month OR 0 if not set
+        invoiceValue = phasingMap.get(project.id) || 0;
       } else {
+        // Project has NO manual phasing - calculate fallback
         if (project.agreed_fee_value && project.start_date && project.end_date) {
           const start = new Date(project.start_date);
           const end = new Date(project.end_date);
