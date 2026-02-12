@@ -350,6 +350,9 @@ export default function InvoicingPage() {
     try {
       setLoading(true);
 
+      const startOfMonth = new Date(selectedYear, selectedMonth - 1, 1);
+      const endOfMonth = new Date(selectedYear, selectedMonth, 0);
+
       // 1. Get all active projects for this period with client details
       const { data: projects, error: projectsError } = await supabase
         .from("projects")
@@ -370,24 +373,36 @@ export default function InvoicingPage() {
 
       if (projectsError) throw projectsError;
 
-      const startOfMonth = new Date(selectedYear, selectedMonth - 1, 1);
-      const endOfMonth = new Date(selectedYear, selectedMonth, 0);
-
-      // Filter for projects active in this month
+      // Filter for projects active in this month (start <= month_end AND end >= month_start)
       const activeProjects = (projects || []).filter(p => {
         if (!p.start_date || !p.end_date) return false;
         const start = new Date(p.start_date);
         const end = new Date(p.end_date);
-        return !(end < startOfMonth || start > endOfMonth);
+        return start <= endOfMonth && end >= startOfMonth;
       });
 
-      // 2. Get existing invoice items to preserve descriptions
+      // Get active project IDs
+      const activeProjectIds = new Set(activeProjects.map(p => p.id));
+
+      // 2. Get existing invoice items
       const existingItemsMap = new Map<string, InvoiceItem>();
       invoiceItems.forEach(item => {
         existingItemsMap.set(item.project_id, item);
       });
 
-      // 3. Process each project
+      // 3. Remove invoice items for projects no longer active in this month
+      const itemsToRemove = invoiceItems.filter(item => !activeProjectIds.has(item.project_id));
+      if (itemsToRemove.length > 0) {
+        const removeIds = itemsToRemove.map(item => item.id);
+        await supabase
+          .from("invoice_items")
+          .delete()
+          .in("id", removeIds);
+        
+        console.log(`Removed ${itemsToRemove.length} invoice items for projects no longer active in this month`);
+      }
+
+      // 4. Process each active project
       for (const p of activeProjects) {
         // Calculate monthly revenue from phasing or spread
         const { data: phasingData } = await supabase
@@ -418,9 +433,8 @@ export default function InvoicingPage() {
           // UPDATE: Only update value and metadata, PRESERVE description
           await invoicingService.updateInvoiceItem(existingItem.id, {
             invoice_value: monthlyRevenue,
-            project_code: p.code || "", // Update code if it changed
+            project_code: p.code || "",
             po_number: p.po_number || existingItem.po_number,
-            // Explicitly do NOT update description here
           });
         } else {
           // CREATE: New item for this project
@@ -431,7 +445,7 @@ export default function InvoicingPage() {
             project_code: p.code || "",
             client_name: clientName,
             invoice_value: monthlyRevenue,
-            description: "", // New items start empty
+            description: "",
             excluded_this_month: false,
             po_number: p.po_number
           });
@@ -440,7 +454,7 @@ export default function InvoicingPage() {
 
       toast({
         title: "Synced",
-        description: "Projects synced successfully. Descriptions preserved.",
+        description: `Projects synced successfully. ${itemsToRemove.length} inactive projects removed.`,
       });
 
       // Refresh list
