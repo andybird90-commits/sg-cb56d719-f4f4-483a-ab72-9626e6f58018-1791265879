@@ -335,7 +335,11 @@ function PipelineMonthlyContent() {
                 // Check if manual phasing exists for this month
                 const phasingKey = `${monthData.month.getFullYear()}-${monthData.month.getMonth() + 1}`;
                 const manualPhasing = oppPhasingMap.get(opp.id);
-                const monthlyTurnover = manualPhasing?.get(phasingKey) ?? defaultMonthlyTurnover;
+                // If the opportunity has ANY manual phasing, use the specific month's value (or 0 if missing)
+                // If it has NO manual phasing, use the default calculated value
+                const monthlyTurnover = hasManualPhasing 
+                  ? (manualPhasing?.get(phasingKey) ?? 0) 
+                  : defaultMonthlyTurnover;
 
                 monthData.projects.push({
                   id: opp.id,
@@ -382,7 +386,11 @@ function PipelineMonthlyContent() {
                 // Check if manual phasing exists for this month
                 const phasingKey = `${monthData.month.getFullYear()}-${monthData.month.getMonth() + 1}`;
                 const manualPhasing = projPhasingMap.get(proj.id);
-                const monthlyTurnover = manualPhasing?.get(phasingKey) ?? defaultMonthlyTurnover;
+                // If the project has ANY manual phasing, use the specific month's value (or 0 if missing)
+                // If it has NO manual phasing, use the default calculated value
+                const monthlyTurnover = hasManualPhasing 
+                  ? (manualPhasing?.get(phasingKey) ?? 0) 
+                  : defaultMonthlyTurnover;
 
                 monthData.projects.push({
                   id: proj.id,

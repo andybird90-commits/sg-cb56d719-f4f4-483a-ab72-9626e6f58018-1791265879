@@ -114,29 +114,49 @@ function FinancialsContent() {
 
       if (opportunitiesError) throw opportunitiesError;
 
-      // Fetch manual phasing for projects
+      // Fetch manual phasing for projects - FOR SELECTED MONTH
       const projectIds = (projectsData || []).map(p => p.id);
       const { data: projPhasingData, error: projPhasingError } = await supabase
         .from("project_monthly_phasing")
-        .select("project_id, year, month, revenue_amount")
+        .select("project_id, revenue_amount")
         .in("project_id", projectIds)
         .eq("year", selectedYear)
         .eq("month", selectedMonth);
 
       if (projPhasingError) throw projPhasingError;
 
-      // Fetch manual phasing for opportunities
+      // Check which projects have ANY manual phasing (to handle 0s correctly)
+      const { data: allPhasedProjects, error: allPhasedProjError } = await supabase
+        .from("project_monthly_phasing")
+        .select("project_id")
+        .in("project_id", projectIds);
+      
+      if (allPhasedProjError) throw allPhasedProjError;
+      
+      const manuallyPhasedProjectSet = new Set(allPhasedProjects?.map(p => p.project_id));
+
+      // Fetch manual phasing for opportunities - FOR SELECTED MONTH
       const opportunityIds = (opportunitiesData || []).map(o => o.id);
       const { data: oppPhasingData, error: oppPhasingError } = await supabase
         .from("opportunity_monthly_phasing")
-        .select("opportunity_id, year, month, revenue_amount")
+        .select("opportunity_id, revenue_amount")
         .in("opportunity_id", opportunityIds)
         .eq("year", selectedYear)
         .eq("month", selectedMonth);
 
       if (oppPhasingError) throw oppPhasingError;
 
-      // Create phasing lookup maps
+      // Check which opportunities have ANY manual phasing
+      const { data: allPhasedOpps, error: allPhasedOppsError } = await supabase
+        .from("opportunity_monthly_phasing")
+        .select("opportunity_id")
+        .in("opportunity_id", opportunityIds);
+        
+      if (allPhasedOppsError) throw allPhasedOppsError;
+      
+      const manuallyPhasedOppSet = new Set(allPhasedOpps?.map(o => o.opportunity_id));
+
+      // Create phasing lookup maps for CURRENT MONTH values
       const projPhasingMap = new Map<string, number>();
       projPhasingData?.forEach(p => {
         projPhasingMap.set(p.project_id, p.revenue_amount || 0);
@@ -231,14 +251,23 @@ function FinancialsContent() {
         // Check if this item overlaps with the selected month (same as pipeline)
         if (endDate < startOfMonth || startDate > endOfMonth) continue;
 
-        // Check for manual phasing first
+        // Determine revenue
         let monthlyRevenue: number;
-        if (projPhasingMap.has(item.project_id)) {
-          const phasingKey = `${selectedYear}-${selectedMonth}`;
-          const manualPhasing = projPhasingMap.get(item.project_id);
-          monthlyRevenue = manualPhasing?.get(phasingKey) ?? 0;
+        
+        // Check if item has manual phasing enabled (exists in ANY month)
+        const isManuallyPhased = item.type === "project" 
+          ? manuallyPhasedProjectSet.has(item.id)
+          : manuallyPhasedOppSet.has(item.id);
+          
+        if (isManuallyPhased) {
+          // If manually phased, use the value for THIS month (or 0 if not set for this month)
+          if (item.type === "project") {
+            monthlyRevenue = projPhasingMap.get(item.id) ?? 0;
+          } else {
+            monthlyRevenue = oppPhasingMap.get(item.id) ?? 0;
+          }
         } else {
-          // No manual phasing - use default calculation
+          // No manual phasing at all - use default calculation
           const durationMonths = Math.max(
             1,
             (endDate.getFullYear() - startDate.getFullYear()) * 12 +
