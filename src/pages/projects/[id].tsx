@@ -768,12 +768,12 @@ function ProjectDetailContent() {
       // If new variation is accepted, add to project's agreed_fee_value
       if (variationForm.status === "accepted") {
         const newAgreedFee = (project.agreed_fee_value || 0) + newValue;
-        const { error: updateError } = await supabase
+        const { error: projectError } = await supabase
           .from("projects")
           .update({ agreed_fee_value: newAgreedFee })
           .eq("id", project.id);
 
-        if (updateError) throw updateError;
+        if (projectError) throw projectError;
       }
 
       setVariationFormOpen(false);
@@ -1541,6 +1541,156 @@ function ProjectDetailContent() {
                                       variant="ghost"
                                       size="sm"
                                       onClick={() => handleDeleteActivity(activity.id)}
+                                    >
+                                      <Trash2 className="w-4 h-4 text-red-600" />
+                                    </Button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="variations">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle>Variations</CardTitle>
+                    {canEdit && (
+                      <Dialog open={variationFormOpen} onOpenChange={setVariationFormOpen}>
+                        <DialogTrigger asChild>
+                          <Button size="sm" className="gap-2" onClick={() => {
+                            setEditingVariation(null);
+                            setVariationForm({
+                              description: "",
+                              value: "",
+                              status: "pending",
+                              po_number: "",
+                            });
+                          }}>
+                            <Plus className="w-4 h-4" />
+                            New Variation
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>{editingVariation ? "Edit Variation" : "New Variation"}</DialogTitle>
+                          </DialogHeader>
+                          <form onSubmit={handleVariationSubmit} className="space-y-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="variation_description">Description *</Label>
+                              <Textarea
+                                id="variation_description"
+                                value={variationForm.description}
+                                onChange={(e) => setVariationForm({ ...variationForm, description: e.target.value })}
+                                required
+                                rows={3}
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="variation_value">Value (£) *</Label>
+                              <Input
+                                id="variation_value"
+                                type="number"
+                                step="0.01"
+                                value={variationForm.value}
+                                onChange={(e) => setVariationForm({ ...variationForm, value: e.target.value })}
+                                required
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="variation_status">Status</Label>
+                              <Select
+                                value={variationForm.status}
+                                onValueChange={(value) => setVariationForm({ ...variationForm, status: value })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="pending">Pending</SelectItem>
+                                  <SelectItem value="proposed">Proposed</SelectItem>
+                                  <SelectItem value="accepted">Accepted</SelectItem>
+                                  <SelectItem value="rejected">Rejected</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="variation_po">PO Number</Label>
+                              <Input
+                                id="variation_po"
+                                value={variationForm.po_number}
+                                onChange={(e) => setVariationForm({ ...variationForm, po_number: e.target.value })}
+                                placeholder="Optional"
+                              />
+                            </div>
+
+                            <div className="flex gap-3">
+                              <Button type="submit">
+                                {editingVariation ? "Update" : "Create"}
+                              </Button>
+                              <Button type="button" variant="outline" onClick={() => setVariationFormOpen(false)}>
+                                Cancel
+                              </Button>
+                            </div>
+                          </form>
+                        </DialogContent>
+                      </Dialog>
+                    )}
+                  </CardHeader>
+                  <CardContent>
+                    {variations.length === 0 ? (
+                      <div className="text-center py-8 text-slate-600">
+                        No variations yet.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {variations.map((variation) => (
+                          <div key={variation.id} className="p-4 border rounded-lg">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-2">
+                                  <span className="font-mono text-sm text-slate-500">{variation.code}</span>
+                                  <Badge className={getStatusColor(variation.status)}>
+                                    {variation.status}
+                                  </Badge>
+                                  <span className="text-lg font-semibold text-slate-900">
+                                    {formatCurrency(variation.value)}
+                                  </span>
+                                </div>
+                                <div className="text-sm text-slate-900 mb-2 whitespace-pre-wrap">
+                                  {variation.description}
+                                </div>
+                                {variation.po_number && (
+                                  <div className="text-xs text-slate-500">
+                                    PO: {variation.po_number}
+                                  </div>
+                                )}
+                                <div className="text-xs text-slate-400 mt-1">
+                                  {formatDate(variation.created_at)}
+                                </div>
+                              </div>
+                              {canEdit && (
+                                <div className="flex gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleEditVariation(variation)}
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </Button>
+                                  {canDelete && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDeleteVariation(variation.id)}
                                     >
                                       <Trash2 className="w-4 h-4 text-red-600" />
                                     </Button>
