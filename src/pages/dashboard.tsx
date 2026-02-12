@@ -467,6 +467,11 @@ function DashboardContent() {
         );
         const defaultMonthlyValue = totalValue / durationMonths;
 
+        // Check if this opportunity has ANY manual phasing entries
+        const opportunityPhasingKeys = Array.from(oppPhasingMap.keys())
+          .filter(key => key.startsWith(`${opp.id}-`));
+        const hasManualPhasing = opportunityPhasingKeys.length > 0;
+
         // Add to each relevant month
         monthDates.forEach((monthDate, idx) => {
           const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
@@ -478,8 +483,8 @@ function DashboardContent() {
             const phasingKey = `${opp.id}-${yearMonth}`;
 
             // Use manual phasing if available, otherwise use default calculation
-            const monthlyValue = oppPhasingMap.has(phasingKey)
-              ? oppPhasingMap.get(phasingKey)!
+            const monthlyValue = hasManualPhasing
+              ? (oppPhasingMap.get(phasingKey) || 0)
               : defaultMonthlyValue;
 
             if (stage === "high_potential") {
@@ -508,6 +513,11 @@ function DashboardContent() {
         );
         const defaultMonthlyValue = totalValue / durationMonths;
 
+        // Check if this project has ANY manual phasing entries
+        const projectPhasingKeys = Array.from(projPhasingMap.keys())
+          .filter(key => key.startsWith(`${proj.id}-`));
+        const hasManualPhasing = projectPhasingKeys.length > 0;
+
         // Add to each relevant month
         monthDates.forEach((monthDate, idx) => {
           const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
@@ -518,8 +528,8 @@ function DashboardContent() {
             const phasingKey = `${proj.id}-${yearMonth}`;
 
             // Use manual phasing if available, otherwise use default calculation
-            const monthlyValue = projPhasingMap.has(phasingKey)
-              ? projPhasingMap.get(phasingKey)!
+            const monthlyValue = hasManualPhasing
+              ? (projPhasingMap.get(phasingKey) || 0)
               : defaultMonthlyValue;
 
             initialData[idx].secured += monthlyValue;
