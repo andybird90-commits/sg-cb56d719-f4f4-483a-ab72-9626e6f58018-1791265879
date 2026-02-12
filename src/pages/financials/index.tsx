@@ -233,15 +233,16 @@ function FinancialsContent() {
 
         // Check for manual phasing first
         let monthlyRevenue: number;
-        if (item.type === "project" && projPhasingMap.has(item.id)) {
-          monthlyRevenue = projPhasingMap.get(item.id)!;
-        } else if (item.type === "opportunity" && oppPhasingMap.has(item.id)) {
-          monthlyRevenue = oppPhasingMap.get(item.id)!;
+        if (projPhasingMap.has(item.project_id)) {
+          const phasingKey = `${selectedYear}-${selectedMonth}`;
+          const manualPhasing = projPhasingMap.get(item.project_id);
+          monthlyRevenue = manualPhasing?.get(phasingKey) ?? 0;
         } else {
-          // Calculate fallback using same logic as pipeline
-          const durationMonths = Math.max(1,
+          // No manual phasing - use default calculation
+          const durationMonths = Math.max(
+            1,
             (endDate.getFullYear() - startDate.getFullYear()) * 12 +
-            (endDate.getMonth() - startDate.getMonth()) + 1
+              (endDate.getMonth() - startDate.getMonth()) + 1
           );
           monthlyRevenue = item.total_value / durationMonths;
         }
