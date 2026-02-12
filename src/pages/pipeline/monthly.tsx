@@ -414,10 +414,13 @@ function PipelineMonthlyContent() {
                 const phasingKey = `${monthData.month.getFullYear()}-${monthData.month.getMonth() + 1}`;
                 const manualPhasing = projPhasingMap.get(proj.id);
                 
-                // CRITICAL: If project has ANY manual phasing, use 0 for months without values
-                // If project has NO manual phasing at all, use the calculated fallback
+                // CRITICAL: If project has ANY manual phasing entries:
+                //   - Use the specific month's phasing value if it exists
+                //   - Use 0 if no value exists for this month (DO NOT use defaultMonthlyTurnover)
+                // If project has NO manual phasing at all:
+                //   - Use defaultMonthlyTurnover (calculated fallback)
                 const monthlyTurnover = hasManualPhasing 
-                  ? (manualPhasing?.get(phasingKey) ?? 0) 
+                  ? (manualPhasing?.get(phasingKey) || 0) 
                   : defaultMonthlyTurnover;
 
                 console.log(`Project ${proj.code} - ${formatMonth(monthData.month)}: hasManualPhasing=${hasManualPhasing}, phasingValue=${manualPhasing?.get(phasingKey)}, monthlyTurnover=${monthlyTurnover}`);
