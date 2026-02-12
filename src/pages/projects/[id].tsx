@@ -96,6 +96,12 @@ interface MonthPhasing {
   hasData: boolean;
 }
 
+interface Company {
+  id: string;
+  name: string;
+  short_name?: string;
+}
+
 type ProjectForm = {
   code: string;
   project_reference: string;
@@ -129,6 +135,7 @@ function ProjectDetailContent() {
   
   const [projectLoading, setProjectLoading] = useState(true);
   const [projectError, setProjectError] = useState<string | null>(null);
+  const [companies, setCompanies] = useState<Company[]>([]);
 
   // Project edit state
   const [isEditingProject, setIsEditingProject] = useState(false);
@@ -186,6 +193,24 @@ function ProjectDetailContent() {
       fetchProjectData(id);
     }
   }, [id]);
+
+  useEffect(() => {
+    fetchCompanies();
+  }, []);
+
+  const fetchCompanies = async () => {
+    const { data, error } = await supabase
+      .from("companies")
+      .select("id, name, short_name")
+      .order("name", { ascending: true });
+
+    if (error) {
+      console.error("Error fetching companies:", error);
+      return;
+    }
+
+    setCompanies(data || []);
+  };
 
   const fetchProjectData = async (projectId: string) => {
     try {
@@ -1167,6 +1192,25 @@ function ProjectDetailContent() {
                           </SelectContent>
                         </Select>
                       </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-client">Client Company *</Label>
+                        <Select
+                          value={projectForm.client_company_id}
+                          onValueChange={(value) => setProjectForm({ ...projectForm, client_company_id: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select client" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {companies.map((company) => (
+                              <SelectItem key={company.id} value={company.id}>
+                                {company.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
 
                     <div className="space-y-2">
@@ -1435,12 +1479,17 @@ function ProjectDetailContent() {
                             </div>
 
                             <div className="flex gap-3">
-                              <Button type="submit">
-                                {editingActivity ? "Update" : "Create"}
-                              </Button>
-                              <Button type="button" variant="outline" onClick={() => setActivityFormOpen(false)}>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => {
+                                  setVariationFormOpen(false);
+                                  setVariationForm({ description: "", value: "", status: "pending", po_number: "" });
+                                }}
+                              >
                                 Cancel
                               </Button>
+                              <Button type="submit">Add Variation</Button>
                             </div>
                           </form>
                         </DialogContent>
@@ -1501,200 +1550,6 @@ function ProjectDetailContent() {
                             </div>
                           </div>
                         ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="variations">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle>Variations</CardTitle>
-                    {canEdit && (
-                      <Dialog open={variationFormOpen} onOpenChange={setVariationFormOpen}>
-                        <DialogTrigger asChild>
-                          <Button size="sm" className="gap-2" onClick={() => {
-                            setEditingVariation(null);
-                            setVariationForm({
-                              description: "",
-                              value: "",
-                              status: "proposed",
-                              po_number: "",
-                            });
-                          }}>
-                            <Plus className="w-4 h-4" />
-                            New Variation
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-md">
-                          <DialogHeader>
-                            <DialogTitle>Add Variation</DialogTitle>
-                          </DialogHeader>
-                          <form onSubmit={handleVariationSubmit} className="space-y-4">
-                            <div>
-                              <Label htmlFor="variation-description">Description</Label>
-                              <Textarea
-                                id="variation-description"
-                                value={variationForm.description}
-                                onChange={(e) =>
-                                  setVariationForm({ ...variationForm, description: e.target.value })
-                                }
-                                required
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor="variation-value">Value (£)</Label>
-                              <Input
-                                id="variation-value"
-                                type="number"
-                                step="0.01"
-                                value={variationForm.value}
-                                onChange={(e) =>
-                                  setVariationForm({ ...variationForm, value: e.target.value })
-                                }
-                                required
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor="variation-po-number">PO Number</Label>
-                              <Input
-                                id="variation-po-number"
-                                type="text"
-                                placeholder="Purchase Order Number (optional)"
-                                value={variationForm.po_number}
-                                onChange={(e) =>
-                                  setVariationForm({ ...variationForm, po_number: e.target.value })
-                                }
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor="variation-status">Status</Label>
-                              <Select
-                                value={variationForm.status}
-                                onValueChange={(value) =>
-                                  setVariationForm({ ...variationForm, status: value })
-                                }
-                              >
-                                <SelectTrigger id="variation-status">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="pending">Pending</SelectItem>
-                                  <SelectItem value="accepted">Accepted</SelectItem>
-                                  <SelectItem value="rejected">Rejected</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => {
-                                  setVariationFormOpen(false);
-                                  setVariationForm({ description: "", value: "", status: "pending", po_number: "" });
-                                }}
-                              >
-                                Cancel
-                              </Button>
-                              <Button type="submit">Add Variation</Button>
-                            </div>
-                          </form>
-                        </DialogContent>
-                      </Dialog>
-                    )}
-                  </CardHeader>
-                  <CardContent>
-                    {variations.length === 0 ? (
-                      <div className="text-center py-8 text-slate-600">
-                        No variations yet.
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <table className="w-full">
-                          <thead className="bg-gray-50 border-b">
-                            <tr>
-                              <th className="px-4 py-3 text-left text-sm font-medium">Code</th>
-                              <th className="px-4 py-3 text-left text-sm font-medium">Description</th>
-                              <th className="px-4 py-3 text-left text-sm font-medium">Value</th>
-                              <th className="px-4 py-3 text-left text-sm font-medium">PO Number</th>
-                              <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
-                              <th className="px-4 py-3 text-left text-sm font-medium">Date</th>
-                              <th className="px-4 py-3"></th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y">
-                            {variations.map((variation) => (
-                              <tr key={variation.id}>
-                                <td className="px-4 py-3 text-sm font-mono text-gray-600">
-                                  {variation.code}
-                                </td>
-                                <td className="px-4 py-3">
-                                  <Textarea
-                                    value={variation.description}
-                                    onChange={(e) =>
-                                      handleUpdateVariation(variation.id, "description", e.target.value)
-                                    }
-                                    className="min-h-[60px]"
-                                  />
-                                </td>
-                                <td className="px-4 py-3">
-                                  <Input
-                                    type="number"
-                                    step="0.01"
-                                    value={variation.value}
-                                    onChange={(e) =>
-                                      handleUpdateVariation(
-                                        variation.id,
-                                        "value",
-                                        parseFloat(e.target.value)
-                                      )
-                                    }
-                                  />
-                                </td>
-                                <td className="px-4 py-3">
-                                  <Input
-                                    type="text"
-                                    placeholder="PO Number"
-                                    value={variation.po_number || ""}
-                                    onChange={(e) =>
-                                      handleUpdateVariation(variation.id, "po_number", e.target.value)
-                                    }
-                                  />
-                                </td>
-                                <td className="px-4 py-3">
-                                  <Select
-                                    value={variation.status}
-                                    onValueChange={(value) =>
-                                      handleUpdateVariation(variation.id, "status", value)
-                                    }
-                                  >
-                                    <SelectTrigger className="w-32">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="pending">Pending</SelectItem>
-                                      <SelectItem value="accepted">Accepted</SelectItem>
-                                      <SelectItem value="rejected">Rejected</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </td>
-                                <td className="px-4 py-3 text-sm text-gray-500">
-                                  {new Date(variation.created_at).toLocaleDateString()}
-                                </td>
-                                <td className="px-4 py-3">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleDeleteVariation(variation.id)}
-                                  >
-                                    Delete
-                                  </Button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
                       </div>
                     )}
                   </CardContent>
