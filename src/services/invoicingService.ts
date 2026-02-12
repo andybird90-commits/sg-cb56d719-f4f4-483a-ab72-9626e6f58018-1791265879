@@ -110,7 +110,7 @@ export const invoicingService = {
           name
         )
       `)
-      .in("status", ["live", "Live"])
+      .eq("archived", false)
       .gte("end_date", monthStart.toISOString().split("T")[0])
       .lte("start_date", monthEnd.toISOString().split("T")[0]);
 

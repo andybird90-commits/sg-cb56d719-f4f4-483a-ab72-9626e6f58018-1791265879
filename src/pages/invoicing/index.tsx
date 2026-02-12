@@ -368,7 +368,6 @@ export default function InvoicingPage() {
             name
           )
         `)
-        .eq("status", "live")
         .eq("archived", false);
 
       if (projectsError) throw projectsError;
