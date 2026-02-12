@@ -279,6 +279,14 @@ function PipelineMonthlyContent() {
 
       if (projPhasingError) throw projPhasingError;
 
+      // Get all projects that have ANY manual phasing entries
+      const { data: projectsWithAnyPhasing, error: projectsWithAnyPhasingError } = await supabase
+        .from("project_monthly_phasing")
+        .select("project_id")
+        .not("revenue_amount", "is", null);
+
+      if (projectsWithAnyPhasingError) throw projectsWithAnyPhasingError;
+
       // Create phasing lookup maps
       const oppPhasingMap = new Map<string, Map<string, number>>();
       oppPhasingData?.forEach((p) => {
@@ -297,6 +305,11 @@ function PipelineMonthlyContent() {
         const key = `${p.year}-${p.month}`;
         projPhasingMap.get(p.project_id)!.set(key, p.revenue_amount || 0);
       });
+
+      // Create a set of all projects that have ANY manual phasing
+      const projectsWithAnyPhasingSet = new Set(
+        projectsWithAnyPhasing?.map((p) => p.project_id) || []
+      );
 
       // Create 12 months array
       const months: MonthData[] = [];
@@ -367,7 +380,7 @@ function PipelineMonthlyContent() {
           const endDate = new Date(proj.end_date || "");
 
           if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
-            const hasManualPhasing = projPhasingMap.has(proj.id);
+            const hasManualPhasing = projectsWithAnyPhasingSet.has(proj.id);
             
             // Calculate default monthly turnover (fallback)
             const durationMonths = Math.max(1, 
@@ -385,6 +398,7 @@ function PipelineMonthlyContent() {
                 // Check if manual phasing exists for this month
                 const phasingKey = `${monthData.month.getFullYear()}-${monthData.month.getMonth() + 1}`;
                 const manualPhasing = projPhasingMap.get(proj.id);
+                
                 // If the project has ANY manual phasing, use the specific month's value (or 0 if missing)
                 // If it has NO manual phasing, use the default calculated value
                 const monthlyTurnover = hasManualPhasing 
