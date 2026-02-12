@@ -331,7 +331,7 @@ function PipelineMonthlyContent() {
           if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
             const hasManualPhasing = oppPhasingMap.has(opp.id);
             
-            // Calculate default monthly turnover (fallback)
+            // Calculate default monthly turnover (only used if NO manual phasing at all)
             const durationMonths = Math.max(1, 
               (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
               (endDate.getMonth() - startDate.getMonth()) + 1
@@ -347,8 +347,13 @@ function PipelineMonthlyContent() {
                 // Check if manual phasing exists for this month
                 const phasingKey = `${monthData.month.getFullYear()}-${monthData.month.getMonth() + 1}`;
                 const manualPhasing = oppPhasingMap.get(opp.id);
-                // If the opportunity has ANY manual phasing, use the specific month's value (or 0 if missing)
-                // If it has NO manual phasing, use the default calculated value
+                
+                // CRITICAL LOGIC: Match invoicing service exactly
+                // If opportunity has ANY manual phasing entries (hasManualPhasing = true):
+                //   - Use the specific month's phasing value if it exists
+                //   - Use 0 if no value exists for this month (DO NOT use defaultMonthlyTurnover)
+                // If opportunity has NO manual phasing at all (hasManualPhasing = false):
+                //   - Use defaultMonthlyTurnover (calculated fallback)
                 const monthlyTurnover = hasManualPhasing 
                   ? (manualPhasing?.get(phasingKey) ?? 0) 
                   : defaultMonthlyTurnover;
