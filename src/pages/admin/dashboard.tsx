@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from "recharts";
-import { TrendingUp, TrendingDown, DollarSign, Users, Building2, Briefcase, Target, Calendar } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Users, Building2, Briefcase, Target, Calendar, Trophy } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -21,9 +21,18 @@ interface ConversionData {
   value: number;
 }
 
+interface LeaderboardEntry {
+  userId: string;
+  userName: string;
+  opportunitiesWon: number;
+  totalValue: number;
+  conversionRate: number;
+}
+
 function AdminDashboardContent() {
   const [financialData, setFinancialData] = useState<MonthlyData[]>([]);
   const [conversionData, setConversionData] = useState<ConversionData[]>([]);
+  const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
   const [yearEndRevenue, setYearEndRevenue] = useState(0);
   const [yearEndCosts, setYearEndCosts] = useState(0);
   const [yearEndMargin, setYearEndMargin] = useState(0);
@@ -33,6 +42,7 @@ function AdminDashboardContent() {
   useEffect(() => {
     fetchFinancialTrends();
     fetchConversionData();
+    fetchLeaderboardData();
   }, []);
 
   const fetchFinancialTrends = async () => {
@@ -198,6 +208,106 @@ function AdminDashboardContent() {
     }
   };
 
+  const fetchLeaderboardData = async () => {
+    try {
+      // Fetch all opportunities with their creators
+      const { data: opportunities, error: oppsError } = await supabase
+        .from("opportunities")
+        .select(`
+          id,
+          added_by_user_id,
+          expected_fee_value,
+          stage
+        `)
+        .not("added_by_user_id", "is", null);
+
+      if (oppsError) throw oppsError;
+
+      // Fetch all projects with their linked opportunities
+      const { data: projects, error: projectsError } = await supabase
+        .from("projects")
+        .select(`
+          id,
+          opportunity_id,
+          agreed_fee_value
+        `)
+        .not("opportunity_id", "is", null);
+
+      if (projectsError) throw projectsError;
+
+      // Fetch all users
+      const { data: profiles, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id, full_name");
+
+      if (profilesError) throw profilesError;
+
+      // Create a map of opportunity_id to project
+      const projectsByOppId = new Map();
+      projects?.forEach((project) => {
+        if (project.opportunity_id) {
+          projectsByOppId.set(project.opportunity_id, project);
+        }
+      });
+
+      // Calculate stats by user
+      const userStats = new Map<string, {
+        userName: string;
+        totalOpportunities: number;
+        opportunitiesWon: number;
+        totalValue: number;
+      }>();
+
+      opportunities?.forEach((opp) => {
+        const userId = opp.added_by_user_id;
+        if (!userId) return;
+
+        const profile = profiles?.find((p) => p.id === userId);
+        if (!profile) return;
+
+        if (!userStats.has(userId)) {
+          userStats.set(userId, {
+            userName: profile.full_name,
+            totalOpportunities: 0,
+            opportunitiesWon: 0,
+            totalValue: 0,
+          });
+        }
+
+        const stats = userStats.get(userId)!;
+        stats.totalOpportunities += 1;
+
+        // Check if this opportunity was converted to a project
+        const project = projectsByOppId.get(opp.id);
+        if (project) {
+          stats.opportunitiesWon += 1;
+          stats.totalValue += Number(project.agreed_fee_value || 0);
+        }
+      });
+
+      // Convert to array and calculate conversion rates
+      const leaderboard: LeaderboardEntry[] = Array.from(userStats.entries()).map(
+        ([userId, stats]) => ({
+          userId,
+          userName: stats.userName,
+          opportunitiesWon: stats.opportunitiesWon,
+          totalValue: stats.totalValue,
+          conversionRate:
+            stats.totalOpportunities > 0
+              ? (stats.opportunitiesWon / stats.totalOpportunities) * 100
+              : 0,
+        })
+      );
+
+      // Sort by total value (descending)
+      leaderboard.sort((a, b) => b.totalValue - a.totalValue);
+
+      setLeaderboardData(leaderboard);
+    } catch (error) {
+      console.error("Error fetching leaderboard data:", error);
+    }
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -344,6 +454,74 @@ function AdminDashboardContent() {
                   <Bar yAxisId="right" dataKey="value" fill="#f59e0b" name="Value (£)" />
                 </BarChart>
               </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Leader Board */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-amber-500" />
+              Work Winning Leader Board
+            </CardTitle>
+            <CardDescription>Team performance in converting opportunities to projects</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-3 px-4 font-medium">Rank</th>
+                    <th className="text-left py-3 px-4 font-medium">Name</th>
+                    <th className="text-right py-3 px-4 font-medium">Opportunities Won</th>
+                    <th className="text-right py-3 px-4 font-medium">Total Value</th>
+                    <th className="text-right py-3 px-4 font-medium">Conversion Rate</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leaderboardData.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="text-center py-8 text-muted-foreground">
+                        No data available
+                      </td>
+                    </tr>
+                  ) : (
+                    leaderboardData.map((entry, index) => (
+                      <tr key={entry.userId} className="border-b hover:bg-muted/50">
+                        <td className="py-3 px-4">
+                          {index === 0 && (
+                            <span className="text-amber-500 font-bold">🥇</span>
+                          )}
+                          {index === 1 && (
+                            <span className="text-gray-400 font-bold">🥈</span>
+                          )}
+                          {index === 2 && (
+                            <span className="text-orange-600 font-bold">🥉</span>
+                          )}
+                          {index > 2 && <span className="text-muted-foreground">#{index + 1}</span>}
+                        </td>
+                        <td className="py-3 px-4 font-medium">{entry.userName}</td>
+                        <td className="py-3 px-4 text-right">{entry.opportunitiesWon}</td>
+                        <td className="py-3 px-4 text-right font-medium">
+                          £{entry.totalValue.toLocaleString()}
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                            entry.conversionRate >= 50
+                              ? "bg-green-100 text-green-800"
+                              : entry.conversionRate >= 25
+                              ? "bg-yellow-100 text-yellow-800"
+                              : "bg-red-100 text-red-800"
+                          }`}>
+                            {entry.conversionRate.toFixed(1)}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </CardContent>
         </Card>
