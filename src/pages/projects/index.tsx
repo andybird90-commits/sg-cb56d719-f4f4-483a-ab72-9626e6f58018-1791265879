@@ -142,21 +142,23 @@ function ProjectsContent() {
 
   return (
     <Layout>
-      <div className="space-y-4 sm:space-y-6">
-        {/* Header - Mobile optimized */}
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Projects</h1>
-            <p className="text-sm sm:text-base text-slate-600 mt-1">Manage active and pipeline projects</p>
+      <div className="space-y-8">
+        {/* Header Section */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="space-y-2">
+            <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+              Projects
+            </h1>
+            <p className="text-muted-foreground text-lg">
+              Active and completed project portfolio
+            </p>
           </div>
-          {canEdit && (
-            <Link href="/projects/new">
-              <Button className="w-full sm:w-auto gap-2">
-                <Plus className="w-4 h-4" />
-                <span>New Project</span>
-              </Button>
-            </Link>
-          )}
+          <Button
+            onClick={() => router.push("/projects/new")}
+            className="btn-professional shadow-lg hover:shadow-xl">
+            <Plus className="w-4 h-4 mr-2" />
+            New Project
+          </Button>
         </div>
 
         {/* Search */}
