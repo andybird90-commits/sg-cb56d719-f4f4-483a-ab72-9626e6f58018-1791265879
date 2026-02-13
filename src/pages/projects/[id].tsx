@@ -169,7 +169,7 @@ function ProjectDetailContent() {
   const [variationForm, setVariationForm] = useState({
     description: "",
     value: "",
-    status: "proposed",
+    status: "pending",
     po_number: "",
   });
 
@@ -1561,7 +1561,7 @@ function ProjectDetailContent() {
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle>Variations</CardTitle>
-                    {canEdit && (
+                    {canDelete && (
                       <Dialog open={variationFormOpen} onOpenChange={setVariationFormOpen}>
                         <DialogTrigger asChild>
                           <Button size="sm" className="gap-2" onClick={() => {
@@ -1686,7 +1686,7 @@ function ProjectDetailContent() {
                                   {formatDate(variation.created_at)}
                                 </div>
                               </div>
-                              {canEdit && (
+                              {canDelete && (
                                 <div className="flex gap-2">
                                   <Button
                                     variant="ghost"
@@ -1695,15 +1695,13 @@ function ProjectDetailContent() {
                                   >
                                     <Edit className="w-4 h-4" />
                                   </Button>
-                                  {canDelete && (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleDeleteVariation(variation.id)}
-                                    >
-                                      <Trash2 className="w-4 h-4 text-red-600" />
-                                    </Button>
-                                  )}
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteVariation(variation.id)}
+                                  >
+                                    <Trash2 className="w-4 h-4 text-red-600" />
+                                  </Button>
                                 </div>
                               )}
                             </div>
