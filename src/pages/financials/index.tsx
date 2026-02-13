@@ -45,6 +45,13 @@ function FinancialsContent() {
   
   const [projectFinancials, setProjectFinancials] = useState<ProjectFinancials[]>([]);
 
+  // Check user role - only directors and admins can access
+  useEffect(() => {
+    if (profile && profile.role !== "director" && profile.role !== "admin") {
+      router.push("/dashboard");
+    }
+  }, [profile, router]);
+
   useEffect(() => {
     fetchFinancials();
   }, [selectedYear, selectedMonth]);
