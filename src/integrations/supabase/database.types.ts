@@ -794,6 +794,7 @@ export type Database = {
           email: string
           full_name: string
           holiday_cost_rate: number | null
+          hourly_rate: number | null
           id: string
           is_active: boolean
           role: Database["public"]["Enums"]["user_role"]
@@ -807,6 +808,7 @@ export type Database = {
           email: string
           full_name: string
           holiday_cost_rate?: number | null
+          hourly_rate?: number | null
           id: string
           is_active?: boolean
           role?: Database["public"]["Enums"]["user_role"]
@@ -820,6 +822,7 @@ export type Database = {
           email?: string
           full_name?: string
           holiday_cost_rate?: number | null
+          hourly_rate?: number | null
           id?: string
           is_active?: boolean
           role?: Database["public"]["Enums"]["user_role"]

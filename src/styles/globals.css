@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=Crimson+Pro:wght@400;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -10,75 +12,99 @@
 
 @layer base {
   :root {
-    --radius: 0.55rem;
-    --background: 0 0% 100%;
-    --foreground: 330 0% 0.3%;
+    --radius: 0.5rem;
+    
+    /* Professional Corporate Palette - Light Mode */
+    --background: 0 0% 99%;
+    --foreground: 220 20% 15%;
+    
     --card: 0 0% 100%;
-    --card-foreground: 330 0% 0.3%;
+    --card-foreground: 220 20% 15%;
+    
     --popover: 0 0% 100%;
-    --popover-foreground: 330 0% 0.3%;
-    --primary: 0 0% 4.5%;
-    --primary-foreground: 0 0% 97.5%;
-    --secondary: 0 0% 97.3%;
-    --secondary-foreground: 0 0% 4.5%;
-    --muted: 0 0% 97.3%;
-    --muted-foreground: 0 0% 55.7%;
-    --accent: 0 0% 97.3%;
-    --accent-foreground: 0 0% 4.5%;
-    --destructive: 359.9132 100.2494% 67.8807%;
-    --destructive-foreground: 0 0% 0%;
-    --border: 0 0% 92.2%;
-    --input: 0 0% 92.2%;
-    --ring: 0 0% 70.8%;
-    --chart-1: 41.1 71.2% 54.4%;
-    --chart-2: 184.7 32.4% 48.6%;
-    --chart-3: 227.4 15.2% 33.3%;
-    --chart-4: 84.4 74.8% 75.7%;
-    --chart-5: 70.1 74.3% 70.5%;
-    --sidebar: 0 0% 97.5%;
-    --sidebar-foreground: 330 0% 0.3%;
-    --sidebar-primary: 0 0% 4.5%;
-    --sidebar-primary-foreground: 0 0% 97.5%;
-    --sidebar-accent: 0 0% 97.3%;
-    --sidebar-accent-foreground: 0 0% 4.5%;
-    --sidebar-border: 0 0% 92.2%;
-    --sidebar-ring: 0 0% 70.8%;
+    --popover-foreground: 220 20% 15%;
+    
+    --primary: 220 70% 35%;
+    --primary-foreground: 0 0% 98%;
+    
+    --secondary: 220 15% 92%;
+    --secondary-foreground: 220 20% 20%;
+    
+    --muted: 220 15% 95%;
+    --muted-foreground: 220 15% 45%;
+    
+    --accent: 200 80% 45%;
+    --accent-foreground: 0 0% 98%;
+    
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 98%;
+    
+    --border: 220 15% 88%;
+    --input: 220 15% 88%;
+    --ring: 220 70% 35%;
+    
+    --chart-1: 220 70% 45%;
+    --chart-2: 200 80% 50%;
+    --chart-3: 180 60% 45%;
+    --chart-4: 160 50% 50%;
+    --chart-5: 140 55% 48%;
+    
+    --sidebar: 220 20% 97%;
+    --sidebar-foreground: 220 20% 15%;
+    --sidebar-primary: 220 70% 35%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 220 15% 92%;
+    --sidebar-accent-foreground: 220 20% 20%;
+    --sidebar-border: 220 15% 88%;
+    --sidebar-ring: 220 70% 35%;
   }
 
   .dark {
-    --radius: 0.55rem;
-    --background: 330 0% 0.3%;
-    --foreground: 0 0% 97.5%;
-    --card: 0 0% 4.5%;
-    --card-foreground: 0 0% 97.5%;
-    --popover: 0 0% 8.6%;
-    --popover-foreground: 0 0% 97.5%;
-    --primary: 0 0% 92.2%;
-    --primary-foreground: 0 0% 4.5%;
-    --secondary: 0 0% 8.6%;
-    --secondary-foreground: 0 0% 97.5%;
-    --muted: 0 0% 8.6%;
-    --muted-foreground: 0 0% 70.8%;
-    --accent: 0 0% 21.2%;
-    --accent-foreground: 0 0% 97.5%;
-    --destructive: 359.9132 100.2494% 67.8807%;
-    --destructive-foreground: 0 0% 0%;
-    --border: 0 0% 100% / 15%;
-    --input: 0 0% 100% / 15%;
-    --ring: 0 0% 55.7%;
-    --chart-1: 264.4 77.2% 41.9%;
-    --chart-2: 162.5 46.7% 57.3%;
-    --chart-3: 70.1 74.3% 70.5%;
-    --chart-4: 303.9 75.8% 51.6%;
-    --chart-5: 16.4 84.7% 55.4%;
-    --sidebar: 0 0% 4.5%;
-    --sidebar-foreground: 0 0% 97.5%;
-    --sidebar-primary: 264.4 77.2% 41.9%;
-    --sidebar-primary-foreground: 0 0% 97.5%;
-    --sidebar-accent: 0 0% 8.6%;
-    --sidebar-accent-foreground: 0 0% 97.5%;
-    --sidebar-border: 0 0% 100% / 10%;
-    --sidebar-ring: 0 0% 43.9%;
+    --radius: 0.5rem;
+    
+    /* Professional Corporate Palette - Dark Mode */
+    --background: 220 25% 8%;
+    --foreground: 220 10% 92%;
+    
+    --card: 220 22% 11%;
+    --card-foreground: 220 10% 92%;
+    
+    --popover: 220 22% 11%;
+    --popover-foreground: 220 10% 92%;
+    
+    --primary: 220 65% 55%;
+    --primary-foreground: 220 25% 8%;
+    
+    --secondary: 220 20% 18%;
+    --secondary-foreground: 220 10% 92%;
+    
+    --muted: 220 20% 16%;
+    --muted-foreground: 220 15% 60%;
+    
+    --accent: 200 75% 50%;
+    --accent-foreground: 220 25% 8%;
+    
+    --destructive: 0 65% 55%;
+    --destructive-foreground: 0 0% 98%;
+    
+    --border: 220 20% 20%;
+    --input: 220 20% 20%;
+    --ring: 220 65% 55%;
+    
+    --chart-1: 220 70% 55%;
+    --chart-2: 200 75% 55%;
+    --chart-3: 180 60% 50%;
+    --chart-4: 160 55% 55%;
+    --chart-5: 140 60% 52%;
+    
+    --sidebar: 220 22% 11%;
+    --sidebar-foreground: 220 10% 92%;
+    --sidebar-primary: 220 65% 55%;
+    --sidebar-primary-foreground: 220 25% 8%;
+    --sidebar-accent: 220 20% 18%;
+    --sidebar-accent-foreground: 220 10% 92%;
+    --sidebar-border: 220 20% 20%;
+    --sidebar-ring: 220 65% 55%;
   }
 }
 
@@ -86,13 +112,106 @@
   * {
     @apply border-border;
   }
+  
   body {
     @apply bg-background text-foreground;
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-weight: 400;
+    line-height: 1.6;
+    letter-spacing: -0.01em;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Crimson Pro', Georgia, serif;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+  }
+  
+  h1 {
+    @apply text-4xl md:text-5xl lg:text-6xl;
+    font-weight: 700;
+  }
+  
+  h2 {
+    @apply text-3xl md:text-4xl lg:text-5xl;
+  }
+  
+  h3 {
+    @apply text-2xl md:text-3xl lg:text-4xl;
+  }
+  
+  h4 {
+    @apply text-xl md:text-2xl;
+  }
+  
+  h5 {
+    @apply text-lg md:text-xl;
+  }
+  
+  h6 {
+    @apply text-base md:text-lg;
   }
 }
 
 @layer components {
   .container {
-    @apply mx-auto px-4 md:px-6 lg:px-8 max-w-7xl w-full;
+    @apply mx-auto px-6 md:px-8 lg:px-12 max-w-7xl w-full;
+  }
+  
+  /* Professional Card Styling */
+  .card-professional {
+    @apply bg-card border border-border rounded-lg shadow-sm;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .card-professional:hover {
+    @apply shadow-md border-primary/20;
+    transform: translateY(-1px);
+  }
+  
+  /* Refined Button States */
+  .btn-professional {
+    @apply transition-all duration-200;
+    letter-spacing: 0.01em;
+  }
+  
+  .btn-professional:hover {
+    transform: translateY(-1px);
+    @apply shadow-sm;
+  }
+  
+  .btn-professional:active {
+    transform: translateY(0);
+  }
+  
+  /* Professional Input Focus */
+  .input-professional {
+    @apply transition-all duration-200;
+  }
+  
+  .input-professional:focus {
+    @apply ring-2 ring-primary/20 border-primary;
+  }
+  
+  /* Subtle Dividers */
+  .divider-professional {
+    @apply border-t border-border/50;
+  }
+  
+  /* Professional Badge */
+  .badge-professional {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-sm font-medium;
+    letter-spacing: 0.02em;
+  }
+  
+  /* Section Spacing */
+  .section-professional {
+    @apply py-12 md:py-16 lg:py-20;
+  }
+  
+  /* Smooth Transitions */
+  .transition-professional {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 }
