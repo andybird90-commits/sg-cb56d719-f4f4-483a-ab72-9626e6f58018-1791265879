@@ -124,10 +124,8 @@ function DashboardContent() {
   const [pipelineError, setPipelineError] = useState<string | null>(null);
   const [pipelineData, setPipelineData] = useState<PipelineData[]>([]);
   
-  // Filter state for secured-only view
   const [showSecuredOnly, setShowSecuredOnly] = useState(false);
 
-  // Sorting state
   const [sortField, setSortField] = useState<SortField>("created_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
@@ -374,13 +372,11 @@ function DashboardContent() {
       const endOfTwelfthMonth = new Date(today.getFullYear(), today.getMonth() + 12, 0);
       endOfTwelfthMonth.setHours(23, 59, 59, 999);
 
-      // Create array of 12 month Date objects
       const monthDates: Date[] = [];
       for (let i = 0; i < 12; i++) {
         monthDates.push(new Date(today.getFullYear(), today.getMonth() + i, 1));
       }
 
-      // Initialize data structure with proper Date formatting
       const initialData: PipelineData[] = monthDates.map((date) => ({
         month: format(date, "MMM yy"),
         secured: 0,
@@ -390,13 +386,6 @@ function DashboardContent() {
         budgetGap: 0
       }));
 
-      console.log("📅 Date range:", {
-        start: startOfCurrentMonth.toISOString(),
-        end: endOfTwelfthMonth.toISOString()
-      });
-
-      // Fetch manual phasing data for both opportunities and projects
-      // Get distinct opportunity IDs first to optimize
       const { data: opportunityPhasing } = await supabase
         .from("opportunity_monthly_phasing")
         .select("opportunity_id, year, month, revenue_amount")
@@ -409,10 +398,8 @@ function DashboardContent() {
         .gte("year", startOfCurrentMonth.getFullYear())
         .lte("year", endOfTwelfthMonth.getFullYear());
 
-      // Create lookup maps for manual phasing
       const oppPhasingMap = new Map<string, number>();
       opportunityPhasing?.forEach((phase) => {
-        // Format month to 2 digits for consistent key: YYYY-MM
         const monthStr = phase.month.toString().padStart(2, '0');
         const key = `${phase.opportunity_id}-${phase.year}-${monthStr}`;
         oppPhasingMap.set(key, phase.revenue_amount);
@@ -425,7 +412,6 @@ function DashboardContent() {
         projPhasingMap.set(key, phase.revenue_amount);
       });
 
-      // MATCH MONTHLY VIEW: Fetch all opportunities with fee values, no stage filter
       const { data: opportunities } = await supabase
         .from("opportunities")
         .select("id, stage, expected_fee_value, expected_start_date, expected_end_date")
@@ -435,21 +421,12 @@ function DashboardContent() {
         .not("status", "in", '("closed_won","closed_lost")')
         .gte("expected_end_date", startOfCurrentMonth.toISOString());
 
-      // MATCH MONTHLY VIEW: Fetch all projects with fee values, no status filter
       const { data: projects } = await supabase
         .from("projects")
         .select("id, status, agreed_fee_value, start_date, end_date")
         .not("agreed_fee_value", "is", null)
         .gte("end_date", startOfCurrentMonth.toISOString());
 
-      console.log("📊 Data loaded:", {
-        opportunities: opportunities?.length || 0,
-        projects: projects?.length || 0,
-        opportunityPhasing: opportunityPhasing?.length || 0,
-        projectPhasing: projectPhasing?.length || 0
-      });
-
-      // Process opportunities - CHECK MANUAL PHASING FIRST
       opportunities?.forEach((opp) => {
         if (!opp.expected_start_date || !opp.expected_end_date || !opp.expected_fee_value) {
           return;
@@ -460,19 +437,16 @@ function DashboardContent() {
         const totalValue = opp.expected_fee_value;
         const stage = opp.stage;
 
-        // Calculate default monthly value (fallback)
         const durationMonths = Math.max(1,
           (endDate.getFullYear() - startDate.getFullYear()) * 12 + (
           endDate.getMonth() - startDate.getMonth()) + 1
         );
         const defaultMonthlyValue = totalValue / durationMonths;
 
-        // Check if this opportunity has ANY manual phasing entries
         const opportunityPhasingKeys = Array.from(oppPhasingMap.keys())
           .filter(key => key.startsWith(`${opp.id}-`));
         const hasManualPhasing = opportunityPhasingKeys.length > 0;
 
-        // Add to each relevant month
         monthDates.forEach((monthDate, idx) => {
           const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
           const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
@@ -482,7 +456,6 @@ function DashboardContent() {
             const yearMonth = format(monthDate, "yyyy-MM");
             const phasingKey = `${opp.id}-${yearMonth}`;
 
-            // Use manual phasing if available, otherwise use default calculation
             const monthlyValue = hasManualPhasing
               ? (oppPhasingMap.get(phasingKey) || 0)
               : defaultMonthlyValue;
@@ -496,7 +469,6 @@ function DashboardContent() {
         });
       });
 
-      // Process projects - CHECK MANUAL PHASING FIRST
       projects?.forEach((proj) => {
         if (!proj.start_date || !proj.end_date || !proj.agreed_fee_value) {
           return;
@@ -506,19 +478,16 @@ function DashboardContent() {
         const endDate = new Date(proj.end_date);
         const totalValue = proj.agreed_fee_value;
 
-        // Calculate default monthly value (fallback)
         const durationMonths = Math.max(1,
           (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
           (endDate.getMonth() - startDate.getMonth()) + 1
         );
         const defaultMonthlyValue = totalValue / durationMonths;
 
-        // Check if this project has ANY manual phasing entries
         const projectPhasingKeys = Array.from(projPhasingMap.keys())
           .filter(key => key.startsWith(`${proj.id}-`));
         const hasManualPhasing = projectPhasingKeys.length > 0;
 
-        // Add to each relevant month
         monthDates.forEach((monthDate, idx) => {
           const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
           const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
@@ -527,7 +496,6 @@ function DashboardContent() {
             const yearMonth = format(monthDate, "yyyy-MM");
             const phasingKey = `${proj.id}-${yearMonth}`;
 
-            // Use manual phasing if available, otherwise use default calculation
             const monthlyValue = hasManualPhasing
               ? (projPhasingMap.get(phasingKey) || 0)
               : defaultMonthlyValue;
@@ -537,13 +505,10 @@ function DashboardContent() {
         });
       });
 
-      // Calculate budget gap for each month
       initialData.forEach((month) => {
         const total = month.secured + month.highPotential + month.bid;
         month.budgetGap = Math.max(0, month.budget - total);
       });
-
-      console.log("📊 Final Pipeline Data:", initialData);
 
       setPipelineData(initialData);
     } catch (error) {
@@ -653,16 +618,15 @@ function DashboardContent() {
     const isActive = sortField === field;
     return (
       <th
-        className="text-left py-3 px-3 text-xs font-medium text-slate-600 cursor-pointer hover:bg-slate-50 transition-shadow select-none"
+        className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider cursor-pointer hover:bg-muted/50 transition-professional select-none"
         onClick={() => handleSort(field)}>
-
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
           {label}
           {isActive ?
             sortDirection === "asc" ?
             <ArrowUp className="w-3 h-3" /> :
             <ArrowDown className="w-3 h-3" /> :
-            <ArrowUpDown className="w-3 h-3 opacity-30" />
+            <ArrowUpDown className="w-3 h-3 opacity-40" />
           }
         </div>
       </th>
@@ -690,43 +654,34 @@ function DashboardContent() {
   const getStageColor = (stage: string) => {
     switch (stage) {
       case "secured":
-        return "bg-green-100 text-green-800";
+        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
       case "high_potential":
-        return "bg-blue-100 text-blue-800";
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400";
       case "bid":
-        return "bg-yellow-100 text-yellow-800";
+        return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400";
       case "lead":
-        return "bg-purple-100 text-purple-800";
+        return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400";
       case "lost":
-        return "bg-red-100 text-red-800";
+        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
       default:
-        return "bg-slate-100 text-slate-800";
-    }
-  };
-
-  const getAbsenceColor = (type: string) => {
-    switch (type) {
-      case "holiday":
-        return "bg-blue-100 text-blue-800";
-      case "sick":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-orange-100 text-orange-800";
+        return "bg-muted text-muted-foreground";
     }
   };
 
   const getEventTypeColor = (type: "visit" | "function") => {
-    return type === "visit" ? "bg-blue-100 text-blue-800" : "bg-purple-100 text-purple-800";
+    return type === "visit" ? 
+      "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400" : 
+      "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400";
   };
 
   const getActivityPostTypeColor = (type: string) => {
     switch (type) {
       case "event":
-        return "bg-blue-100 text-blue-700";
+        return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
       case "post":
-        return "bg-purple-100 text-purple-700";
+        return "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400";
       default:
-        return "bg-slate-100 text-slate-700";
+        return "bg-muted text-muted-foreground";
     }
   };
 
@@ -754,18 +709,14 @@ function DashboardContent() {
     });
   };
 
-  const maxValue = 200000;
-
   const ErrorState = ({ message }: {message: string;}) =>
     <Alert variant="destructive" className="my-4">
       <AlertTriangle className="h-4 w-4" />
       <AlertDescription>{message}</AlertDescription>
     </Alert>;
 
-
   const sortedOpportunities = getSortedOpportunities();
   
-  // Filter pipeline data based on secured-only toggle
   const filteredPipelineData = showSecuredOnly
     ? pipelineData.map(month => ({
         ...month,
@@ -777,76 +728,75 @@ function DashboardContent() {
 
   return (
     <Layout>
-      <div className="space-y-4 sm:space-y-6">
-        {/* Welcome Header */}
-        <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
-            Welcome back{profile?.full_name ? `, ${profile.full_name}` : ""}
-          </h1>
-          {profile?.role &&
-            <p className="text-sm sm:text-base text-slate-600 capitalize">
-              {profile.role} Dashboard
-            </p>
-          }
+      <div className="space-y-8">
+        <div className="flex flex-col gap-3">
+          <h1 className="text-5xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground text-lg">Comprehensive overview of business operations</p>
         </div>
 
-        {/* Quick Stats Grid */}
         {statsError ?
           <ErrorState message={statsError} /> :
-
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <Link href="/companies">
-              <Card className="hover:shadow-md transition-shadow cursor-pointer">
-                <CardContent className="p-4 sm:p-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
-                    <div className="text-xl sm:text-2xl font-bold text-slate-900">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+            <Link href="/companies" className="group">
+              <Card className="card-professional h-full">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center group-hover:scale-110 transition-professional">
+                      <Building2 className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div className="text-3xl font-bold tracking-tight">
                       {statsLoading ? "..." : stats.companiesCount}
                     </div>
                   </div>
-                  <div className="text-xs sm:text-sm text-slate-600">Companies</div>
+                  <div className="text-sm font-medium text-muted-foreground">Companies</div>
                 </CardContent>
               </Card>
             </Link>
 
-            <Link href="/contacts">
-              <Card className="hover:shadow-md transition-shadow cursor-pointer">
-                <CardContent className="p-4 sm:p-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <Users className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
-                    <div className="text-xl sm:text-2xl font-bold text-slate-900">
+            <Link href="/contacts" className="group">
+              <Card className="card-professional h-full">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="w-12 h-12 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center group-hover:scale-110 transition-professional">
+                      <Users className="w-6 h-6 text-green-600 dark:text-green-400" />
+                    </div>
+                    <div className="text-3xl font-bold tracking-tight">
                       {statsLoading ? "..." : stats.contactsCount}
                     </div>
                   </div>
-                  <div className="text-xs sm:text-sm text-slate-600">Contacts</div>
+                  <div className="text-sm font-medium text-muted-foreground">Contacts</div>
                 </CardContent>
               </Card>
             </Link>
 
-            <Link href="/opportunities">
-              <Card className="hover:shadow-md transition-shadow cursor-pointer">
-                <CardContent className="p-4 sm:p-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <Target className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" />
-                    <div className="text-xl sm:text-2xl font-bold text-slate-900">
+            <Link href="/opportunities" className="group">
+              <Card className="card-professional h-full">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="w-12 h-12 rounded-xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center group-hover:scale-110 transition-professional">
+                      <Target className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+                    </div>
+                    <div className="text-3xl font-bold tracking-tight">
                       {statsLoading ? "..." : stats.opportunitiesCount}
                     </div>
                   </div>
-                  <div className="text-xs sm:text-sm text-slate-600">Opportunities</div>
+                  <div className="text-sm font-medium text-muted-foreground">Opportunities</div>
                 </CardContent>
               </Card>
             </Link>
 
-            <Link href="/projects">
-              <Card className="hover:shadow-md transition-shadow cursor-pointer">
-                <CardContent className="p-4 sm:p-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <Briefcase className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
-                    <div className="text-xl sm:text-2xl font-bold text-slate-900">
+            <Link href="/projects" className="group">
+              <Card className="card-professional h-full">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="w-12 h-12 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center group-hover:scale-110 transition-professional">
+                      <Briefcase className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <div className="text-3xl font-bold tracking-tight">
                       {statsLoading ? "..." : stats.liveProjectsCount}
                     </div>
                   </div>
-                  <div className="text-xs sm:text-sm text-slate-600">Live Projects</div>
+                  <div className="text-sm font-medium text-muted-foreground">Live Projects</div>
                 </CardContent>
               </Card>
             </Link>
@@ -854,24 +804,27 @@ function DashboardContent() {
         }
 
         {/* Pipeline Chart */}
-        <Card className="col-span-full">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>12-Month Pipeline</span>
+        <Card className="card-professional">
+          <CardHeader className="pb-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-2xl mb-2">12-Month Pipeline</CardTitle>
+                <p className="text-sm text-muted-foreground">Revenue forecast and budget analysis</p>
+              </div>
               <div className="flex gap-2">
                 <Button
                   variant={showSecuredOnly ? "default" : "outline"}
                   size="sm"
                   onClick={() => setShowSecuredOnly(!showSecuredOnly)}
-                >
+                  className="btn-professional">
                   {showSecuredOnly ? (
                     <>
-                      <EyeOff className="w-4 h-4 mr-1" />
+                      <EyeOff className="w-4 h-4 mr-2" />
                       Show All
                     </>
                   ) : (
                     <>
-                      <Eye className="w-4 h-4 mr-1" />
+                      <Eye className="w-4 h-4 mr-2" />
                       Secured Only
                     </>
                   )}
@@ -879,19 +832,19 @@ function DashboardContent() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => router.push("/pipeline/monthly")}>
-
+                  onClick={() => router.push("/pipeline/monthly")}
+                  className="btn-professional">
                   View Monthly
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => router.push("/pipeline/gantt")}>
-
+                  onClick={() => router.push("/pipeline/gantt")}
+                  className="btn-professional">
                   View Gantt
                 </Button>
               </div>
-            </CardTitle>
+            </div>
           </CardHeader>
           <CardContent>
             {pipelineLoading ?
@@ -902,100 +855,98 @@ function DashboardContent() {
               <div className="h-96 flex items-center justify-center">
                 <p className="text-destructive">{pipelineError}</p>
               </div> :
-
               <>
-                {/* Chart with dynamic height */}
                 <div className="w-full" style={{ minHeight: "500px", height: "auto" }}>
                   <ResponsiveContainer width="100%" height="100%" minHeight={500}>
                     <BarChart data={filteredPipelineData} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                       <XAxis
                         dataKey="month"
                         angle={-45}
                         textAnchor="end"
                         height={80}
-                        tick={{ fontSize: 12 }} />
-
+                        tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
                       <YAxis
                         tickFormatter={(value) => `£${(value / 1000).toFixed(0)}k`}
-                        tick={{ fontSize: 12 }} />
-
+                        tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
                       <Tooltip
                         formatter={(value: number) => `£${value.toLocaleString()}`}
-                        contentStyle={{ fontSize: 12 }} />
-
+                        contentStyle={{ 
+                          fontSize: 12,
+                          backgroundColor: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px"
+                        }} />
                       <Legend
                         wrapperStyle={{ paddingTop: "20px" }}
                         iconType="circle" />
-
-                      <Bar dataKey="secured" stackId="a" fill="#22c55e" name="Secured + Projects" />
+                      <Bar dataKey="secured" stackId="a" fill="#22c55e" name="Secured + Projects" radius={[0, 0, 0, 0]} />
                       {!showSecuredOnly && (
                         <>
-                          <Bar dataKey="highPotential" stackId="a" name="High Potential" fill="#3b82f6" />
-                          <Bar dataKey="bid" stackId="a" name="Bid" fill="#f59e0b" />
+                          <Bar dataKey="highPotential" stackId="a" name="High Potential" fill="#3b82f6" radius={[0, 0, 0, 0]} />
+                          <Bar dataKey="bid" stackId="a" name="Bid" fill="#f59e0b" radius={[0, 0, 0, 0]} />
                         </>
                       )}
-                      <Bar dataKey="budgetGap" stackId="a" name="Budget Gap" fill="#ef4444" />
+                      <Bar dataKey="budgetGap" stackId="a" name="Budget Gap" fill="#ef4444" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
 
-                {/* Monthly Totals Table - Always Visible */}
                 <div className="mt-8 border-t pt-6">
-                  <div className="mt-6 overflow-x-auto">
-                    <h3 className="text-lg font-semibold mb-4">Monthly Breakdown</h3>
+                  <h3 className="text-lg font-semibold mb-4">Monthly Breakdown</h3>
+                  <div className="overflow-x-auto">
                     <table className="w-full border-collapse">
                       <thead>
-                        <tr className="bg-muted">
-                          <th className="border p-2 text-left">Month</th>
-                          <th className="border p-2 text-right text-green-600">Secured + Projects</th>
+                        <tr className="bg-muted/50">
+                          <th className="border border-border p-3 text-left text-sm font-semibold">Month</th>
+                          <th className="border border-border p-3 text-right text-sm font-semibold text-green-600 dark:text-green-400">Secured + Projects</th>
                           {!showSecuredOnly && (
                             <>
-                              <th className="border p-2 text-right text-blue-600">High Potential</th>
-                              <th className="border p-2 text-right text-amber-600">Bid</th>
+                              <th className="border border-border p-3 text-right text-sm font-semibold text-blue-600 dark:text-blue-400">High Potential</th>
+                              <th className="border border-border p-3 text-right text-sm font-semibold text-amber-600 dark:text-amber-400">Bid</th>
                             </>
                           )}
-                          <th className="border p-2 text-right text-red-600">Budget Gap</th>
-                          <th className="border p-2 text-right font-semibold">Total</th>
+                          <th className="border border-border p-3 text-right text-sm font-semibold text-red-600 dark:text-red-400">Budget Gap</th>
+                          <th className="border border-border p-3 text-right text-sm font-bold">Total</th>
                         </tr>
                       </thead>
                       <tbody>
                         {filteredPipelineData.map((row) =>
-                          <tr key={row.month} className="hover:bg-muted/50">
-                            <td className="border p-2">{row.month}</td>
-                            <td className="border p-2 text-right">{formatCurrency(row.secured)}</td>
+                          <tr key={row.month} className="hover:bg-muted/30 transition-professional">
+                            <td className="border border-border p-3 text-sm font-medium">{row.month}</td>
+                            <td className="border border-border p-3 text-right text-sm">{formatCurrency(row.secured)}</td>
                             {!showSecuredOnly && (
                               <>
-                                <td className="border p-2 text-right">{formatCurrency(row.highPotential)}</td>
-                                <td className="border p-2 text-right">{formatCurrency(row.bid)}</td>
+                                <td className="border border-border p-3 text-right text-sm">{formatCurrency(row.highPotential)}</td>
+                                <td className="border border-border p-3 text-right text-sm">{formatCurrency(row.bid)}</td>
                               </>
                             )}
-                            <td className="border p-2 text-right">{formatCurrency(row.budgetGap)}</td>
-                            <td className="border p-2 text-right font-semibold">
+                            <td className="border border-border p-3 text-right text-sm">{formatCurrency(row.budgetGap)}</td>
+                            <td className="border border-border p-3 text-right text-sm font-semibold">
                               {formatCurrency(row.secured + row.highPotential + row.bid)}
                             </td>
                           </tr>
                         )}
-                        <tr className="bg-gray-100 dark:bg-gray-800 font-bold">
-                          <td className="px-4 py-2">TOTAL</td>
-                          <td className="px-4 py-2 text-green-600" style={{ textAlign: "right" }}>
-                            £{filteredPipelineData.reduce((sum, month) => sum + month.secured, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                        <tr className="bg-muted font-bold">
+                          <td className="border border-border p-3 text-sm">TOTAL</td>
+                          <td className="border border-border p-3 text-right text-sm text-green-600 dark:text-green-400">
+                            {formatCurrency(filteredPipelineData.reduce((sum, month) => sum + month.secured, 0))}
                           </td>
                           {!showSecuredOnly && (
                             <>
-                              <td className="px-4 py-2 text-blue-600" style={{ textAlign: "right" }}>
-                                £{filteredPipelineData.reduce((sum, month) => sum + month.highPotential, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                              <td className="border border-border p-3 text-right text-sm text-blue-600 dark:text-blue-400">
+                                {formatCurrency(filteredPipelineData.reduce((sum, month) => sum + month.highPotential, 0))}
                               </td>
-                              <td className="px-4 py-2 text-amber-600" style={{ textAlign: "right" }}>
-                                £{filteredPipelineData.reduce((sum, month) => sum + month.bid, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                              <td className="border border-border p-3 text-right text-sm text-amber-600 dark:text-amber-400">
+                                {formatCurrency(filteredPipelineData.reduce((sum, month) => sum + month.bid, 0))}
                               </td>
                             </>
                           )}
-                          <td className="px-4 py-2 text-red-600" style={{ textAlign: "right" }}>
-                            £{filteredPipelineData.reduce((sum, month) => sum + month.budgetGap, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                          <td className="border border-border p-3 text-right text-sm text-red-600 dark:text-red-400">
+                            {formatCurrency(filteredPipelineData.reduce((sum, month) => sum + month.budgetGap, 0))}
                           </td>
-                          <td className="px-4 py-2" style={{ textAlign: "right" }}>
-                            £{filteredPipelineData.reduce((sum, month) => sum + month.secured + month.highPotential + month.bid, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                          <td className="border border-border p-3 text-right text-sm">
+                            {formatCurrency(filteredPipelineData.reduce((sum, month) => sum + month.secured + month.highPotential + month.bid, 0))}
                           </td>
                         </tr>
                       </tbody>
@@ -1008,31 +959,32 @@ function DashboardContent() {
         </Card>
 
         {/* Live Opportunities & High Potentials Table */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Target className="w-5 h-5 text-orange-600" />
-              <CardTitle className="text-base sm:text-lg">Live Opportunities & High Potentials</CardTitle>
+        <Card className="card-professional">
+          <CardHeader className="pb-6">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                <Target className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+              </div>
+              <CardTitle className="text-2xl">Live Opportunities & High Potentials</CardTitle>
             </div>
-            <p className="text-xs sm:text-sm text-slate-600">Active pipeline opportunities - Click column headers to sort</p>
+            <p className="text-sm text-muted-foreground">Active pipeline opportunities - Click column headers to sort</p>
           </CardHeader>
           <CardContent>
             {opportunitiesTableError ?
               <ErrorState message={opportunitiesTableError} /> :
               opportunitiesTableLoading ?
-              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
+              <div className="text-center py-12 text-muted-foreground">
                 Loading opportunities...
               </div> :
               opportunitiesTable.length === 0 ?
-              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
+              <div className="text-center py-12 text-muted-foreground">
                 No active opportunities in pipeline
               </div> :
-
-              <div className="overflow-x-auto -mx-2 sm:mx-0">
-                <table className="w-full min-w-[800px]">
+              <div className="overflow-x-auto -mx-6">
+                <table className="w-full min-w-[900px]">
                   <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-3 px-3 text-xs font-medium text-slate-600">Reference</th>
+                    <tr className="border-b border-border">
+                      <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Reference</th>
                       <SortableHeader field="name" label="Opportunity Name" />
                       <SortableHeader field="company" label="Company" />
                       <SortableHeader field="stage" label="Stage" />
@@ -1047,61 +999,60 @@ function DashboardContent() {
                     {sortedOpportunities.map((opp) =>
                       <tr
                         key={opp.id}
-                        className="border-b hover:bg-slate-50 cursor-pointer transition-colors"
+                        className="border-b border-border hover:bg-muted/30 cursor-pointer transition-professional"
                         onClick={() => router.push(`/opportunities/${opp.id}`)}>
-
-                        <td className="py-3 px-3 text-sm text-slate-500">
+                        <td className="py-3 px-4 text-sm text-muted-foreground font-mono">
                           {opp.project_reference || "—"}
                         </td>
-                        <td className="py-3 px-3">
-                          <div className="font-medium text-sm text-slate-900">{opp.name}</div>
+                        <td className="py-3 px-4">
+                          <div className="font-medium text-sm">{opp.name}</div>
                         </td>
-                        <td className="py-3 px-3 text-sm text-slate-700">
+                        <td className="py-3 px-4 text-sm">
                           {opp.companies?.name || "—"}
                         </td>
-                        <td className="py-3 px-3">
-                          <Badge className={`${getStageColor(opp.stage)} text-xs`}>
+                        <td className="py-3 px-4">
+                          <Badge className={`${getStageColor(opp.stage)} text-xs font-medium`}>
                             {opp.stage === "high_potential" ? "High Potential" : opp.stage}
                           </Badge>
                         </td>
-                        <td className="py-3 px-3 text-right text-sm font-medium text-slate-900">
+                        <td className="py-3 px-4 text-right text-sm font-semibold">
                           {opp.expected_fee_value ? formatCurrency(opp.expected_fee_value) : "—"}
                         </td>
-                        <td className="py-3 px-3 text-sm text-slate-700">
+                        <td className="py-3 px-4 text-sm">
                           {formatDate(opp.tender_due_date)}
                         </td>
-                        <td className="py-3 px-3 text-sm text-slate-700">
+                        <td className="py-3 px-4 text-sm">
                           {formatDate(opp.expected_start_date)}
                         </td>
-                        <td className="py-3 px-3 text-sm text-slate-700">
+                        <td className="py-3 px-4 text-sm">
                           {formatDate(opp.expected_end_date)}
                         </td>
-                        <td className="py-3 px-3 text-right text-sm text-slate-700">
+                        <td className="py-3 px-4 text-right text-sm">
                           {opp.probability_percent !== null ? `${opp.probability_percent}%` : "—"}
                         </td>
                       </tr>
                     )}
                   </tbody>
                   <tfoot>
-                    <tr className="border-t-2 bg-slate-50">
-                      <td colSpan={4} className="py-3 px-3 text-sm font-semibold text-slate-900">
+                    <tr className="border-t-2 bg-muted/50">
+                      <td colSpan={4} className="py-4 px-4 text-sm font-bold">
                         Totals:
                       </td>
-                      <td className="py-3 px-3 text-right text-sm font-bold text-slate-900">
+                      <td className="py-4 px-4 text-right text-sm">
                         {(() => {
-                          const highPotentialTotal = opportunitiesTable.
-                            filter((opp) => opp.stage === "high_potential").
-                            reduce((sum, opp) => sum + (opp.expected_fee_value || 0), 0);
-                          const bidTotal = opportunitiesTable.
-                            filter((opp) => opp.stage === "bid").
-                            reduce((sum, opp) => sum + (opp.expected_fee_value || 0), 0);
+                          const highPotentialTotal = opportunitiesTable
+                            .filter((opp) => opp.stage === "high_potential")
+                            .reduce((sum, opp) => sum + (opp.expected_fee_value || 0), 0);
+                          const bidTotal = opportunitiesTable
+                            .filter((opp) => opp.stage === "bid")
+                            .reduce((sum, opp) => sum + (opp.expected_fee_value || 0), 0);
 
                           return (
-                            <div className="space-y-1">
-                              <div className="text-blue-600">
+                            <div className="space-y-1.5">
+                              <div className="text-blue-600 dark:text-blue-400 font-semibold">
                                 High Potential: {formatCurrency(highPotentialTotal)}
                               </div>
-                              <div className="text-yellow-600">
+                              <div className="text-amber-600 dark:text-amber-400 font-semibold">
                                 Bids: {formatCurrency(bidTotal)}
                               </div>
                             </div>
@@ -1117,249 +1068,247 @@ function DashboardContent() {
           </CardContent>
         </Card>
 
-        {/* Upcoming Tenders */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-5 h-5 text-orange-600" />
-              <CardTitle className="text-base sm:text-lg">Upcoming Tenders</CardTitle>
-            </div>
-            <p className="text-xs sm:text-sm text-slate-600">Next 30 days</p>
-          </CardHeader>
-          <CardContent>
-            {tendersError ?
-              <ErrorState message={tendersError} /> :
-              tendersLoading ?
-              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
-                Loading tenders...
-              </div> :
-              upcomingTenders.length === 0 ?
-              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
-                No tenders due in the next 30 days
-              </div> :
-
-              <div className="space-y-3">
-                {upcomingTenders.map((opp) =>
-                  <div
-                    key={opp.id}
-                    className="p-3 border rounded-lg hover:bg-slate-50 transition-colors">
-
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div
-                        className="font-medium text-sm text-slate-900 line-clamp-2 cursor-pointer hover:text-blue-600"
-                        onClick={() => router.push(`/opportunities/${opp.id}`)}>
-
-                        {opp.name}
-                      </div>
-                      <Badge className={`${getStageColor(opp.stage)} flex-shrink-0 text-xs`}>
-                        {opp.stage.replace("_", " ")}
-                      </Badge>
-                    </div>
-                    <div className="text-xs text-slate-600 mb-1">
-                      {opp.companies?.name}
-                    </div>
-                    <div className="text-xs text-slate-500">
-                      Due: {formatDate(opp.tender_due_date)}
-                    </div>
-                  </div>
-                )}
+        {/* Two Column Layout for Cards */}
+        <div className="grid lg:grid-cols-2 gap-6">
+          {/* Upcoming Tenders */}
+          <Card className="card-professional">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                  <AlertCircle className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                </div>
+                <CardTitle className="text-xl">Upcoming Tenders</CardTitle>
               </div>
-            }
-          </CardContent>
-        </Card>
+              <p className="text-sm text-muted-foreground">Next 30 days</p>
+            </CardHeader>
+            <CardContent>
+              {tendersError ?
+                <ErrorState message={tendersError} /> :
+                tendersLoading ?
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  Loading tenders...
+                </div> :
+                upcomingTenders.length === 0 ?
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  No tenders due in the next 30 days
+                </div> :
+                <div className="space-y-3">
+                  {upcomingTenders.map((opp) =>
+                    <div
+                      key={opp.id}
+                      className="p-4 border border-border rounded-lg hover:bg-muted/30 transition-professional cursor-pointer"
+                      onClick={() => router.push(`/opportunities/${opp.id}`)}>
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <div className="font-medium text-sm line-clamp-2 flex-1">
+                          {opp.name}
+                        </div>
+                        <Badge className={`${getStageColor(opp.stage)} flex-shrink-0 text-xs font-medium`}>
+                          {opp.stage.replace("_", " ")}
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-muted-foreground mb-1">
+                        {opp.companies?.name}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Due: <span className="font-medium">{formatDate(opp.tender_due_date)}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              }
+            </CardContent>
+          </Card>
 
-        {/* Latest Activity */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-purple-600" />
-              <CardTitle className="text-base sm:text-lg">Latest Activity</CardTitle>
-            </div>
-            <p className="text-xs sm:text-sm text-slate-600">Recent updates</p>
-          </CardHeader>
-          <CardContent>
-            {activityError ?
-              <ErrorState message={activityError} /> :
-              activityLoading ?
-              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
-                Loading activity...
-              </div> :
-              latestActivity.length === 0 ?
-              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
-                No recent activity
-              </div> :
-
-              <div className="space-y-3">
-                {latestActivity.map((activity) =>
-                  <div
-                    key={`${activity.source}-${activity.id}`}
-                    className="p-3 border rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
-                    onClick={() => {
-                      const path = activity.source === "contact" ?
-                        `/contacts/${activity.source_id}` :
-                        `/opportunities/${activity.source_id}`;
-                      router.push(path);
-                    }}>
-
-                    <div className="flex items-start gap-2 mb-2">
-                      <span className="text-sm">{getActivitySourceIcon(activity.source)}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <span className="text-xs font-medium text-slate-900 truncate">
-                            {activity.source_name}
+          {/* Latest Opportunities */}
+          <Card className="card-professional">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                  <Target className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                </div>
+                <CardTitle className="text-xl">Latest Opportunities</CardTitle>
+              </div>
+              <p className="text-sm text-muted-foreground">Recently added</p>
+            </CardHeader>
+            <CardContent>
+              {latestOpportunitiesError ?
+                <ErrorState message={latestOpportunitiesError} /> :
+                latestOpportunitiesLoading ?
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  Loading opportunities...
+                </div> :
+                latestOpportunities.length === 0 ?
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  No opportunities yet
+                </div> :
+                <div className="space-y-3">
+                  {latestOpportunities.map((opp) =>
+                    <div
+                      key={opp.id}
+                      className="p-4 border border-border rounded-lg hover:bg-muted/30 transition-professional cursor-pointer"
+                      onClick={() => router.push(`/opportunities/${opp.id}`)}>
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <div className="font-medium text-sm line-clamp-2 flex-1">
+                          {opp.name}
+                        </div>
+                        <Badge className={`${getStageColor(opp.stage)} flex-shrink-0 text-xs font-medium`}>
+                          {opp.stage.replace("_", " ")}
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-muted-foreground mb-2">
+                        {opp.companies?.name}
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>{formatDate(opp.created_at)}</span>
+                        {opp.expected_fee_value &&
+                          <span className="font-semibold">
+                            {formatCurrency(opp.expected_fee_value)}
                           </span>
-                          <Badge variant="outline" className={`text-xs ${getActivityPostTypeColor(activity.post_type)}`}>
-                            {activity.post_type}
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-slate-700 line-clamp-2 mb-1">
-                          {activity.content}
-                        </p>
-                        <div className="flex items-center gap-2 text-xs text-slate-500">
-                          <span>{activity.author_name}</span>
-                          <span>•</span>
-                          <span>{formatActivityDate(activity.created_at)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            }
-          </CardContent>
-        </Card>
-
-        {/* Latest Opportunities */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Target className="w-5 h-5 text-orange-600" />
-              <CardTitle className="text-base sm:text-lg">Latest Opportunities</CardTitle>
-            </div>
-            <p className="text-xs sm:text-sm text-slate-600">Recently added</p>
-          </CardHeader>
-          <CardContent>
-            {latestOpportunitiesError ?
-              <ErrorState message={latestOpportunitiesError} /> :
-              latestOpportunitiesLoading ?
-              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
-                Loading opportunities...
-              </div> :
-              latestOpportunities.length === 0 ?
-              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
-                No opportunities yet
-              </div> :
-
-              <div className="space-y-3">
-                {latestOpportunities.map((opp) =>
-                  <div
-                    key={opp.id}
-                    className="p-3 border rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
-                    onClick={() => router.push(`/opportunities/${opp.id}`)}>
-
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div className="font-medium text-sm text-slate-900 line-clamp-2">
-                        {opp.name}
-                      </div>
-                      <Badge className={`${getStageColor(opp.stage)} flex-shrink-0 text-xs`}>
-                        {opp.stage.replace("_", " ")}
-                      </Badge>
-                    </div>
-                    <div className="text-xs text-slate-600 mb-1">
-                      {opp.companies?.name}
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-slate-500">
-                      <span>{formatDate(opp.created_at)}</span>
-                      {opp.expected_fee_value &&
-                        <span className="font-medium text-slate-700">
-                          {formatCurrency(opp.expected_fee_value)}
-                        </span>
-                      }
-                    </div>
-                  </div>
-                )}
-              </div>
-            }
-          </CardContent>
-        </Card>
-
-        {/* Client Visits & Functions - Full Width */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-purple-600" />
-              <CardTitle className="text-base sm:text-lg">Client Visits & Functions</CardTitle>
-            </div>
-            <p className="text-xs sm:text-sm text-slate-600">Next 7 days</p>
-          </CardHeader>
-          <CardContent>
-            {visitsError ?
-              <ErrorState message={visitsError} /> :
-              visitsLoading ?
-              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
-                Loading visits...
-              </div> :
-              upcomingVisits.length === 0 ?
-              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm">
-                No visits or functions scheduled in the next 7 days
-              </div> :
-
-              <div className="space-y-3">
-                {upcomingVisits.map((visit) =>
-                  <div
-                    key={visit.id}
-                    className="p-3 sm:p-4 border rounded-lg cursor-pointer hover:bg-slate-50 transition-colors"
-                    onClick={() => router.push(`/contacts/${visit.contact_id}`)}>
-
-                    <div className="flex flex-col sm:flex-row sm:items-start gap-3">
-                      {/* Date & Time Column */}
-                      <div className="flex-shrink-0 sm:w-32">
-                        <div className="text-sm font-semibold text-slate-900">
-                          {formatDate(visit.event_date)}
-                        </div>
-                        {visit.start_time &&
-                          <div className="text-xs text-slate-500">
-                            {visit.start_time.substring(0, 5)}
-                            {visit.end_time && ` - ${visit.end_time.substring(0, 5)}`}
-                          </div>
                         }
                       </div>
+                    </div>
+                  )}
+                </div>
+              }
+            </CardContent>
+          </Card>
 
-                      {/* Event Details Column */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start gap-2 mb-2">
-                          <Badge className={`${getEventTypeColor(visit.event_type)} flex-shrink-0 text-xs`}>
-                            {visit.event_type}
-                          </Badge>
-                          <div className="font-medium text-sm text-slate-900 truncate">
-                            {visit.title}
+          {/* Latest Activity */}
+          <Card className="card-professional">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                  <MessageSquare className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                </div>
+                <CardTitle className="text-xl">Latest Activity</CardTitle>
+              </div>
+              <p className="text-sm text-muted-foreground">Recent updates</p>
+            </CardHeader>
+            <CardContent>
+              {activityError ?
+                <ErrorState message={activityError} /> :
+                activityLoading ?
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  Loading activity...
+                </div> :
+                latestActivity.length === 0 ?
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  No recent activity
+                </div> :
+                <div className="space-y-3">
+                  {latestActivity.map((activity) =>
+                    <div
+                      key={`${activity.source}-${activity.id}`}
+                      className="p-4 border border-border rounded-lg hover:bg-muted/30 transition-professional cursor-pointer"
+                      onClick={() => {
+                        const path = activity.source === "contact" ?
+                          `/contacts/${activity.source_id}` :
+                          `/opportunities/${activity.source_id}`;
+                        router.push(path);
+                      }}>
+                      <div className="flex items-start gap-3">
+                        <span className="text-lg">{getActivitySourceIcon(activity.source)}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                            <span className="text-xs font-semibold truncate">
+                              {activity.source_name}
+                            </span>
+                            <Badge variant="outline" className={`text-xs ${getActivityPostTypeColor(activity.post_type)}`}>
+                              {activity.post_type}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
+                            {activity.content}
+                          </p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span className="font-medium">{activity.author_name}</span>
+                            <span>•</span>
+                            <span>{formatActivityDate(activity.created_at)}</span>
                           </div>
                         </div>
-                        <div className="text-sm text-slate-600">
-                          <span className="font-medium">{visit.contacts?.name}</span>
-                          {visit.contacts?.companies?.name &&
-                            <span className="text-slate-500"> • {visit.contacts.companies.name}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              }
+            </CardContent>
+          </Card>
+
+          {/* Client Visits & Functions */}
+          <Card className="card-professional">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                  <Calendar className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                </div>
+                <CardTitle className="text-xl">Client Visits & Functions</CardTitle>
+              </div>
+              <p className="text-sm text-muted-foreground">Next 7 days</p>
+            </CardHeader>
+            <CardContent>
+              {visitsError ?
+                <ErrorState message={visitsError} /> :
+                visitsLoading ?
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  Loading visits...
+                </div> :
+                upcomingVisits.length === 0 ?
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  No visits or functions scheduled in the next 7 days
+                </div> :
+                <div className="space-y-3">
+                  {upcomingVisits.map((visit) =>
+                    <div
+                      key={visit.id}
+                      className="p-4 border border-border rounded-lg cursor-pointer hover:bg-muted/30 transition-professional"
+                      onClick={() => router.push(`/contacts/${visit.contact_id}`)}>
+                      <div className="flex gap-3">
+                        <div className="flex-shrink-0 w-20">
+                          <div className="text-sm font-semibold">
+                            {formatDate(visit.event_date)}
+                          </div>
+                          {visit.start_time &&
+                            <div className="text-xs text-muted-foreground mt-0.5">
+                              {visit.start_time.substring(0, 5)}
+                              {visit.end_time && ` - ${visit.end_time.substring(0, 5)}`}
+                            </div>
                           }
                         </div>
-                        {visit.location &&
-                          <div className="text-xs text-slate-500 mt-1">
-                            📍 {visit.location}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start gap-2 mb-2">
+                            <Badge className={`${getEventTypeColor(visit.event_type)} flex-shrink-0 text-xs font-medium`}>
+                              {visit.event_type}
+                            </Badge>
+                            <div className="font-medium text-sm truncate">
+                              {visit.title}
+                            </div>
                           </div>
-                        }
+                          <div className="text-sm mb-1">
+                            <span className="font-medium">{visit.contacts?.name}</span>
+                            {visit.contacts?.companies?.name &&
+                              <span className="text-muted-foreground"> • {visit.contacts.companies.name}</span>
+                            }
+                          </div>
+                          {visit.location &&
+                            <div className="text-xs text-muted-foreground">
+                              📍 {visit.location}
+                            </div>
+                          }
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            }
-          </CardContent>
-        </Card>
+                  )}
+                </div>
+              }
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </Layout>
   );
 }
 
-export default function DashboardPage() {
+export default function Dashboard() {
   return (
     <RequireAuth>
       <DashboardContent />
