@@ -47,90 +47,190 @@ function AdminDashboardContent() {
 
   const fetchFinancialTrends = async () => {
     try {
-      // 1. Fetch manually phased project revenue for 2026
+      // Replicate pipeline monthly view calculation for 2026
       const { data: projectPhasing, error: projectError } = await supabase
         .from("project_monthly_phasing")
-        .select(`
-          month,
-          revenue_amount
-        `)
+        .select("project_id, year, month, revenue_amount")
         .eq("year", 2026);
 
       if (projectError) throw projectError;
 
-      // 2. Fetch secured opportunities (WIP) that overlap with 2026
-      // Logic mirrors the pipeline monthly view
-      const { data: opportunities, error: oppsError } = await supabase
+      const { data: oppPhasingData, error: oppPhasingError } = await supabase
+        .from("opportunity_monthly_phasing")
+        .select("opportunity_id, year, month, revenue_amount")
+        .eq("year", 2026);
+
+      if (oppPhasingError) throw oppPhasingError;
+
+      // Get all projects that have ANY manual phasing entries
+      const { data: projectsWithAnyPhasing, error: projectsWithAnyPhasingError } = await supabase
+        .from("project_monthly_phasing")
+        .select("project_id")
+        .not("revenue_amount", "is", null);
+
+      if (projectsWithAnyPhasingError) throw projectsWithAnyPhasingError;
+
+      // Get all opportunities that have ANY manual phasing entries
+      const { data: oppsWithAnyPhasing, error: oppsWithAnyPhasingError } = await supabase
+        .from("opportunity_monthly_phasing")
+        .select("opportunity_id")
+        .not("revenue_amount", "is", null);
+
+      if (oppsWithAnyPhasingError) throw oppsWithAnyPhasingError;
+
+      // Fetch all opportunities
+      const now = new Date();
+      const startOfCurrentMonth = new Date(2026, 0, 1); // Jan 1, 2026
+
+      const { data: oppsData, error: oppsError } = await supabase
         .from("opportunities")
         .select(`
           id,
           name,
-          expected_fee_value,
+          stage,
           expected_start_date,
           expected_end_date,
-          stage
+          expected_fee_value
         `)
-        .eq("stage", "secured")
-        .is("archived", false);
+        .eq("archived", false)
+        .neq("status", "closed_won")
+        .neq("status", "closed_lost")
+        .not("expected_fee_value", "is", null)
+        .gte("expected_end_date", startOfCurrentMonth.toISOString());
 
       if (oppsError) throw oppsError;
 
-      // Initialize monthly totals
+      // Fetch all projects
+      const { data: projectsData, error: projectsError } = await supabase
+        .from("projects")
+        .select(`
+          id,
+          code,
+          name,
+          status,
+          start_date,
+          end_date,
+          agreed_fee_value
+        `)
+        .eq("archived", false)
+        .not("agreed_fee_value", "is", null)
+        .gte("end_date", startOfCurrentMonth.toISOString());
+
+      if (projectsError) throw projectsError;
+
+      // Create phasing lookup maps
+      const oppPhasingMap = new Map<string, Map<string, number>>();
+      oppPhasingData?.forEach((p) => {
+        if (!oppPhasingMap.has(p.opportunity_id)) {
+          oppPhasingMap.set(p.opportunity_id, new Map());
+        }
+        const key = `${p.year}-${p.month}`;
+        oppPhasingMap.get(p.opportunity_id)!.set(key, p.revenue_amount || 0);
+      });
+
+      const projPhasingMap = new Map<string, Map<string, number>>();
+      projectPhasing?.forEach((p) => {
+        if (!projPhasingMap.has(p.project_id)) {
+          projPhasingMap.set(p.project_id, new Map());
+        }
+        const key = `${p.year}-${p.month}`;
+        projPhasingMap.get(p.project_id)!.set(key, p.revenue_amount || 0);
+      });
+
+      // Create sets of all projects/opportunities that have ANY manual phasing
+      const projectsWithAnyPhasingSet = new Set(
+        projectsWithAnyPhasing?.map((p) => p.project_id) || []
+      );
+
+      const oppsWithAnyPhasingSet = new Set(
+        oppsWithAnyPhasing?.map((o) => o.opportunity_id) || []
+      );
+
+      // Initialize monthly totals for 2026 (12 months)
       const monthlyRevenue: { [key: number]: number } = {};
       for (let i = 1; i <= 12; i++) {
         monthlyRevenue[i] = 0;
       }
-      
-      // Add project phasing (Delivered + Phased WIP)
-      projectPhasing?.forEach((entry) => {
-        if (entry.revenue_amount) {
-          monthlyRevenue[entry.month] += Number(entry.revenue_amount);
-        }
-      });
 
-      // Add opportunity revenue (Unphased WIP)
-      // Only include opportunities that don't have project phasing (to avoid double counting)
-      // Note: In a perfect world we'd check if a linked project exists and has phasing,
-      // but for now we'll assume opportunities in 'secured' stage are pre-project or unphased
-      opportunities?.forEach((opp) => {
-        // Skip if no value
-        if (!opp.expected_fee_value) return;
+      // Distribute opportunities across months (matching pipeline logic)
+      if (oppsData) {
+        oppsData.forEach((opp) => {
+          const startDate = new Date(opp.expected_start_date || "");
+          const endDate = new Date(opp.expected_end_date || "");
 
-        const value = Number(opp.expected_fee_value);
-        let startDate = opp.expected_start_date ? new Date(opp.expected_start_date) : new Date(2026, 0, 1);
-        
-        // If no end date, default to spreading over remainder of year or fixed period
-        // For secured opps without dates, spread from Start Date to Dec 2026
-        const endDate = opp.expected_end_date ? new Date(opp.expected_end_date) : new Date(2026, 11, 31);
-        
-        // If start date is before 2026, clamp to Jan 1 2026 for calculation
-        if (startDate.getFullYear() < 2026) startDate = new Date(2026, 0, 1);
-        
-        // If end date is after 2026, clamp to Dec 31 2026 for calculation
-        
-        const startMonth = startDate.getMonth() + 1; // 1-12
-        const endMonth = endDate.getFullYear() > 2026 ? 12 : endDate.getMonth() + 1;
-        
-        // Only process if overlaps with 2026
-        if (startDate.getFullYear() <= 2026 && (endDate.getFullYear() >= 2026)) {
-          // Simple distribution: Value / Duration in months
-          // Calculate total duration in months (including cross-year)
-          const trueStartDate = opp.expected_start_date ? new Date(opp.expected_start_date) : new Date(2026, 0, 1);
-          const trueEndDate = opp.expected_end_date ? new Date(opp.expected_end_date) : new Date(2026, 11, 31);
-          
-          const totalMonths = (trueEndDate.getFullYear() - trueStartDate.getFullYear()) * 12 + 
-                             (trueEndDate.getMonth() - trueStartDate.getMonth()) + 1;
-          
-          const monthlyAmount = value / Math.max(1, totalMonths);
-          
-          // Add to 2026 months
-          for (let m = Math.max(1, startMonth); m <= Math.min(12, endMonth); m++) {
-             monthlyRevenue[m] += monthlyAmount;
+          if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+            const hasManualPhasing = oppsWithAnyPhasingSet.has(opp.id);
+            
+            // Calculate default monthly turnover (only used if NO manual phasing at all)
+            const durationMonths = Math.max(1, 
+              (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
+              (endDate.getMonth() - startDate.getMonth()) + 1
+            );
+            const defaultMonthlyTurnover = (opp.expected_fee_value || 0) / durationMonths;
+
+            // Add to each relevant month in 2026
+            for (let m = 1; m <= 12; m++) {
+              const monthStart = new Date(2026, m - 1, 1);
+              const monthEnd = new Date(2026, m, 0);
+
+              if (startDate <= monthEnd && endDate >= monthStart) {
+                // Check if manual phasing exists for this month
+                const phasingKey = `2026-${m}`;
+                const manualPhasing = oppPhasingMap.get(opp.id);
+                
+                // If opportunity has ANY manual phasing, use 0 for months without values
+                // If opportunity has NO manual phasing at all, use the calculated fallback
+                const monthlyTurnover = hasManualPhasing 
+                  ? (manualPhasing?.get(phasingKey) ?? 0) 
+                  : defaultMonthlyTurnover;
+
+                monthlyRevenue[m] += monthlyTurnover;
+              }
+            }
           }
-        }
-      });
+        });
+      }
 
-      console.log("Monthly revenue totals (Projects + Opportunities):", monthlyRevenue);
+      // Distribute projects across months (matching pipeline logic)
+      if (projectsData) {
+        projectsData.forEach((proj) => {
+          const startDate = new Date(proj.start_date || "");
+          const endDate = new Date(proj.end_date || "");
+
+          if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+            const hasManualPhasing = projectsWithAnyPhasingSet.has(proj.id);
+            
+            // Calculate default monthly turnover (only used if NO manual phasing at all)
+            const durationMonths = Math.max(1, 
+              (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
+              (endDate.getMonth() - startDate.getMonth()) + 1
+            );
+            const defaultMonthlyTurnover = (proj.agreed_fee_value || 0) / durationMonths;
+
+            // Add to each relevant month in 2026
+            for (let m = 1; m <= 12; m++) {
+              const monthStart = new Date(2026, m - 1, 1);
+              const monthEnd = new Date(2026, m, 0);
+
+              if (startDate <= monthEnd && endDate >= monthStart) {
+                // Check if manual phasing exists for this month
+                const phasingKey = `2026-${m}`;
+                const manualPhasing = projPhasingMap.get(proj.id);
+                
+                // If project has ANY manual phasing entries, use month value or 0
+                // If project has NO manual phasing at all, use defaultMonthlyTurnover
+                const monthlyTurnover = hasManualPhasing 
+                  ? (manualPhasing?.get(phasingKey) || 0) 
+                  : defaultMonthlyTurnover;
+
+                monthlyRevenue[m] += monthlyTurnover;
+              }
+            }
+          }
+        });
+      }
+
+      console.log("Monthly revenue totals (2026):", monthlyRevenue);
 
       // Calculate total year revenue
       let totalYearRevenue = 0;
@@ -151,7 +251,7 @@ function AdminDashboardContent() {
         });
       }
 
-      console.log("Total year revenue:", totalYearRevenue);
+      console.log("Total year revenue (pipeline calc):", totalYearRevenue);
 
       setFinancialData(chartData);
       setYearEndRevenue(totalYearRevenue);
