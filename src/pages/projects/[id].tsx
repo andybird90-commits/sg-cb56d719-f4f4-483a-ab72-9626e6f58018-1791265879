@@ -169,7 +169,7 @@ function ProjectDetailContent() {
   const [variationForm, setVariationForm] = useState({
     description: "",
     value: "",
-    status: "pending",
+    status: "proposed",
     po_number: "",
   });
 
@@ -1485,7 +1485,7 @@ function ProjectDetailContent() {
                                 onClick={() => {
                                   setVariationFormOpen(false);
                                   setEditingVariation(null);
-                                  setVariationForm({ description: "", value: "", status: "pending", po_number: "" });
+                                  setVariationForm({ description: "", value: "", status: "proposed", po_number: "" });
                                 }}
                               >
                                 Cancel
@@ -1569,7 +1569,7 @@ function ProjectDetailContent() {
                             setVariationForm({
                               description: "",
                               value: "",
-                              status: "pending",
+                              status: "proposed",
                               po_number: "",
                             });
                           }}>
@@ -1640,7 +1640,7 @@ function ProjectDetailContent() {
                                 onClick={() => {
                                   setVariationFormOpen(false);
                                   setEditingVariation(null);
-                                  setVariationForm({ description: "", value: "", status: "pending", po_number: "" });
+                                  setVariationForm({ description: "", value: "", status: "proposed", po_number: "" });
                                 }}
                               >
                                 Cancel
