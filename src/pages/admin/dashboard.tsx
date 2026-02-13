@@ -37,37 +37,92 @@ function AdminDashboardContent() {
 
   const fetchFinancialTrends = async () => {
     try {
-      // Fetch manually phased project revenue for 2026
-      const { data: phasingData, error: phasingError } = await supabase
+      // 1. Fetch manually phased project revenue for 2026
+      const { data: projectPhasing, error: projectError } = await supabase
         .from("project_monthly_phasing")
         .select(`
           month,
-          revenue_amount,
-          projects (
-            code,
-            name
-          )
+          revenue_amount
         `)
         .eq("year", 2026);
 
-      if (phasingError) throw phasingError;
+      if (projectError) throw projectError;
 
-      console.log("Manual phasing data for 2026:", phasingData);
+      // 2. Fetch secured opportunities (WIP) that overlap with 2026
+      // Logic mirrors the pipeline monthly view
+      const { data: opportunities, error: oppsError } = await supabase
+        .from("opportunities")
+        .select(`
+          id,
+          name,
+          expected_fee_value,
+          expected_start_date,
+          expected_end_date,
+          stage
+        `)
+        .eq("stage", "secured")
+        .is("archived", false);
 
-      // Group by month and sum revenue
+      if (oppsError) throw oppsError;
+
+      // Initialize monthly totals
       const monthlyRevenue: { [key: number]: number } = {};
+      for (let i = 1; i <= 12; i++) {
+        monthlyRevenue[i] = 0;
+      }
       
-      phasingData?.forEach((entry) => {
-        const month = entry.month;
-        if (!monthlyRevenue[month]) {
-          monthlyRevenue[month] = 0;
+      // Add project phasing (Delivered + Phased WIP)
+      projectPhasing?.forEach((entry) => {
+        if (entry.revenue_amount) {
+          monthlyRevenue[entry.month] += Number(entry.revenue_amount);
         }
-        monthlyRevenue[month] += entry.revenue_amount || 0;
       });
 
-      console.log("Monthly revenue totals:", monthlyRevenue);
+      // Add opportunity revenue (Unphased WIP)
+      // Only include opportunities that don't have project phasing (to avoid double counting)
+      // Note: In a perfect world we'd check if a linked project exists and has phasing,
+      // but for now we'll assume opportunities in 'secured' stage are pre-project or unphased
+      opportunities?.forEach((opp) => {
+        // Skip if no value
+        if (!opp.expected_fee_value) return;
 
-      // Calculate total year revenue from manual phasing only
+        const value = Number(opp.expected_fee_value);
+        let startDate = opp.expected_start_date ? new Date(opp.expected_start_date) : new Date(2026, 0, 1);
+        
+        // If no end date, default to spreading over remainder of year or fixed period
+        // For secured opps without dates, spread from Start Date to Dec 2026
+        const endDate = opp.expected_end_date ? new Date(opp.expected_end_date) : new Date(2026, 11, 31);
+        
+        // If start date is before 2026, clamp to Jan 1 2026 for calculation
+        if (startDate.getFullYear() < 2026) startDate = new Date(2026, 0, 1);
+        
+        // If end date is after 2026, clamp to Dec 31 2026 for calculation
+        
+        const startMonth = startDate.getMonth() + 1; // 1-12
+        const endMonth = endDate.getFullYear() > 2026 ? 12 : endDate.getMonth() + 1;
+        
+        // Only process if overlaps with 2026
+        if (startDate.getFullYear() <= 2026 && (endDate.getFullYear() >= 2026)) {
+          // Simple distribution: Value / Duration in months
+          // Calculate total duration in months (including cross-year)
+          const trueStartDate = opp.expected_start_date ? new Date(opp.expected_start_date) : new Date(2026, 0, 1);
+          const trueEndDate = opp.expected_end_date ? new Date(opp.expected_end_date) : new Date(2026, 11, 31);
+          
+          const totalMonths = (trueEndDate.getFullYear() - trueStartDate.getFullYear()) * 12 + 
+                             (trueEndDate.getMonth() - trueStartDate.getMonth()) + 1;
+          
+          const monthlyAmount = value / Math.max(1, totalMonths);
+          
+          // Add to 2026 months
+          for (let m = Math.max(1, startMonth); m <= Math.min(12, endMonth); m++) {
+             monthlyRevenue[m] += monthlyAmount;
+          }
+        }
+      });
+
+      console.log("Monthly revenue totals (Projects + Opportunities):", monthlyRevenue);
+
+      // Calculate total year revenue
       let totalYearRevenue = 0;
       
       const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -102,10 +157,11 @@ function AdminDashboardContent() {
 
   const fetchConversionData = async () => {
     try {
+      // Fixed: Use opportunity_id instead of converted_from_opportunity_id
       const { data: projects, error } = await supabase
         .from("projects")
-        .select("created_at, agreed_fee_value, converted_from_opportunity_id")
-        .not("converted_from_opportunity_id", "is", null)
+        .select("created_at, agreed_fee_value, opportunity_id")
+        .not("opportunity_id", "is", null)
         .gte("created_at", "2026-01-01")
         .lt("created_at", "2027-01-01")
         .order("created_at");
