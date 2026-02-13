@@ -1,28 +1,28 @@
 import { RequireAuth } from "@/components/RequireAuth";
 import { Layout } from "@/components/Layout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
-import { format, startOfMonth, endOfMonth, eachMonthOfInterval } from "date-fns";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { supabase } from "@/lib/supabase";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, TrendingUp, TrendingDown, Percent, PoundSterling } from "lucide-react";
-import Link from "next/link";
+import { ArrowLeft, TrendingUp, TrendingDown, DollarSign, Percent } from "lucide-react";
+import { useRouter } from "next/router";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 
-interface MonthlyFinancials {
+interface MonthlyData {
   month: string;
   revenue: number;
   cost: number;
   margin: number;
-}
-
-interface YearEndForecast {
-  totalRevenue: number;
-  totalCost: number;
-  totalMargin: number;
-  marginPercent: number;
 }
 
 interface ConversionData {
@@ -31,522 +31,529 @@ interface ConversionData {
   value: number;
 }
 
-interface TeamMemberStats {
-  userId: string | null;
-  userName: string;
-  projectCount: number;
-  totalValue: number;
-}
-
 function AdminDashboardContent() {
-  const [financials, setFinancials] = useState<MonthlyFinancials[]>([]);
-  const [yearEndForecast, setYearEndForecast] = useState<YearEndForecast | null>(null);
-  const [conversions, setConversions] = useState<ConversionData[]>([]);
-  const [teamStats, setTeamStats] = useState<TeamMemberStats[]>([]);
+  const router = useRouter();
+  const [financialData, setFinancialData] = useState<MonthlyData[]>([]);
+  const [conversionData, setConversionData] = useState<ConversionData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [yearEndRevenue, setYearEndRevenue] = useState(0);
+  const [yearEndCosts, setYearEndCosts] = useState(0);
+  const [yearEndMargin, setYearEndMargin] = useState(0);
+  const [marginPercent, setMarginPercent] = useState(0);
 
   useEffect(() => {
-    fetchDashboardData();
+    fetchFinancialTrends();
+    fetchConversionData();
   }, []);
 
-  async function fetchDashboardData() {
-    setLoading(true);
+  const fetchFinancialTrends = async () => {
     try {
-      await Promise.all([
-        fetchFinancialTrends(),
-        fetchConversions(),
-        fetchTeamStats()
-      ]);
-    } catch (error) {
-      console.error("Error fetching dashboard data:", error);
+      setLoading(true);
+      setError(null);
+
+      const targetYear = 2026;
+      const monthlyData: MonthlyData[] = [];
+
+      // Fixed cost per month
+      const monthlyCost = 160000;
+
+      // Fetch all projects with dates and turnover
+      const { data: projectsData, error: projectsError } = await supabase
+        .from("projects")
+        .select(`
+          id,
+          code,
+          name,
+          start_date,
+          end_date,
+          agreed_fee_value,
+          companies!projects_client_company_id_fkey (
+            short_name,
+            name
+          )
+        `)
+        .eq("archived", false)
+        .not("agreed_fee_value", "is", null)
+        .gte("end_date", `${targetYear}-01-01`)
+        .lte("start_date", `${targetYear}-12-31`);
+
+      if (projectsError) throw projectsError;
+
+      // Fetch all opportunities with dates and turnover
+      const { data: oppsData, error: oppsError } = await supabase
+        .from("opportunities")
+        .select(`
+          id,
+          name,
+          stage,
+          expected_start_date,
+          expected_end_date,
+          tender_due_date,
+          expected_fee_value,
+          companies (
+            short_name,
+            name
+          )
+        `)
+        .eq("archived", false)
+        .eq("stage", "secured")
+        .neq("status", "closed_won")
+        .neq("status", "closed_lost")
+        .not("expected_fee_value", "is", null);
+
+      if (oppsError) throw oppsError;
+
+      // Fetch all manual phasing for projects
+      const { data: projPhasingData, error: projPhasingError } = await supabase
+        .from("project_monthly_phasing")
+        .select("project_id, year, month, revenue_amount")
+        .eq("year", targetYear);
+
+      if (projPhasingError) throw projPhasingError;
+
+      // Fetch all manual phasing for opportunities
+      const { data: oppPhasingData, error: oppPhasingError } = await supabase
+        .from("opportunity_monthly_phasing")
+        .select("opportunity_id, year, month, revenue_amount")
+        .eq("year", targetYear);
+
+      if (oppPhasingError) throw oppPhasingError;
+
+      // Get projects/opportunities that have ANY manual phasing
+      const { data: projectsWithAnyPhasing } = await supabase
+        .from("project_monthly_phasing")
+        .select("project_id")
+        .not("revenue_amount", "is", null);
+
+      const { data: oppsWithAnyPhasing } = await supabase
+        .from("opportunity_monthly_phasing")
+        .select("opportunity_id")
+        .not("revenue_amount", "is", null);
+
+      // Create phasing lookup maps
+      const projPhasingMap = new Map<string, Map<string, number>>();
+      projPhasingData?.forEach((p) => {
+        if (!projPhasingMap.has(p.project_id)) {
+          projPhasingMap.set(p.project_id, new Map());
+        }
+        const key = `${p.year}-${p.month}`;
+        projPhasingMap.get(p.project_id)!.set(key, p.revenue_amount || 0);
+      });
+
+      const oppPhasingMap = new Map<string, Map<string, number>>();
+      oppPhasingData?.forEach((p) => {
+        if (!oppPhasingMap.has(p.opportunity_id)) {
+          oppPhasingMap.set(p.opportunity_id, new Map());
+        }
+        const key = `${p.year}-${p.month}`;
+        oppPhasingMap.get(p.opportunity_id)!.set(key, p.revenue_amount || 0);
+      });
+
+      // Create sets of projects/opportunities with ANY manual phasing
+      const projectsWithAnyPhasingSet = new Set(
+        projectsWithAnyPhasing?.map((p) => p.project_id) || []
+      );
+
+      const oppsWithAnyPhasingSet = new Set(
+        oppsWithAnyPhasing?.map((o) => o.opportunity_id) || []
+      );
+
+      // Calculate revenue for each month in 2026
+      let totalYearRevenue = 0;
+
+      for (let month = 1; month <= 12; month++) {
+        let monthRevenue = 0;
+        const monthStart = new Date(targetYear, month - 1, 1);
+        const monthEnd = new Date(targetYear, month, 0);
+
+        // Add project revenue for this month
+        if (projectsData) {
+          projectsData.forEach((proj) => {
+            const startDate = new Date(proj.start_date || "");
+            const endDate = new Date(proj.end_date || "");
+
+            if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+              // Check if project overlaps with this month
+              if (startDate <= monthEnd && endDate >= monthStart) {
+                const hasManualPhasing = projectsWithAnyPhasingSet.has(proj.id);
+                const phasingKey = `${targetYear}-${month}`;
+                const manualPhasing = projPhasingMap.get(proj.id);
+
+                if (hasManualPhasing) {
+                  // Use manual phasing value (or 0 if not set for this month)
+                  monthRevenue += manualPhasing?.get(phasingKey) || 0;
+                } else {
+                  // Calculate default monthly turnover
+                  const durationMonths = Math.max(
+                    1,
+                    (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+                      (endDate.getMonth() - startDate.getMonth()) +
+                      1
+                  );
+                  const defaultMonthlyTurnover = (proj.agreed_fee_value || 0) / durationMonths;
+                  monthRevenue += defaultMonthlyTurnover;
+                }
+              }
+            }
+          });
+        }
+
+        // Add secured opportunity revenue for this month
+        if (oppsData) {
+          oppsData.forEach((opp) => {
+            const startDate = new Date(opp.expected_start_date || opp.tender_due_date || "");
+            const endDate = opp.expected_end_date ? new Date(opp.expected_end_date) : null;
+
+            // For opportunities without end date, spread across remaining months of year
+            if (!isNaN(startDate.getTime())) {
+              const hasManualPhasing = oppsWithAnyPhasingSet.has(opp.id);
+              const phasingKey = `${targetYear}-${month}`;
+              const manualPhasing = oppPhasingMap.get(opp.id);
+
+              if (hasManualPhasing) {
+                // Use manual phasing value (or 0 if not set for this month)
+                monthRevenue += manualPhasing?.get(phasingKey) || 0;
+              } else {
+                // Handle opportunities without end dates
+                if (!endDate) {
+                  // If no end date, spread from start month to end of year
+                  const yearEnd = new Date(targetYear, 11, 31);
+                  if (startDate <= monthEnd && startDate.getFullYear() === targetYear) {
+                    // Calculate months from start to end of year
+                    const remainingMonths = Math.max(
+                      1,
+                      12 - startDate.getMonth()
+                    );
+                    const defaultMonthlyTurnover = (opp.expected_fee_value || 0) / remainingMonths;
+                    
+                    // Only add if this month is after or equal to start month
+                    if (month >= startDate.getMonth() + 1) {
+                      monthRevenue += defaultMonthlyTurnover;
+                    }
+                  }
+                } else {
+                  // Has end date - check if overlaps with this month
+                  if (startDate <= monthEnd && endDate >= monthStart) {
+                    const durationMonths = Math.max(
+                      1,
+                      (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+                        (endDate.getMonth() - startDate.getMonth()) +
+                        1
+                    );
+                    const defaultMonthlyTurnover = (opp.expected_fee_value || 0) / durationMonths;
+                    monthRevenue += defaultMonthlyTurnover;
+                  }
+                }
+              }
+            }
+          });
+        }
+
+        totalYearRevenue += monthRevenue;
+
+        monthlyData.push({
+          month: new Date(targetYear, month - 1).toLocaleDateString("en-GB", {
+            month: "short",
+            year: "2-digit",
+          }),
+          revenue: monthRevenue,
+          cost: monthlyCost,
+          margin: monthRevenue - monthlyCost,
+        });
+      }
+
+      const totalYearCosts = monthlyCost * 12;
+      const totalYearMargin = totalYearRevenue - totalYearCosts;
+      const marginPct = totalYearRevenue > 0 ? (totalYearMargin / totalYearRevenue) * 100 : 0;
+
+      console.log("2026 Year-End Calculation:");
+      console.log("Total Revenue:", totalYearRevenue);
+      console.log("Total Costs:", totalYearCosts);
+      console.log("Total Margin:", totalYearMargin);
+      console.log("Margin %:", marginPct);
+
+      setYearEndRevenue(totalYearRevenue);
+      setYearEndCosts(totalYearCosts);
+      setYearEndMargin(totalYearMargin);
+      setMarginPercent(marginPct);
+      setFinancialData(monthlyData);
+    } catch (err) {
+      console.error("Failed to load financial trends", err);
+      setError("Failed to load financial trends. Please try again.");
     } finally {
       setLoading(false);
     }
-  }
+  };
 
-  async function fetchFinancialTrends() {
-    const startMonth = new Date(2026, 0, 1);
-    const endMonth = new Date(2026, 11, 31);
+  const fetchConversionData = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("opportunities")
+        .select("created_at, expected_fee_value, status")
+        .eq("status", "closed_won")
+        .gte("created_at", "2026-01-01")
+        .lte("created_at", "2026-12-31");
 
-    const months = eachMonthOfInterval({
-      start: startMonth,
-      end: endMonth
-    });
+      if (error) throw error;
 
-    const monthlyData: MonthlyFinancials[] = [];
-    const today = new Date();
-    
-    const FIXED_MONTHLY_COST = 160000;
-    let totalYearRevenue = 0;
+      const monthlyConversions: { [key: string]: { count: number; value: number } } = {};
 
-    console.log("=== REVENUE CALCULATION START (PHASING-ONLY) ===");
-
-    // Get ALL manual phasing data for 2026 in one query
-    const { data: allPhasing, error: phasingError } = await supabase
-      .from("project_monthly_phasing")
-      .select("project_id, year, month, revenue_amount, projects!project_monthly_phasing_project_id_fkey(code, name)")
-      .eq("year", 2026);
-
-    if (phasingError) {
-      console.error("Phasing query error:", phasingError);
-      return;
-    }
-
-    // Group phasing by month
-    const phasingByMonth = new Map<number, number>();
-    allPhasing?.forEach((p: any) => {
-      const month = p.month;
-      const revenue = Number(p.revenue_amount) || 0;
-      phasingByMonth.set(month, (phasingByMonth.get(month) || 0) + revenue);
-    });
-
-    for (const month of months) {
-      const year = month.getFullYear();
-      const monthNum = month.getMonth() + 1;
-      const monthStart = startOfMonth(month);
-      const monthEnd = endOfMonth(month);
-      const isPastMonth = monthEnd < today;
-
-      let totalRevenue = 0;
-      let totalCost = 0;
-
-      console.log(`\n--- ${format(month, "MMM yyyy")} ---`);
-
-      // Use ONLY manually phased revenue from project_monthly_phasing table
-      totalRevenue = phasingByMonth.get(monthNum) || 0;
-      console.log(`Month ${monthNum} phased revenue: £${totalRevenue.toLocaleString()}`);
-
-      totalYearRevenue += totalRevenue;
-
-      // Cost calculation
-      if (isPastMonth) {
-        const { data: timesheets } = await supabase
-          .from("timesheets")
-          .select("hours, profiles!timesheets_user_id_fkey(default_hourly_cost_rate)")
-          .gte("date", format(monthStart, "yyyy-MM-dd"))
-          .lte("date", format(monthEnd, "yyyy-MM-dd"));
-
-        const { data: subcontractors } = await supabase
-          .from("subcontractor_costs")
-          .select("cost_amount")
-          .gte("cost_date", format(monthStart, "yyyy-MM-dd"))
-          .lte("cost_date", format(monthEnd, "yyyy-MM-dd"));
-
-        const { data: budget } = await supabase
-          .from("monthly_budgets")
-          .select("overhead, total_staff_cost")
-          .eq("year", year)
-          .eq("month", monthNum)
-          .maybeSingle();
-
-        let internalCost = 0;
-        timesheets?.forEach(ts => {
-          const rate = ts.profiles?.default_hourly_cost_rate || 0;
-          internalCost += Number(ts.hours) * Number(rate);
+      data?.forEach((opp) => {
+        const month = new Date(opp.created_at).toLocaleDateString("en-GB", {
+          month: "short",
+          year: "2-digit",
         });
-
-        const subcontractorCost = subcontractors?.reduce((sum, sc) => sum + Number(sc.cost_amount), 0) || 0;
-        const overhead = Number(budget?.overhead) || 0;
-        const totalStaffCost = Number(budget?.total_staff_cost) || 0;
-        const staffSuspense = Math.max(0, totalStaffCost - internalCost);
-
-        totalCost = internalCost + subcontractorCost + staffSuspense + overhead;
-        console.log(`Actual cost: £${totalCost.toLocaleString()}`);
-      } else {
-        totalCost = FIXED_MONTHLY_COST;
-        console.log(`Forecast cost: £${FIXED_MONTHLY_COST.toLocaleString()}`);
-      }
-
-      monthlyData.push({
-        month: format(month, "MMM yy"),
-        revenue: totalRevenue,
-        cost: totalCost,
-        margin: totalRevenue - totalCost
+        if (!monthlyConversions[month]) {
+          monthlyConversions[month] = { count: 0, value: 0 };
+        }
+        monthlyConversions[month].count += 1;
+        monthlyConversions[month].value += opp.expected_fee_value || 0;
       });
+
+      const conversions = Object.entries(monthlyConversions).map(([month, data]) => ({
+        month,
+        count: data.count,
+        value: data.value,
+      }));
+
+      setConversionData(conversions);
+    } catch (err) {
+      console.error("Failed to load conversion data", err);
     }
-
-    console.log(`\n=== YEAR-END TOTALS (PHASING-ONLY) ===`);
-    console.log(`Total Revenue: £${totalYearRevenue.toLocaleString()}`);
-    console.log(`Total Costs: £${(FIXED_MONTHLY_COST * 12).toLocaleString()}`);
-    console.log(`=== CALCULATION END ===\n`);
-
-    const forecastTotalCost = FIXED_MONTHLY_COST * 12;
-    const forecastMargin = totalYearRevenue - forecastTotalCost;
-    const forecastMarginPercent = totalYearRevenue > 0 
-      ? (forecastMargin / totalYearRevenue) * 100 
-      : 0;
-
-    setYearEndForecast({
-      totalRevenue: totalYearRevenue,
-      totalCost: forecastTotalCost,
-      totalMargin: forecastMargin,
-      marginPercent: forecastMarginPercent
-    });
-
-    setFinancials(monthlyData);
-  }
-
-  async function fetchConversions() {
-    const startMonth = new Date(2026, 0, 1);
-    const endMonth = new Date();
-    if (endMonth.getTime() < new Date(2026, 11, 31).getTime()) {
-      endMonth.setTime(new Date(2026, 11, 31).getTime());
-    }
-
-    const months = eachMonthOfInterval({
-      start: startMonth,
-      end: endMonth
-    });
-
-    const conversionData: ConversionData[] = [];
-
-    for (const month of months) {
-      const monthStart = startOfMonth(month);
-      const monthEnd = endOfMonth(month);
-
-      const { data: projects } = await supabase
-        .from("projects")
-        .select("id, agreed_fee_value, opportunity_id, opportunities!projects_opportunity_id_fkey!inner(stage)")
-        .gte("created_at", monthStart.toISOString())
-        .lte("created_at", monthEnd.toISOString())
-        .not("opportunity_id", "is", null);
-
-      const count = projects?.length || 0;
-      const value = projects?.reduce((sum, p) => sum + (Number(p.agreed_fee_value) || 0), 0) || 0;
-
-      conversionData.push({
-        month: format(month, "MMM yy"),
-        count,
-        value
-      });
-    }
-
-    setConversions(conversionData);
-  }
-
-  async function fetchTeamStats() {
-    const startDate = "2026-01-01";
-
-    const { data: projects } = await supabase
-      .from("projects")
-      .select(`
-        id,
-        agreed_fee_value,
-        opportunity_id,
-        opportunities!projects_opportunity_id_fkey(added_by_user_id, profiles!opportunities_added_by_user_id_fkey(full_name))
-      `)
-      .gte("created_at", startDate)
-      .not("opportunity_id", "is", null);
-
-    const userMap = new Map<string, TeamMemberStats>();
-
-    projects?.forEach(project => {
-      const opp = project.opportunities as any;
-      const userId = opp?.added_by_user_id || null;
-      const userName = userId ? opp?.profiles?.full_name || "Unknown" : "Anonymous";
-      const key = userId || "anonymous";
-
-      if (!userMap.has(key)) {
-        userMap.set(key, {
-          userId,
-          userName,
-          projectCount: 0,
-          totalValue: 0
-        });
-      }
-
-      const stats = userMap.get(key)!;
-      stats.projectCount += 1;
-      stats.totalValue += Number(project.agreed_fee_value) || 0;
-    });
-
-    const { data: orphanProjects } = await supabase
-      .from("projects")
-      .select("id, agreed_fee_value")
-      .gte("created_at", startDate)
-      .is("opportunity_id", null);
-
-    if (orphanProjects && orphanProjects.length > 0) {
-      if (!userMap.has("anonymous")) {
-        userMap.set("anonymous", {
-          userId: null,
-          userName: "Anonymous",
-          projectCount: 0,
-          totalValue: 0
-        });
-      }
-
-      const anonymousStats = userMap.get("anonymous")!;
-      orphanProjects.forEach(project => {
-        anonymousStats.projectCount += 1;
-        anonymousStats.totalValue += Number(project.agreed_fee_value) || 0;
-      });
-    }
-
-    const stats = Array.from(userMap.values()).sort((a, b) => b.totalValue - a.totalValue);
-    setTeamStats(stats);
-  }
+  };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-GB", {
       style: "currency",
       currency: "GBP",
       minimumFractionDigits: 0,
-      maximumFractionDigits: 0
+      maximumFractionDigits: 0,
     }).format(value);
   };
 
-  if (loading) {
-    return (
-      <Layout>
-        <div className="container mx-auto p-6">
-          <div className="flex items-center gap-4 mb-8">
-            <Link href="/admin">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Admin
-              </Button>
-            </Link>
-            <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-          </div>
-          <p className="text-muted-foreground">Loading dashboard data...</p>
-        </div>
-      </Layout>
-    );
-  }
-
   return (
     <Layout>
-      <div className="container mx-auto p-6">
-        <div className="flex items-center gap-4 mb-8">
-          <Link href="/admin">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Admin
-            </Button>
-          </Link>
-          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" onClick={() => router.push("/admin")} className="gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Admin
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Admin Dashboard</h1>
+            <p className="text-slate-600 dark:text-slate-400 mt-1">
+              Financial overview and key metrics
+            </p>
+          </div>
         </div>
 
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Financial Trends (2026)</CardTitle>
-              <CardDescription>Revenue, costs, and margin over time</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
-                <LineChart data={financials}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis
-                    domain={[0, 250000]}
-                    ticks={[0, 50000, 100000, 150000, 200000, 250000]}
-                    tickFormatter={(value) => `£${(value / 1000).toFixed(0)}k`}
-                  />
-                  <Tooltip
-                    formatter={(value: number) => formatCurrency(value)}
-                  />
-                  <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="revenue"
-                    stroke="#10b981"
-                    strokeWidth={2}
-                    name="Revenue"
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="cost"
-                    stroke="#ef4444"
-                    strokeWidth={2}
-                    name="Cost"
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="margin"
-                    stroke="#3b82f6"
-                    strokeWidth={2}
-                    name="Margin"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-              {yearEndForecast && (
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-sm font-medium flex items-center gap-2">
-                        <TrendingUp className="h-4 w-4 text-green-600" />
-                        Year-End Revenue
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold text-green-600">
-                        {formatCurrency(yearEndForecast.totalRevenue)}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Manually phased projects only
-                      </p>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-sm font-medium flex items-center gap-2">
-                        <PoundSterling className="h-4 w-4 text-red-600" />
-                        Year-End Costs
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold text-red-600">
-                        {formatCurrency(yearEndForecast.totalCost)}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        £160k/month × 12 months
-                      </p>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-sm font-medium flex items-center gap-2">
-                        {yearEndForecast.totalMargin >= 0 ? (
-                          <TrendingUp className="h-4 w-4 text-blue-600" />
-                        ) : (
-                          <TrendingDown className="h-4 w-4 text-red-600" />
-                        )}
-                        Year-End Margin
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className={`text-2xl font-bold ${yearEndForecast.totalMargin >= 0 ? "text-blue-600" : "text-red-600"}`}>
-                        {formatCurrency(yearEndForecast.totalMargin)}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Revenue - Costs
-                      </p>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-sm font-medium flex items-center gap-2">
-                        <Percent className="h-4 w-4 text-purple-600" />
-                        Margin %
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className={`text-2xl font-bold ${yearEndForecast.marginPercent >= 0 ? "text-purple-600" : "text-red-600"}`}>
-                        {yearEndForecast.marginPercent.toFixed(1)}%
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Profit margin
-                      </p>
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Opportunities Converted to Projects</CardTitle>
-              <CardDescription>Monthly conversion count and total value</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={conversions}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis yAxisId="left" />
-                  <YAxis
-                    yAxisId="right"
-                    orientation="right"
-                    tickFormatter={(value) => `£${(value / 1000).toFixed(0)}k`}
-                  />
-                  <Tooltip
-                    formatter={(value: number, name: string) => {
-                      if (name === "Value") return formatCurrency(value);
-                      return value;
-                    }}
-                  />
-                  <Legend />
-                  <Line
-                    yAxisId="left"
-                    type="monotone"
-                    dataKey="count"
-                    stroke="#8b5cf6"
-                    strokeWidth={2}
-                    name="Count"
-                  />
-                  <Line
-                    yAxisId="right"
-                    type="monotone"
-                    dataKey="value"
-                    stroke="#f59e0b"
-                    strokeWidth={2}
-                    name="Value"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Work Secured by Team Member</CardTitle>
-              <CardDescription>
-                Cumulative since January 2026 - Projects converted from opportunities
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {teamStats.length === 0 ? (
-                <p className="text-muted-foreground text-sm">
-                  No projects converted from opportunities since Jan 2026
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-slate-600">Loading dashboard data...</div>
+          </div>
+        ) : (
+          <>
+            {/* Financial Trends Chart */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Financial Trends (2026)</CardTitle>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  Revenue, costs, and margin over time
                 </p>
-              ) : (
-                <div className="space-y-4">
-                  {teamStats.map((member, index) => (
-                    <div
-                      key={member.userId || "anonymous"}
-                      className="flex items-center justify-between p-4 border rounded-lg"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Avatar>
-                          <AvatarFallback>
-                            {member.userName === "Anonymous"
-                              ? "?"
-                              : member.userName
-                                  .split(" ")
-                                  .map((n) => n[0])
-                                  .join("")
-                                  .toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">{member.userName}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {member.projectCount} {member.projectCount === 1 ? "project" : "projects"}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-lg font-semibold">
-                          {formatCurrency(member.totalValue)}
-                        </p>
-                        <Badge variant={index === 0 ? "default" : "secondary"}>
-                          {index === 0 ? "Top Performer" : `#${index + 1}`}
-                        </Badge>
-                      </div>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={400}>
+                  <LineChart data={financialData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis dataKey="month" stroke="#64748b" />
+                    <YAxis stroke="#64748b" />
+                    <Tooltip
+                      formatter={(value: number) => formatCurrency(value)}
+                      contentStyle={{
+                        backgroundColor: "white",
+                        border: "1px solid #e2e8f0",
+                        borderRadius: "8px",
+                      }}
+                    />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="revenue"
+                      stroke="#10b981"
+                      strokeWidth={2}
+                      name="Revenue"
+                      dot={{ fill: "#10b981", r: 4 }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="cost"
+                      stroke="#ef4444"
+                      strokeWidth={2}
+                      name="Cost"
+                      dot={{ fill: "#ef4444", r: 4 }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="margin"
+                      stroke="#3b82f6"
+                      strokeWidth={2}
+                      name="Margin"
+                      dot={{ fill: "#3b82f6", r: 4 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+
+                {/* Year-End Summary */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+                  <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-xl p-4 border border-green-200 dark:border-green-800">
+                    <div className="flex items-center gap-2 mb-2">
+                      <TrendingUp className="h-4 w-4 text-green-600" />
+                      <span className="text-sm font-medium text-green-900 dark:text-green-100">
+                        Year-End Revenue
+                      </span>
                     </div>
-                  ))}
+                    <div className="text-2xl font-bold text-green-900 dark:text-green-100">
+                      {formatCurrency(yearEndRevenue)}
+                    </div>
+                    <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+                      Secured work + manual phasing
+                    </p>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 rounded-xl p-4 border border-red-200 dark:border-red-800">
+                    <div className="flex items-center gap-2 mb-2">
+                      <DollarSign className="h-4 w-4 text-red-600" />
+                      <span className="text-sm font-medium text-red-900 dark:text-red-100">
+                        Year-End Costs
+                      </span>
+                    </div>
+                    <div className="text-2xl font-bold text-red-900 dark:text-red-100">
+                      {formatCurrency(yearEndCosts)}
+                    </div>
+                    <p className="text-xs text-red-700 dark:text-red-300 mt-1">
+                      £160k/month × 12 months
+                    </p>
+                  </div>
+
+                  <div
+                    className={`bg-gradient-to-br rounded-xl p-4 border ${
+                      yearEndMargin >= 0
+                        ? "from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-blue-200 dark:border-blue-800"
+                        : "from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 border-orange-200 dark:border-orange-800"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      {yearEndMargin >= 0 ? (
+                        <TrendingUp className="h-4 w-4 text-blue-600" />
+                      ) : (
+                        <TrendingDown className="h-4 w-4 text-orange-600" />
+                      )}
+                      <span
+                        className={`text-sm font-medium ${
+                          yearEndMargin >= 0
+                            ? "text-blue-900 dark:text-blue-100"
+                            : "text-orange-900 dark:text-orange-100"
+                        }`}
+                      >
+                        Year-End Margin
+                      </span>
+                    </div>
+                    <div
+                      className={`text-2xl font-bold ${
+                        yearEndMargin >= 0
+                          ? "text-blue-900 dark:text-blue-100"
+                          : "text-orange-900 dark:text-orange-100"
+                      }`}
+                    >
+                      {formatCurrency(yearEndMargin)}
+                    </div>
+                    <p
+                      className={`text-xs mt-1 ${
+                        yearEndMargin >= 0
+                          ? "text-blue-700 dark:text-blue-300"
+                          : "text-orange-700 dark:text-orange-300"
+                      }`}
+                    >
+                      Revenue - Costs
+                    </p>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 rounded-xl p-4 border border-purple-200 dark:border-purple-800">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Percent className="h-4 w-4 text-purple-600" />
+                      <span className="text-sm font-medium text-purple-900 dark:text-purple-100">
+                        Margin %
+                      </span>
+                    </div>
+                    <div className="text-2xl font-bold text-purple-900 dark:text-purple-100">
+                      {marginPercent >= 0 ? "" : "-"}
+                      {Math.abs(marginPercent).toFixed(1)}%
+                    </div>
+                    <p className="text-xs text-purple-700 dark:text-purple-300 mt-1">
+                      Profit margin
+                    </p>
+                  </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+              </CardContent>
+            </Card>
+
+            {/* Opportunities Converted to Projects */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Opportunities Converted to Projects</CardTitle>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  Monthly conversion count and total value
+                </p>
+              </CardHeader>
+              <CardContent>
+                {conversionData.length === 0 ? (
+                  <div className="text-center py-8 text-slate-600">
+                    No conversions recorded for 2026 yet
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={conversionData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis dataKey="month" stroke="#64748b" />
+                      <YAxis stroke="#64748b" />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "white",
+                          border: "1px solid #e2e8f0",
+                          borderRadius: "8px",
+                        }}
+                      />
+                      <Legend />
+                      <Line
+                        type="monotone"
+                        dataKey="count"
+                        stroke="#f59e0b"
+                        strokeWidth={2}
+                        name="Count"
+                        dot={{ fill: "#f59e0b", r: 4 }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="value"
+                        stroke="#8b5cf6"
+                        strokeWidth={2}
+                        name="Value"
+                        dot={{ fill: "#8b5cf6", r: 4 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
     </Layout>
   );
