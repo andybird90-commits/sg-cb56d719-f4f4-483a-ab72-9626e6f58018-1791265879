@@ -1484,6 +1484,7 @@ function ProjectDetailContent() {
                                 variant="outline"
                                 onClick={() => {
                                   setVariationFormOpen(false);
+                                  setEditingVariation(null);
                                   setVariationForm({ description: "", value: "", status: "pending", po_number: "" });
                                 }}
                               >
@@ -1633,11 +1634,19 @@ function ProjectDetailContent() {
                             </div>
 
                             <div className="flex gap-3">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => {
+                                  setVariationFormOpen(false);
+                                  setEditingVariation(null);
+                                  setVariationForm({ description: "", value: "", status: "pending", po_number: "" });
+                                }}
+                              >
+                                Cancel
+                              </Button>
                               <Button type="submit">
                                 {editingVariation ? "Update" : "Create"}
-                              </Button>
-                              <Button type="button" variant="outline" onClick={() => setVariationFormOpen(false)}>
-                                Cancel
                               </Button>
                             </div>
                           </form>
