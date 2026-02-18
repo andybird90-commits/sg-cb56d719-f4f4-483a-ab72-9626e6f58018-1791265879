@@ -272,7 +272,7 @@ function IntakeInvoicesContent() {
           due_date: "",
           net_amount: "",
           vat_amount: "0",
-          status: "unpaid" as const,
+          status: "unpaid" as "unpaid" | "part_paid" | "paid" | "written_off",
           paid_amount: "0",
           notes: "",
         });
@@ -320,7 +320,7 @@ function IntakeInvoicesContent() {
       due_date: invoice.due_date,
       net_amount: invoice.net_amount.toString(),
       vat_amount: invoice.vat_amount.toString(),
-      status: invoice.status,
+      status: invoice.status as "unpaid" | "part_paid" | "paid" | "written_off",
       paid_amount: invoice.paid_amount.toString(),
       notes: invoice.notes || "",
     });
@@ -339,7 +339,7 @@ function IntakeInvoicesContent() {
       due_date: "",
       net_amount: "",
       vat_amount: "0",
-      status: "unpaid" as const,
+      status: "unpaid" as "unpaid" | "part_paid" | "paid" | "written_off",
       paid_amount: "0",
       notes: "",
     });
