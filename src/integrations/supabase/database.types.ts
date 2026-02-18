@@ -380,6 +380,60 @@ export type Database = {
           },
         ]
       }
+      invoice_history: {
+        Row: {
+          client_name: string
+          created_at: string | null
+          created_by: string | null
+          due_date: string
+          gross_amount: number | null
+          id: string
+          invoice_date: string
+          invoice_number: string
+          net_amount: number
+          notes: string | null
+          paid_amount: number | null
+          project_name: string | null
+          status: string | null
+          updated_at: string | null
+          vat_amount: number | null
+        }
+        Insert: {
+          client_name: string
+          created_at?: string | null
+          created_by?: string | null
+          due_date: string
+          gross_amount?: number | null
+          id?: string
+          invoice_date: string
+          invoice_number: string
+          net_amount: number
+          notes?: string | null
+          paid_amount?: number | null
+          project_name?: string | null
+          status?: string | null
+          updated_at?: string | null
+          vat_amount?: number | null
+        }
+        Update: {
+          client_name?: string
+          created_at?: string | null
+          created_by?: string | null
+          due_date?: string
+          gross_amount?: number | null
+          id?: string
+          invoice_date?: string
+          invoice_number?: string
+          net_amount?: number
+          notes?: string | null
+          paid_amount?: number | null
+          project_name?: string | null
+          status?: string | null
+          updated_at?: string | null
+          vat_amount?: number | null
+        }
+        Relationships: []
+      }
       invoice_items: {
         Row: {
           client_name: string
