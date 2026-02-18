@@ -173,6 +173,186 @@ export default function InvoicingPage() {
     }
   }
 
+  async function fetchCashFlowData() {
+    try {
+      setCashFlowLoading(true);
+
+      // Fetch locked invoice months with items and company payment terms
+      const { data: invoiceData, error: invoiceError } = await supabase
+        .from("invoice_months")
+        .select(`
+          id,
+          month,
+          year,
+          created_at,
+          status,
+          invoice_items (
+            id,
+            invoice_value,
+            project_name,
+            project_id,
+            projects (
+              id,
+              name,
+              companies!projects_client_company_id_fkey (
+                id,
+                name,
+                payment_terms
+              )
+            )
+          )
+        `)
+        .eq("status", "locked")
+        .order("year", { ascending: false })
+        .order("month", { ascending: false });
+
+      if (invoiceError) throw invoiceError;
+
+      // Fetch existing collections
+      const { data: collectionsData, error: collectionsError } = await supabase
+        .from("invoice_collections")
+        .select("*");
+
+      if (collectionsError) throw collectionsError;
+
+      // Process data to create weekly view
+      const today = new Date();
+      const weeks = [];
+      let totalOut = 0;
+      let totalInTerms = 0;
+      let totalOverdue = 0;
+      let totalCollected = 0;
+      let totalVal = 0;
+
+      // Generate next 12 weeks
+      for (let i = 0; i < 12; i++) {
+        const weekStart = startOfWeek(addWeeks(today, i), { weekStartsOn: 1 });
+        const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
+        
+        weeks.push({
+          weekCommencing: weekStart,
+          weekEnding: weekEnd,
+          invoices: [],
+          total: 0
+        });
+      }
+
+      // Process each invoice month and its items
+      invoiceData?.forEach((invoiceMonth: any) => {
+        const issueDate = new Date(invoiceMonth.created_at);
+        
+        invoiceMonth.invoice_items?.forEach((item: any) => {
+          if (!item.invoice_value || item.excluded_this_month) return;
+          
+          const company = item.projects?.companies;
+          const paymentTerms = company?.payment_terms || 30;
+          const dueDate = addDays(issueDate, paymentTerms);
+          
+          // Find collection record
+          const collection = collectionsData?.find((c: any) => 
+            c.invoice_item_id === item.id
+          );
+
+          const invoiceRecord = {
+            id: item.id,
+            invoiceMonthId: invoiceMonth.id,
+            invoiceNumber: `INV-${invoiceMonth.year}-${String(invoiceMonth.month).padStart(2, '0')}`,
+            client: company?.name || 'Unknown',
+            project: item.projects?.name || item.project_name || 'Unknown',
+            issueDate,
+            dueDate,
+            amount: item.invoice_value,
+            paymentTerms,
+            collected: !!collection?.collected_date,
+            collectedDate: collection?.collected_date,
+            collectionId: collection?.id
+          };
+
+          totalVal += item.invoice_value;
+
+          if (invoiceRecord.collected) {
+            totalCollected += item.invoice_value;
+          } else {
+            totalOut += item.invoice_value;
+            
+            if (isBefore(dueDate, today)) {
+              totalOverdue += item.invoice_value;
+            } else {
+              totalInTerms += item.invoice_value;
+            }
+
+            // Add to appropriate week
+            weeks.forEach(week => {
+              if (isWithinInterval(dueDate, { start: week.weekCommencing, end: week.weekEnding })) {
+                week.invoices.push(invoiceRecord);
+                week.total += item.invoice_value;
+              }
+            });
+          }
+        });
+      });
+
+      setWeeklyData(weeks);
+      setCollections(collectionsData || []);
+      setTotals({
+        totalOutstanding: totalOut,
+        inTerms: totalInTerms,
+        overdue: totalOverdue,
+        collected: totalCollected,
+        totalValue: totalVal
+      });
+    } catch (error) {
+      console.error("Error fetching cash flow data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load cash flow data",
+        variant: "destructive",
+      });
+    } finally {
+      setCashFlowLoading(false);
+    }
+  }
+
+  async function markAsCollected(invoiceItemId: string, collectionId?: string) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      if (collectionId) {
+        // Update existing collection
+        const { error } = await supabase
+          .from("invoice_collections")
+          .update({
+            collected_date: new Date().toISOString(),
+            collected_by_user_id: user.id
+          })
+          .eq("id", collectionId);
+
+        if (error) throw error;
+      } else {
+        toast({
+          title: "Error",
+          description: "Collection record not found. Please refresh and try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Success",
+        description: "Invoice marked as collected",
+      });
+      await fetchCashFlowData();
+    } catch (error) {
+      console.error("Error marking invoice as collected:", error);
+      toast({
+        title: "Error",
+        description: "Failed to mark invoice as collected",
+        variant: "destructive",
+      });
+    }
+  }
+
   async function handleCreateMonth() {
     try {
       setLoading(true);
