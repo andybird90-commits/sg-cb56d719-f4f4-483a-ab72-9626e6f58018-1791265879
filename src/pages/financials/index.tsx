@@ -12,7 +12,8 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { jsPDF, autoTable } from "jspdf";
+import { jsPDF } from "jspdf";
+import { autoTable } from "jspdf-autotable";
 import { format } from "date-fns";
 
 interface ProjectFinancials {
