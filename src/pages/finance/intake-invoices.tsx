@@ -272,7 +272,7 @@ function IntakeInvoicesContent() {
           due_date: "",
           net_amount: "",
           vat_amount: "0",
-          status: "unpaid" as "unpaid" | "part_paid" | "paid" | "written_off",
+          status: "unpaid",
           paid_amount: "0",
           notes: "",
         });
