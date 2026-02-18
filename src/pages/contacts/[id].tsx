@@ -147,7 +147,7 @@ function ContactDetailContent() {
         <div className="flex items-center justify-between">
           <div>
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-              <Link href="/contacts">
+              <Link href={returnTo === '/calendar' ? '/calendar' : '/contacts'}>
                 <Button variant="ghost" size="sm" className="gap-2 self-start">
                   <ArrowLeft className="w-4 h-4" />
                   Back

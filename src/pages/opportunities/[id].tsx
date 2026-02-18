@@ -310,10 +310,10 @@ function OpportunityDetailContent() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => router.push("/opportunities")}
+              onClick={() => router.push(returnTo === '/calendar' ? '/calendar' : '/opportunities')}
               className="text-sm text-blue-600 hover:text-blue-800"
             >
-              ← Back to Opportunities
+              ← Back to {returnTo === '/calendar' ? 'Calendar' : 'Opportunities'}
             </button>
           </div>
         </div>
