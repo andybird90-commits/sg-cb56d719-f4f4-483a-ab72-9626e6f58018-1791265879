@@ -37,6 +37,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Download, Lock, LockOpen, Plus, RefreshCw, Edit } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/router";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type InvoiceMonth = {
   id: string;
@@ -75,6 +77,7 @@ const MONTHS = [
 export default function InvoicingPage() {
   const { user, profile } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
   
   const currentDate = new Date();
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
@@ -515,317 +518,326 @@ export default function InvoicingPage() {
     <RequireAuth>
       <Layout>
         <div className="space-y-6">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-bold">Invoicing</h1>
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900">Invoicing</h1>
+            <p className="text-slate-600 mt-1">Manage invoices and payments</p>
           </div>
 
-          {/* Month Selector */}
-          <div className="flex items-center gap-4 p-4 bg-white rounded-lg shadow">
-            <div className="flex items-center gap-2">
-              <Select
-                value={selectedYear.toString()}
-                onValueChange={(value) => setSelectedYear(parseInt(value))}
-              >
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {years.map((year) => (
-                    <SelectItem key={year} value={year.toString()}>
-                      {year}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <Tabs defaultValue="invoices" className="space-y-6">
+            <TabsList>
+              <TabsTrigger value="invoices">Invoices</TabsTrigger>
+              <TabsTrigger value="cashflow">Cash Flow Forecast</TabsTrigger>
+            </TabsList>
 
-              <Select
-                value={selectedMonth.toString()}
-                onValueChange={(value) => setSelectedMonth(parseInt(value))}
-              >
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {MONTHS.map((month, index) => (
-                    <SelectItem key={index + 1} value={(index + 1).toString()}>
-                      {month}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <TabsContent value="invoices" className="space-y-6">
+              {/* Month Selector */}
+              <div className="flex items-center gap-4 p-4 bg-white rounded-lg shadow">
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={selectedYear.toString()}
+                    onValueChange={(value) => setSelectedYear(parseInt(value))}
+                  >
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {years.map((year) => (
+                        <SelectItem key={year} value={year.toString()}>
+                          {year}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
 
-            {invoiceMonth && (
-              <Badge variant={isLocked ? "default" : "secondary"} className="ml-auto">
-                {isLocked ? (
-                  <>
-                    <Lock className="w-3 h-3 mr-1" />
-                    LOCKED
-                  </>
-                ) : (
-                  <>
-                    <LockOpen className="w-3 h-3 mr-1" />
-                    OPEN
-                  </>
-                )}
-              </Badge>
-            )}
-
-            {!invoiceMonth && canEdit && (
-              <Button onClick={handleCreateMonth} className="ml-auto">
-                <Plus className="w-4 h-4 mr-2" />
-                Create Month
-              </Button>
-            )}
-          </div>
-
-          {/* Status Message */}
-          {!invoiceMonth ? (
-            <div className="p-8 text-center bg-white rounded-lg shadow">
-              <p className="text-lg text-muted-foreground mb-4">
-                No invoicing period created for {MONTHS[selectedMonth - 1]} {selectedYear} yet.
-              </p>
-              {canEdit ? (
-                <Button onClick={handleCreateMonth} size="lg">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create invoicing period for {MONTHS[selectedMonth - 1]} {selectedYear}
-                </Button>
-              ) : (
-                <p className="text-sm text-red-600">
-                  You need admin or director permissions to create invoice periods.
-                  Your current role: {profile?.role || "unknown"}
-                </p>
-              )}
-            </div>
-          ) : (
-            <>
-              {/* Locked Message */}
-              {isLocked && (
-                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <p className="text-sm text-green-800">
-                    This billing period is locked. Values and descriptions cannot be edited.
-                  </p>
+                  <Select
+                    value={selectedMonth.toString()}
+                    onValueChange={(value) => setSelectedMonth(parseInt(value))}
+                  >
+                    <SelectTrigger className="w-40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MONTHS.map((month, index) => (
+                        <SelectItem key={index + 1} value={(index + 1).toString()}>
+                          {month}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              )}
 
-              {/* Invoice Items Table */}
-              <div className="bg-white rounded-lg shadow overflow-hidden">
-                {invoiceItems.length === 0 ? (
-                  <div className="p-8 text-center">
-                    <p className="text-lg text-muted-foreground mb-2">
-                      No active projects found for this billing period.
+                {invoiceMonth && (
+                  <Badge variant={isLocked ? "default" : "secondary"} className="ml-auto">
+                    {isLocked ? (
+                      <>
+                        <Lock className="w-3 h-3 mr-1" />
+                        LOCKED
+                      </>
+                    ) : (
+                      <>
+                        <LockOpen className="w-3 h-3 mr-1" />
+                        OPEN
+                      </>
+                    )}
+                  </Badge>
+                )}
+
+                {!invoiceMonth && canEdit && (
+                  <Button onClick={handleCreateMonth} className="ml-auto">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Month
+                  </Button>
+                )}
+              </div>
+
+              {/* Status Message */}
+              {!invoiceMonth ? (
+                <div className="p-8 text-center bg-white rounded-lg shadow">
+                  <p className="text-lg text-muted-foreground mb-4">
+                    No invoicing period created for {MONTHS[selectedMonth - 1]} {selectedYear} yet.
+                  </p>
+                  {canEdit ? (
+                    <Button onClick={handleCreateMonth} size="lg">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create invoicing period for {MONTHS[selectedMonth - 1]} {selectedYear}
+                    </Button>
+                  ) : (
+                    <p className="text-sm text-red-600">
+                      You need admin or director permissions to create invoice periods.
+                      Your current role: {profile?.role || "unknown"}
                     </p>
-                    <p className="text-sm text-muted-foreground">
-                      Invoice items are automatically created from active projects. 
-                      Make sure you have projects with status "active" and they will appear here.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-gray-50 border-b">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                            Include
-                          </th>
-                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                            Project
-                          </th>
-                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                            Client
-                          </th>
-                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                            PO Number
-                          </th>
-                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                            Invoice Value (from Monthly Phasing)
-                          </th>
-                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                            Description
-                          </th>
-                          <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                            Last Updated
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {invoiceItems.map((item) => (
-                          <tr key={item.id} className={item.excluded_this_month ? "opacity-50" : ""}>
-                            <td className="px-4 py-3">
-                              <Checkbox
-                                checked={!item.excluded_this_month}
-                                disabled={!canEdit || isLocked}
-                                onCheckedChange={(checked) =>
-                                  handleUpdateItem(item.id, "excluded_this_month", !checked)
-                                }
-                              />
-                            </td>
-                            <td className="px-4 py-3">
-                              <Link
-                                href={`/projects/${item.project_id}`}
-                                className="text-blue-600 hover:underline"
-                              >
-                                {item.project_code} - {item.project_name}
-                              </Link>
-                            </td>
-                            <td className="px-4 py-3 text-sm">{item.client_name}</td>
-                            <td className="px-4 py-3 text-sm">
-                              {item.po_number || "—"}
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium">
-                                  {item.invoice_value
-                                    ? `£${item.invoice_value.toFixed(2)}`
-                                    : "—"}
-                                </span>
-                                <span className="text-xs text-muted-foreground italic">
-                                  (from phasing)
-                                </span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3">
-                              {canEdit && !isLocked && !item.excluded_this_month ? (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleOpenEditDialog(item)}
-                                  className="w-full justify-start text-left min-h-[60px] whitespace-normal"
-                                >
-                                  {item.description ? (
-                                    <span className="text-sm">{item.description}</span>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {/* Locked Message */}
+                  {isLocked && (
+                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                      <p className="text-sm text-green-800">
+                        This billing period is locked. Values and descriptions cannot be edited.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Invoice Items Table */}
+                  <div className="bg-white rounded-lg shadow overflow-hidden">
+                    {invoiceItems.length === 0 ? (
+                      <div className="p-8 text-center">
+                        <p className="text-lg text-muted-foreground mb-2">
+                          No active projects found for this billing period.
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Invoice items are automatically created from active projects. 
+                          Make sure you have projects with status "active" and they will appear here.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead className="bg-gray-50 border-b">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                                Include
+                              </th>
+                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                                Project
+                              </th>
+                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                                Client
+                              </th>
+                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                                PO Number
+                              </th>
+                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                                Invoice Value (from Monthly Phasing)
+                              </th>
+                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                                Description
+                              </th>
+                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                                Last Updated
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y">
+                            {invoiceItems.map((item) => (
+                              <tr key={item.id} className={item.excluded_this_month ? "opacity-50" : ""}>
+                                <td className="px-4 py-3">
+                                  <Checkbox
+                                    checked={!item.excluded_this_month}
+                                    disabled={!canEdit || isLocked}
+                                    onCheckedChange={(checked) =>
+                                      handleUpdateItem(item.id, "excluded_this_month", !checked)
+                                    }
+                                  />
+                                </td>
+                                <td className="px-4 py-3">
+                                  <Link
+                                    href={`/projects/${item.project_id}`}
+                                    className="text-blue-600 hover:underline"
+                                  >
+                                    {item.project_code} - {item.project_name}
+                                  </Link>
+                                </td>
+                                <td className="px-4 py-3 text-sm">{item.client_name}</td>
+                                <td className="px-4 py-3 text-sm">
+                                  {item.po_number || "—"}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium">
+                                      {item.invoice_value
+                                        ? `£${item.invoice_value.toFixed(2)}`
+                                        : "—"}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground italic">
+                                      (from phasing)
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3">
+                                  {canEdit && !isLocked && !item.excluded_this_month ? (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleOpenEditDialog(item)}
+                                      className="w-full justify-start text-left min-h-[60px] whitespace-normal"
+                                    >
+                                      {item.description ? (
+                                        <span className="text-sm">{item.description}</span>
+                                      ) : (
+                                        <span className="text-sm text-muted-foreground italic">
+                                          Click to add description...
+                                        </span>
+                                      )}
+                                    </Button>
                                   ) : (
-                                    <span className="text-sm text-muted-foreground italic">
-                                      Click to add description...
+                                    <span className="text-sm whitespace-pre-wrap">
+                                      {item.description || "—"}
                                     </span>
                                   )}
-                                </Button>
-                              ) : (
-                                <span className="text-sm whitespace-pre-wrap">
-                                  {item.description || "—"}
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-500">
-                              {new Date(item.updated_at).toLocaleDateString()}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                                </td>
+                                <td className="px-4 py-3 text-sm text-gray-500">
+                                  {new Date(item.updated_at).toLocaleDateString()}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
 
-              {/* Footer Actions */}
-              <div className="flex items-center justify-between pt-6 border-t">
-                <div className="text-lg font-semibold">
-                  Total invoice value this month:{" "}
-                  <span className="text-primary">
-                    £{totalValue.toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex gap-2">
-                  {invoiceMonth && (
-                    <Button
-                      onClick={handleDownloadPdf}
-                      variant="outline"
-                      disabled={loading}
-                    >
-                      <Download className="mr-2 h-4 w-4" />
-                      {loading ? "Generating..." : "Download PDF"}
-                    </Button>
-                  )}
-                  
-                  {canEdit && invoiceMonth.status === "locked" && (
-                    <Button
-                      onClick={handleReopenMonth}
-                      variant="outline"
-                    >
-                      <LockOpen className="mr-2 h-4 w-4" />
-                      Unlock Invoice
-                    </Button>
-                  )}
-                  
-                  {canEdit && invoiceMonth.status === "open" && (
-                    <>
-                      <Button
-                        onClick={handleSyncProjects}
-                        variant="outline"
-                      >
-                        <RefreshCw className="mr-2 h-4 w-4" />
-                        Sync Projects
-                      </Button>
-                      <Button
-                        onClick={handleFinishInvoicing}
-                        disabled={totalValue === 0}
-                      >
-                        <Lock className="mr-2 h-4 w-4" />
-                        Finish Invoicing for this Month
-                      </Button>
-                    </>
-                  )}
-                </div>
+                  {/* Footer Actions */}
+                  <div className="flex items-center justify-between pt-6 border-t">
+                    <div className="text-lg font-semibold">
+                      Total invoice value this month:{" "}
+                      <span className="text-primary">
+                        £{totalValue.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      {invoiceMonth && (
+                        <Button
+                          onClick={handleDownloadPdf}
+                          variant="outline"
+                          disabled={loading}
+                        >
+                          <Download className="mr-2 h-4 w-4" />
+                          {loading ? "Generating..." : "Download PDF"}
+                        </Button>
+                      )}
+                      
+                      {canEdit && invoiceMonth.status === "locked" && (
+                        <Button
+                          onClick={handleReopenMonth}
+                          variant="outline"
+                        >
+                          <LockOpen className="mr-2 h-4 w-4" />
+                          Unlock Invoice
+                        </Button>
+                      )}
+                      
+                      {canEdit && invoiceMonth.status === "open" && (
+                        <>
+                          <Button
+                            onClick={handleSyncProjects}
+                            variant="outline"
+                          >
+                            <RefreshCw className="mr-2 h-4 w-4" />
+                            Sync Projects
+                          </Button>
+                          <Button
+                            onClick={handleFinishInvoicing}
+                            disabled={totalValue === 0}
+                          >
+                            <Lock className="mr-2 h-4 w-4" />
+                            Finish Invoicing for this Month
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </TabsContent>
+          </Tabs>
+
+          {/* Edit Description Dialog */}
+          <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Edit Invoice Description</DialogTitle>
+                <DialogDescription>
+                  Describe what you&apos;re invoicing for this project this month. This text will appear on the invoice.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                <Textarea
+                  value={editingDescription}
+                  onChange={(e) => setEditingDescription(e.target.value)}
+                  placeholder="What we're invoicing this month..."
+                  className="min-h-[200px]"
+                />
               </div>
-            </>
-          )}
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setEditDialogOpen(false);
+                    setEditingItemId(null);
+                    setEditingDescription("");
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveDescription}>
+                  Save Description
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Lock Confirmation Dialog */}
+          <AlertDialog open={showLockDialog} onOpenChange={setShowLockDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Lock and finalise this billing period?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will lock all invoice values and descriptions for {MONTHS[selectedMonth - 1]}{" "}
+                  {selectedYear}. You will not be able to edit them unless an administrator reopens
+                  the period. You can still download the PDF summary at any time.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleLockMonth}>
+                  Yes, Finish Invoicing
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
-
-        {/* Edit Description Dialog */}
-        <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Edit Invoice Description</DialogTitle>
-              <DialogDescription>
-                Describe what you&apos;re invoicing for this project this month. This text will appear on the invoice.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="py-4">
-              <Textarea
-                value={editingDescription}
-                onChange={(e) => setEditingDescription(e.target.value)}
-                placeholder="What we're invoicing this month..."
-                className="min-h-[200px]"
-              />
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setEditDialogOpen(false);
-                  setEditingItemId(null);
-                  setEditingDescription("");
-                }}
-              >
-                Cancel
-              </Button>
-              <Button onClick={handleSaveDescription}>
-                Save Description
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Lock Confirmation Dialog */}
-        <AlertDialog open={showLockDialog} onOpenChange={setShowLockDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Lock and finalise this billing period?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This will lock all invoice values and descriptions for {MONTHS[selectedMonth - 1]}{" "}
-                {selectedYear}. You will not be able to edit them unless an administrator reopens
-                the period. You can still download the PDF summary at any time.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleLockMonth}>
-                Yes, Finish Invoicing
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </Layout>
     </RequireAuth>
   );

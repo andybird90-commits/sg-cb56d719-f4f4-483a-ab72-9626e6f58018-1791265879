@@ -18,6 +18,7 @@ interface User {
   id: string;
   full_name: string | null;
   email: string;
+  payment_terms?: string;
 }
 
 function NewCompanyContent() {
@@ -31,6 +32,7 @@ function NewCompanyContent() {
     short_name: "",
     sector: "",
     status: "active",
+    payment_terms: 30,
     notes: "",
     added_by_user_id: "",
   });
@@ -66,6 +68,7 @@ function NewCompanyContent() {
       short_name: formData.short_name || null,
       sector: formData.sector || null,
       status: formData.status as "active" | "prospect" | "inactive",
+      payment_terms: formData.payment_terms,
       notes: formData.notes || null,
       added_by_user_id: formData.added_by_user_id || null,
     });
@@ -152,6 +155,24 @@ function NewCompanyContent() {
                     <SelectItem value="active">Active</SelectItem>
                     <SelectItem value="prospect">Prospect</SelectItem>
                     <SelectItem value="inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="payment_terms" className="text-sm sm:text-base">Payment Terms</Label>
+                <Select
+                  value={formData.payment_terms.toString()}
+                  onValueChange={(value) => setFormData({ ...formData, payment_terms: parseInt(value) })}
+                >
+                  <SelectTrigger className="h-10 sm:h-11">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="14">14 days</SelectItem>
+                    <SelectItem value="30">30 days</SelectItem>
+                    <SelectItem value="45">45 days</SelectItem>
+                    <SelectItem value="60">60 days</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -22,6 +22,7 @@ interface Company {
   short_name: string | null;
   sector: string | null;
   status: string;
+  payment_terms: number | null;
   notes: string | null;
   added_by_user_id: string | null;
   added_by_profile?: {
@@ -64,6 +65,7 @@ function CompanyDetailContent() {
     short_name: string;
     sector: string;
     status: "active" | "prospect" | "inactive";
+    payment_terms: number;
     notes: string;
     added_by_user_id: string;
   }>({
@@ -71,6 +73,7 @@ function CompanyDetailContent() {
     short_name: "",
     sector: "",
     status: "prospect",
+    payment_terms: 30,
     notes: "",
     added_by_user_id: "",
   });
@@ -140,6 +143,7 @@ function CompanyDetailContent() {
         short_name: companyData.short_name || "",
         sector: companyData.sector || "",
         status: companyData.status as "active" | "prospect" | "inactive",
+        payment_terms: companyData.payment_terms || 30,
         notes: companyData.notes || "",
         added_by_user_id: companyData.added_by_user_id || "",
       });
@@ -163,6 +167,7 @@ function CompanyDetailContent() {
           short_name: editData.short_name || null,
           sector: editData.sector || null,
           status: editData.status,
+          payment_terms: editData.payment_terms,
           notes: editData.notes || null,
           added_by_user_id: editData.added_by_user_id || null,
         })
@@ -341,6 +346,24 @@ function CompanyDetailContent() {
                       </div>
 
                       <div className="space-y-2">
+                        <Label htmlFor="payment_terms">Payment Terms</Label>
+                        <Select
+                          value={editData.payment_terms.toString()}
+                          onValueChange={(value) => setEditData({ ...editData, payment_terms: parseInt(value) })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="14">14 days</SelectItem>
+                            <SelectItem value="30">30 days</SelectItem>
+                            <SelectItem value="45">45 days</SelectItem>
+                            <SelectItem value="60">60 days</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
                         <Label htmlFor="short_name">Short Name</Label>
                         <Input
                           id="short_name"
@@ -408,6 +431,12 @@ function CompanyDetailContent() {
                         <div>
                           <div className="text-sm font-medium text-slate-500">Sector</div>
                           <div className="text-slate-900">{company.sector}</div>
+                        </div>
+                      )}
+                      {company.payment_terms && (
+                        <div>
+                          <div className="text-sm font-medium text-slate-500">Payment Terms</div>
+                          <div className="text-slate-900">{company.payment_terms} days</div>
                         </div>
                       )}
                     </div>
