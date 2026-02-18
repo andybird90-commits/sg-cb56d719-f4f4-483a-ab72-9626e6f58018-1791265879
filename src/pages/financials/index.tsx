@@ -394,11 +394,14 @@ function FinancialsContent() {
   const exportUserTimeBreakdownToPDF = () => {
     const doc = new jsPDF();
     
+    // Create a date object for the selected month/year
+    const selectedDate = new Date(selectedYear, selectedMonth - 1);
+    
     // Add title
     doc.setFontSize(16);
     doc.text("User Time Breakdown", 14, 15);
     doc.setFontSize(10);
-    doc.text(`Period: ${format(selectedMonth, "MMMM yyyy")}`, 14, 22);
+    doc.text(`Period: ${format(selectedDate, "MMMM yyyy")}`, 14, 22);
 
     // Prepare table data
     const tableData: any[] = [];
@@ -446,7 +449,7 @@ function FinancialsContent() {
     });
 
     // Save the PDF
-    doc.save(`user-time-breakdown-${selectedMonth.getMonth() + 1}-${selectedMonth.getFullYear()}.pdf`);
+    doc.save(`user-time-breakdown-${selectedMonth}-${selectedYear}.pdf`);
   };
 
   const formatCurrency = (value: number | null) => {
