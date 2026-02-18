@@ -382,7 +382,8 @@ export type Database = {
       }
       invoice_history: {
         Row: {
-          client_name: string
+          client_name: string | null
+          company_id: string | null
           created_at: string | null
           created_by: string | null
           due_date: string
@@ -393,13 +394,16 @@ export type Database = {
           net_amount: number
           notes: string | null
           paid_amount: number | null
+          po_reference: string | null
+          project_id: string | null
           project_name: string | null
           status: string | null
           updated_at: string | null
           vat_amount: number | null
         }
         Insert: {
-          client_name: string
+          client_name?: string | null
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           due_date: string
@@ -410,13 +414,16 @@ export type Database = {
           net_amount: number
           notes?: string | null
           paid_amount?: number | null
+          po_reference?: string | null
+          project_id?: string | null
           project_name?: string | null
           status?: string | null
           updated_at?: string | null
           vat_amount?: number | null
         }
         Update: {
-          client_name?: string
+          client_name?: string | null
+          company_id?: string | null
           created_at?: string | null
           created_by?: string | null
           due_date?: string
@@ -427,12 +434,29 @@ export type Database = {
           net_amount?: number
           notes?: string | null
           paid_amount?: number | null
+          po_reference?: string | null
+          project_id?: string | null
           project_name?: string | null
           status?: string | null
           updated_at?: string | null
           vat_amount?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "invoice_history_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_history_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       invoice_items: {
         Row: {

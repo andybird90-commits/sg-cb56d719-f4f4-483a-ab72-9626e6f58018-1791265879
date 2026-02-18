@@ -31,13 +31,19 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
-import { Pencil, Save, X, Filter } from "lucide-react";
+import { Pencil, Save, X, Filter, CalendarIcon, Check, ChevronsUpDown } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 interface InvoiceHistory {
   id: string;
-  client_name: string;
+  client_name: string | null;
   project_name: string | null;
+  company_id: string | null;
+  project_id: string | null;
+  po_reference: string | null;
   invoice_number: string;
   invoice_date: string;
   due_date: string;
@@ -48,7 +54,6 @@ interface InvoiceHistory {
   paid_amount: number;
   notes: string | null;
   created_at: string;
-  updated_at: string;
 }
 
 interface FormData {
@@ -78,11 +83,36 @@ const initialFormData: FormData = {
 };
 
 function IntakeInvoicesContent() {
-  const [formData, setFormData] = useState<FormData>(initialFormData);
+  const { toast } = useToast();
   const [invoices, setInvoices] = useState<InvoiceHistory[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [showUnpaidOnly, setShowUnpaidOnly] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  
+  // Companies and projects data
+  const [companies, setCompanies] = useState<Array<{ id: string; name: string }>>([]);
+  const [projects, setProjects] = useState<Array<{ id: string; name: string; company_id: string }>>([]);
+  const [filteredProjects, setFilteredProjects] = useState<Array<{ id: string; name: string }>>([]);
+  
+  // Combobox open states
+  const [companyOpen, setCompanyOpen] = useState(false);
+  const [projectOpen, setProjectOpen] = useState(false);
+
+  const [formData, setFormData] = useState({
+    client_name: "",
+    company_id: "",
+    project_name: "",
+    project_id: "",
+    po_reference: "",
+    invoice_number: "",
+    invoice_date: "",
+    due_date: "",
+    net_amount: "",
+    vat_amount: "0",
+    status: "unpaid" as const,
+    paid_amount: "0",
+    notes: "",
+  });
 
   // Calculate gross amount
   const netAmount = parseFloat(formData.net_amount) || 0;
@@ -101,16 +131,40 @@ function IntakeInvoicesContent() {
     return true;
   };
 
+  const [dateError, setDateError] = useState("");
+
+  // Fetch companies and projects
+  const fetchCompaniesAndProjects = async () => {
+    try {
+      const [companiesRes, projectsRes] = await Promise.all([
+        supabase.from("companies").select("id, name").order("name"),
+        supabase.from("projects").select("id, name, company_id").order("name")
+      ]);
+
+      if (companiesRes.error) throw companiesRes.error;
+      if (projectsRes.error) throw projectsRes.error;
+
+      setCompanies(companiesRes.data || []);
+      setProjects(projectsRes.data || []);
+    } catch (error) {
+      console.error("Error fetching companies/projects:", error);
+    }
+  };
+
   // Fetch invoices
   const fetchInvoices = async () => {
     try {
       const { data, error } = await supabase
         .from("invoice_history")
-        .select("*")
+        .select(`
+          *,
+          companies!invoice_history_company_id_fkey(name),
+          projects!invoice_history_project_id_fkey(name)
+        `)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setInvoices((data as InvoiceHistory[]) || []);
+      setInvoices(data as InvoiceHistory[]);
     } catch (error) {
       console.error("Error fetching invoices:", error);
       toast({
@@ -118,12 +172,25 @@ function IntakeInvoicesContent() {
         description: "Failed to load invoices",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
+    fetchCompaniesAndProjects();
     fetchInvoices();
   }, []);
+
+  // Filter projects based on selected company
+  useEffect(() => {
+    if (formData.company_id) {
+      const filtered = projects.filter(p => p.company_id === formData.company_id);
+      setFilteredProjects(filtered);
+    } else {
+      setFilteredProjects(projects);
+    }
+  }, [formData.company_id, projects]);
 
   // Calculate summary metrics
   const unpaidInvoices = invoices.filter((inv) => inv.status === "unpaid");
@@ -209,6 +276,101 @@ function IntakeInvoicesContent() {
     }
   };
 
+  const handleSubmit = async (saveAndAddAnother: boolean = false) => {
+    // Validation
+    if (!formData.company_id || !formData.invoice_number || !formData.invoice_date || !formData.due_date || !formData.net_amount) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (dateError) {
+      toast({
+        title: "Validation Error",
+        description: dateError,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const selectedCompany = companies.find(c => c.id === formData.company_id);
+      const selectedProject = projects.find(p => p.id === formData.project_id);
+
+      const invoiceData = {
+        company_id: formData.company_id,
+        client_name: selectedCompany?.name || null,
+        project_id: formData.project_id || null,
+        project_name: selectedProject?.name || null,
+        po_reference: formData.po_reference || null,
+        invoice_number: formData.invoice_number,
+        invoice_date: formData.invoice_date,
+        due_date: formData.due_date,
+        net_amount: parseFloat(formData.net_amount),
+        vat_amount: parseFloat(formData.vat_amount),
+        status: formData.status,
+        paid_amount: parseFloat(formData.paid_amount),
+        notes: formData.notes || null,
+      };
+
+      if (editingId) {
+        const { error } = await supabase
+          .from("invoice_history")
+          .update(invoiceData)
+          .eq("id", editingId);
+
+        if (error) throw error;
+
+        toast({
+          title: "Success",
+          description: "Invoice updated successfully",
+        });
+        setEditingId(null);
+      } else {
+        const { error } = await supabase
+          .from("invoice_history")
+          .insert([invoiceData]);
+
+        if (error) throw error;
+
+        toast({
+          title: "Success",
+          description: "Invoice added successfully",
+        });
+      }
+
+      if (saveAndAddAnother) {
+        setFormData({
+          client_name: "",
+          company_id: "",
+          project_name: "",
+          project_id: "",
+          po_reference: "",
+          invoice_number: "",
+          invoice_date: "",
+          due_date: "",
+          net_amount: "",
+          vat_amount: "0",
+          status: "unpaid",
+          paid_amount: "0",
+          notes: "",
+        });
+      }
+
+      fetchInvoices();
+    } catch (error) {
+      console.error("Error saving invoice:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save invoice",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Edit invoice
   const editInvoice = (invoice: InvoiceHistory) => {
     setFormData({
@@ -225,6 +387,25 @@ function IntakeInvoicesContent() {
     });
     setEditingId(invoice.id);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleEdit = (invoice: InvoiceHistory) => {
+    setEditingId(invoice.id);
+    setFormData({
+      client_name: invoice.client_name || "",
+      company_id: invoice.company_id || "",
+      project_name: invoice.project_name || "",
+      project_id: invoice.project_id || "",
+      po_reference: invoice.po_reference || "",
+      invoice_number: invoice.invoice_number,
+      invoice_date: invoice.invoice_date,
+      due_date: invoice.due_date,
+      net_amount: invoice.net_amount.toString(),
+      vat_amount: invoice.vat_amount.toString(),
+      status: invoice.status,
+      paid_amount: invoice.paid_amount.toString(),
+      notes: invoice.notes || "",
+    });
   };
 
   // Cancel edit
@@ -320,31 +501,113 @@ function IntakeInvoicesContent() {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Client Name */}
-              <div className="space-y-2">
-                <Label htmlFor="client_name">
-                  Client Name <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="client_name"
-                  value={formData.client_name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, client_name: e.target.value })
-                  }
-                  placeholder="Enter client name"
-                />
-              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="client_name">
+                    Client Name <span className="text-red-500">*</span>
+                  </Label>
+                  <Popover open={companyOpen} onOpenChange={setCompanyOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={companyOpen}
+                        className="w-full justify-between"
+                      >
+                        {formData.company_id
+                          ? companies.find((company) => company.id === formData.company_id)?.name
+                          : "Select client..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0">
+                      <Command>
+                        <CommandInput placeholder="Search client..." />
+                        <CommandList>
+                          <CommandEmpty>No client found.</CommandEmpty>
+                          <CommandGroup>
+                            {companies.map((company) => (
+                              <CommandItem
+                                key={company.id}
+                                value={company.name}
+                                onSelect={() => {
+                                  setFormData({ 
+                                    ...formData, 
+                                    company_id: company.id,
+                                    client_name: company.name,
+                                    project_id: "", // Reset project when company changes
+                                    project_name: ""
+                                  });
+                                  setCompanyOpen(false);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    formData.company_id === company.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                {company.name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
 
-              {/* Project Name */}
-              <div className="space-y-2">
-                <Label htmlFor="project_name">Project Name</Label>
-                <Input
-                  id="project_name"
-                  value={formData.project_name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, project_name: e.target.value })
-                  }
-                  placeholder="Enter project name (optional)"
-                />
+                <div>
+                  <Label htmlFor="project_name">Project Name</Label>
+                  <Popover open={projectOpen} onOpenChange={setProjectOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={projectOpen}
+                        className="w-full justify-between"
+                        disabled={!formData.company_id}
+                      >
+                        {formData.project_id
+                          ? filteredProjects.find((project) => project.id === formData.project_id)?.name
+                          : "Select project (optional)"}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0">
+                      <Command>
+                        <CommandInput placeholder="Search project..." />
+                        <CommandList>
+                          <CommandEmpty>No project found.</CommandEmpty>
+                          <CommandGroup>
+                            {filteredProjects.map((project) => (
+                              <CommandItem
+                                key={project.id}
+                                value={project.name}
+                                onSelect={() => {
+                                  setFormData({ 
+                                    ...formData, 
+                                    project_id: project.id,
+                                    project_name: project.name
+                                  });
+                                  setProjectOpen(false);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    formData.project_id === project.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                {project.name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
 
               {/* Invoice Number */}
@@ -586,11 +849,9 @@ function IntakeInvoicesContent() {
                   ) : (
                     displayedInvoices.map((invoice) => (
                       <TableRow key={invoice.id}>
-                        <TableCell className="font-medium">
-                          {invoice.invoice_number}
-                        </TableCell>
-                        <TableCell>{invoice.client_name}</TableCell>
-                        <TableCell>{invoice.project_name || "-"}</TableCell>
+                        <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
+                        <TableCell>{(invoice as any).companies?.name || invoice.client_name || "N/A"}</TableCell>
+                        <TableCell>{(invoice as any).projects?.name || invoice.project_name || "N/A"}</TableCell>
                         <TableCell>
                           {format(new Date(invoice.invoice_date), "dd MMM yyyy")}
                         </TableCell>
