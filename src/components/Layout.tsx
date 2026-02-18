@@ -4,7 +4,7 @@ import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Home, Building2, Users, FileText, Calendar, Clock, DollarSign, Target, Settings, LogOut, Menu, ChevronDown, Archive, LayoutDashboard, Briefcase, PoundSterling, User } from "lucide-react";
+import { Home, Building2, Users, FileText, Calendar, Clock, DollarSign, Target, Settings, LogOut, Menu, ChevronDown, Archive, LayoutDashboard, Briefcase, PoundSterling, User, BarChart3 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import Image from "next/image";
 import { useState } from "react";

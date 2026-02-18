@@ -109,20 +109,24 @@ function ContactDetailContent() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-          <Link href="/contacts">
-            <Button variant="ghost" size="sm" className="gap-2 self-start">
-              <ArrowLeft className="w-4 h-4" />
-              Back
-            </Button>
-          </Link>
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">{contact.name}</h1>
-            <div className="flex items-center gap-2 text-slate-600 mt-1">
-              <Building2 className="w-4 h-4" />
-              <Link href={`/companies/${contact.company_id}`} className="hover:text-blue-600 hover:underline">
-                {contact.companies?.name}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+              <Link href="/contacts">
+                <Button variant="ghost" size="sm" className="gap-2 self-start">
+                  <ArrowLeft className="w-4 h-4" />
+                  Back
+                </Button>
               </Link>
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">{contact.name}</h1>
+                <div className="flex items-center gap-2 text-slate-600 mt-1">
+                  <Building2 className="w-4 h-4" />
+                  <Link href={`/companies/${contact.company_id}`} className="hover:text-blue-600 hover:underline">
+                    {contact.companies?.name}
+                  </Link>
+                </div>
+              </div>
             </div>
           </div>
         </div>
