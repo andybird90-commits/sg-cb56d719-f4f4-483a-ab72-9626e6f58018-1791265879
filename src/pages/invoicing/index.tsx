@@ -39,6 +39,8 @@ import { Download, Lock, LockOpen, Plus, RefreshCw, Edit } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Calendar, CheckCircle2, AlertTriangle, Clock } from "lucide-react";
+import { format, addDays, startOfWeek, endOfWeek, addWeeks, isBefore, isAfter, isWithinInterval } from "date-fns";
 
 type InvoiceMonth = {
   id: string;
@@ -780,6 +782,14 @@ export default function InvoicingPage() {
                   </div>
                 </>
               )}
+            </TabsContent>
+
+            <TabsContent value="cashflow" className="space-y-6">
+              <iframe 
+                src="/invoicing/cashflow" 
+                className="w-full h-[800px] border-0"
+                title="Cash Flow Forecast"
+              />
             </TabsContent>
           </Tabs>
 
