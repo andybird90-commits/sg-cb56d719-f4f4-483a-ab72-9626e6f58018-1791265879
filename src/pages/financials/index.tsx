@@ -393,26 +393,60 @@ function FinancialsContent() {
 
   const exportUserTimeBreakdownToPDF = () => {
     const doc = new jsPDF();
-    const tableData = userTimesheetBreakdown.map(user => {
-      return {
-        user: user.user_name,
-        rate: user.hourly_rate,
-        projects: user.projects.map(proj => `${proj.project_code} (${proj.project_name})`).join(", "),
-        hours: user.total_hours,
-        cost: user.total_cost
-      };
+    
+    // Add title
+    doc.setFontSize(16);
+    doc.text("User Time Breakdown", 14, 15);
+    doc.setFontSize(10);
+    doc.text(`Period: ${format(selectedMonth, "MMMM yyyy")}`, 14, 22);
+
+    // Prepare table data
+    const tableData: any[] = [];
+    
+    userTimesheetBreakdown.forEach((user) => {
+      // Add user header row
+      tableData.push([
+        user.user_name,
+        `£${user.hourly_rate.toFixed(2)}`,
+        "",
+        "",
+        user.total_hours.toFixed(1),
+        `£${user.total_cost.toFixed(2)}`
+      ]);
+      
+      // Add project rows for this user
+      user.projects.forEach((project) => {
+        tableData.push([
+          "",
+          "",
+          project.project_code,
+          project.project_name,
+          project.hours.toFixed(1),
+          `£${project.cost.toFixed(2)}`
+        ]);
+      });
     });
+
+    // Generate table
     autoTable(doc, {
-      head: [["User", "Rate", "Projects", "Hours", "Cost"]],
+      startY: 28,
+      head: [["User", "Hourly Rate", "Project Code", "Project Name", "Hours", "Cost"]],
       body: tableData,
       theme: "grid",
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [220, 220, 220] },
+      headStyles: { fillColor: [66, 66, 66] },
+      styles: { fontSize: 8 },
       columnStyles: {
-        projects: { cellWidth: 100 }
+        0: { cellWidth: 35 },
+        1: { cellWidth: 25 },
+        2: { cellWidth: 25 },
+        3: { cellWidth: 60 },
+        4: { cellWidth: 20, halign: "right" },
+        5: { cellWidth: 25, halign: "right" }
       }
     });
-    doc.save(`user-time-breakdown-${selectedMonth}-${selectedYear}.pdf`);
+
+    // Save the PDF
+    doc.save(`user-time-breakdown-${selectedMonth.getMonth() + 1}-${selectedMonth.getFullYear()}.pdf`);
   };
 
   const formatCurrency = (value: number | null) => {
@@ -718,7 +752,7 @@ function FinancialsContent() {
                                 <div>
                                   <span className="text-slate-500">Cost:</span>
                                   <div className="font-semibold text-slate-900">
-                                    {formatCurrency(pf.total_cost)}
+                                    {formatCurrency(pf.internal_cost)}
                                   </div>
                                 </div>
                                 <div>
