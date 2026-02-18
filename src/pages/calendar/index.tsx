@@ -179,6 +179,7 @@ function CalendarContent() {
           start_time: event.start_time,
           end_time: event.end_time,
           location: event.location,
+          type: "meeting" as "meeting" | "visit" | "function",
           event_type: "meeting" as const,
           source: "contact" as const,
           source_id: event.contact_id,
@@ -193,6 +194,7 @@ function CalendarContent() {
           start_time: event.start_time,
           end_time: event.end_time,
           location: event.location,
+          type: "meeting" as "meeting" | "visit" | "function",
           event_type: (event.event_type === "submission" ? "deadline" : "meeting") as "meeting" | "deadline" | "milestone" | "other",
           source: "opportunity" as const,
           source_id: event.opportunity_id,
@@ -737,7 +739,7 @@ function CalendarContent() {
                   />
                 </div>
                 <div className="flex justify-between gap-4">
-                  <Button variant="destructive" onClick={() => handleDeleteEvent(editingEvent.id)} type="button">
+                  <Button variant="destructive" onClick={() => handleDeleteEvent()} type="button">
                     <Trash2 className="w-4 h-4 mr-2" /> Delete
                   </Button>
                   <Button onClick={handleEditEvent} disabled={saving}>
