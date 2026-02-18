@@ -272,7 +272,7 @@ function IntakeInvoicesContent() {
           due_date: "",
           net_amount: "",
           vat_amount: "0",
-          status: "unpaid",
+          status: "unpaid" as const,
           paid_amount: "0",
           notes: "",
         });
@@ -339,7 +339,7 @@ function IntakeInvoicesContent() {
       due_date: "",
       net_amount: "",
       vat_amount: "0",
-      status: "unpaid",
+      status: "unpaid" as const,
       paid_amount: "0",
       notes: "",
     });
