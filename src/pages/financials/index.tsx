@@ -77,8 +77,6 @@ function FinancialsContent() {
     fetchFinancials();
   }, [selectedYear, selectedMonth]);
 
-  const totalRevenue = projectFinancials.reduce((sum, p) => sum + (p.revenue || 0), 0);
-
   const fetchFinancials = async () => {
     try {
       setLoading(true);
