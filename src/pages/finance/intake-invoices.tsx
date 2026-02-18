@@ -289,24 +289,6 @@ function IntakeInvoicesContent() {
     }
   };
 
-  // Edit invoice
-  const editInvoice = (invoice: InvoiceHistory) => {
-    setFormData({
-      client_name: invoice.client_name,
-      project_name: invoice.project_name || "",
-      invoice_number: invoice.invoice_number,
-      invoice_date: invoice.invoice_date,
-      due_date: invoice.due_date,
-      net_amount: invoice.net_amount.toString(),
-      vat_amount: invoice.vat_amount.toString(),
-      status: invoice.status,
-      paid_amount: invoice.paid_amount.toString(),
-      notes: invoice.notes || "",
-    });
-    setEditingId(invoice.id);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
   const handleEdit = (invoice: InvoiceHistory) => {
     setEditingId(invoice.id);
     setFormData({
