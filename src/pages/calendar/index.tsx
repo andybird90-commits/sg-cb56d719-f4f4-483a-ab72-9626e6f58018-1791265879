@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Calendar as CalendarIcon, Plus, ChevronLeft, ChevronRight, AlertTriangle, Trash2, Edit, Users, Target, Briefcase, CalendarDays } from "lucide-react";
+import { Calendar as CalendarIcon, Plus, ChevronLeft, ChevronRight, AlertTriangle, Trash2, Edit, Users, Target, CalendarDays } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek, parseISO } from "date-fns";
 import { useRouter } from "next/router";
 
@@ -25,7 +25,7 @@ interface CalendarEvent {
   end_time?: string;
   location?: string;
   event_type: "meeting" | "deadline" | "milestone" | "other";
-  source: "calendar" | "contact" | "opportunity" | "project";
+  source: "calendar" | "contact" | "opportunity";
   source_id?: string;
   source_name?: string;
   color?: string;
@@ -76,13 +76,20 @@ function CalendarContent() {
 
       const monthStart = startOfMonth(currentMonth);
       const monthEnd = endOfMonth(currentMonth);
+      
+      // Expand range to include full weeks displayed
+      const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+      const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
+
+      const startDateStr = format(calendarStart, "yyyy-MM-dd");
+      const endDateStr = format(calendarEnd, "yyyy-MM-dd");
 
       // Fetch standalone calendar events
       const { data: calendarEvents, error: calendarError } = await supabase
         .from("calendar_events")
         .select("*")
-        .gte("event_date", format(monthStart, "yyyy-MM-dd"))
-        .lte("event_date", format(monthEnd, "yyyy-MM-dd"))
+        .gte("event_date", startDateStr)
+        .lte("event_date", endDateStr)
         .order("event_date")
         .order("start_time");
 
@@ -107,8 +114,8 @@ function CalendarContent() {
             )
           )
         `)
-        .gte("event_date", format(monthStart, "yyyy-MM-dd"))
-        .lte("event_date", format(monthEnd, "yyyy-MM-dd"))
+        .gte("event_date", startDateStr)
+        .lte("event_date", endDateStr)
         .order("event_date")
         .order("start_time");
 
@@ -130,23 +137,43 @@ function CalendarContent() {
             name
           )
         `)
-        .gte("event_date", format(monthStart, "yyyy-MM-dd"))
-        .lte("event_date", format(monthEnd, "yyyy-MM-dd"))
+        .gte("event_date", startDateStr)
+        .lte("event_date", endDateStr)
         .order("event_date")
         .order("start_time");
 
       if (opportunityError) throw opportunityError;
 
-      // Fetch project milestones (using project dates)
-      const { data: projects, error: projectsError } = await supabase
-        .from("projects")
-        .select("id, name, start_date, end_date, status")
-        .eq("status", "live");
-
-      if (projectsError) throw projectsError;
-
-      // Combine all events
+      // Combine all events into a single array
       const allEvents: CalendarEvent[] = [
+        ...(contactEvents || []).map((event: any) => ({
+          id: event.id,
+          title: event.title || "Contact Event",
+          description: undefined,
+          event_date: event.event_date,
+          start_time: event.start_time,
+          end_time: event.end_time,
+          location: event.location,
+          event_type: "meeting" as const,
+          source: "contact" as const,
+          source_id: event.contact_id,
+          source_name: `${event.contacts?.name || 'Unknown'}${event.contacts?.companies?.name ? ` (${event.contacts.companies.name})` : ""}`,
+          color: "bg-blue-500"
+        })),
+        ...(opportunityEvents || []).map((event: any) => ({
+          id: event.id,
+          title: event.title || "Opportunity Event",
+          description: undefined,
+          event_date: event.event_date,
+          start_time: event.start_time,
+          end_time: event.end_time,
+          location: event.location,
+          event_type: (event.event_type === "submission" ? "deadline" : "meeting") as "meeting" | "deadline" | "milestone" | "other",
+          source: "opportunity" as const,
+          source_id: event.opportunity_id,
+          source_name: event.opportunities?.name,
+          color: "bg-orange-500"
+        })),
         ...(calendarEvents || []).map((event: any) => ({
           id: event.id,
           title: event.title,
@@ -155,73 +182,12 @@ function CalendarContent() {
           start_time: event.start_time,
           end_time: event.end_time,
           location: event.location,
-          event_type: event.event_type,
+          event_type: (event.event_type || "other") as "meeting" | "deadline" | "milestone" | "other",
           source: "calendar" as const,
+          source_id: event.id,
+          source_name: undefined,
           color: "bg-purple-500"
-        })),
-        ...(contactEvents || []).map((event: any) => ({
-          id: event.id,
-          title: event.title,
-          description: undefined,
-          event_date: event.event_date,
-          start_time: event.start_time,
-          end_time: event.end_time,
-          location: event.location,
-          event_type: (event.event_type === "visit" ? "meeting" : "other") as "meeting" | "deadline" | "milestone" | "other",
-          source: "contact" as const,
-          source_id: event.contact_id,
-          source_name: `${event.contacts?.name}${event.contacts?.companies?.name ? ` (${event.contacts.companies.name})` : ""}`,
-          color: "bg-blue-500"
-        })),
-        ...(opportunityEvents || []).map((event: any) => ({
-          id: event.id,
-          title: event.title,
-          description: undefined,
-          event_date: event.event_date,
-          start_time: event.start_time,
-          end_time: event.end_time,
-          location: event.location,
-          event_type: (event.event_type === "client_meeting" ? "meeting" : event.event_type === "submission" ? "deadline" : "other") as "meeting" | "deadline" | "milestone" | "other",
-          source: "opportunity" as const,
-          source_id: event.opportunity_id,
-          source_name: event.opportunities?.name,
-          color: "bg-orange-500"
-        })),
-        ...(projects || []).flatMap((project: any) => {
-          const projectEvents: CalendarEvent[] = [];
-          
-          if (project.start_date && 
-              parseISO(project.start_date) >= monthStart && 
-              parseISO(project.start_date) <= monthEnd) {
-            projectEvents.push({
-              id: `project-start-${project.id}`,
-              title: `${project.name} - Start`,
-              event_date: project.start_date,
-              event_type: "milestone",
-              source: "project" as const,
-              source_id: project.id,
-              source_name: project.name,
-              color: "bg-green-500"
-            });
-          }
-          
-          if (project.end_date && 
-              parseISO(project.end_date) >= monthStart && 
-              parseISO(project.end_date) <= monthEnd) {
-            projectEvents.push({
-              id: `project-end-${project.id}`,
-              title: `${project.name} - End`,
-              event_date: project.end_date,
-              event_type: "milestone",
-              source: "project" as const,
-              source_id: project.id,
-              source_name: project.name,
-              color: "bg-green-500"
-            });
-          }
-          
-          return projectEvents;
-        })
+        }))
       ];
 
       // Sort by date and time
@@ -345,8 +311,6 @@ function CalendarContent() {
       router.push(`/contacts/${event.source_id}`);
     } else if (event.source === "opportunity" && event.source_id) {
       router.push(`/opportunities/${event.source_id}`);
-    } else if (event.source === "project" && event.source_id) {
-      router.push(`/projects/${event.source_id}`);
     } else if (event.source === "calendar") {
       openEditDialog(event);
     }
@@ -381,8 +345,6 @@ function CalendarContent() {
         return <Users className="w-3 h-3" />;
       case "opportunity":
         return <Target className="w-3 h-3" />;
-      case "project":
-        return <Briefcase className="w-3 h-3" />;
       default:
         return <CalendarDays className="w-3 h-3" />;
     }
@@ -409,7 +371,7 @@ function CalendarContent() {
           <div>
             <h1 className="text-5xl font-bold tracking-tight mb-2">Calendar</h1>
             <p className="text-muted-foreground text-lg">
-              All events from projects, opportunities, and contacts
+              Manage your schedule and view upcoming events
             </p>
           </div>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
