@@ -742,7 +742,7 @@ function CalendarContent() {
                   <Button variant="destructive" onClick={() => handleDeleteEvent()} type="button">
                     <Trash2 className="w-4 h-4 mr-2" /> Delete
                   </Button>
-                  <Button onClick={handleEditEvent} disabled={saving}>
+                  <Button onClick={handleSaveEditedEvent} disabled={saving}>
                     {saving ? "Saving..." : "Save Changes"}
                   </Button>
                 </div>
