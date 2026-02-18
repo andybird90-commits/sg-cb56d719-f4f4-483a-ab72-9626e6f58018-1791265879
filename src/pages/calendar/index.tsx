@@ -3,7 +3,7 @@ import { Layout } from "@/components/Layout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { Badge } from "@/components/ui/badge";
 
 interface CalendarEvent {
   id: string;
@@ -30,6 +31,7 @@ interface CalendarEvent {
   start_time?: string;
   end_time?: string;
   location?: string;
+  type: "meeting" | "visit" | "function";
   event_type: "meeting" | "deadline" | "milestone" | "other";
   source: "calendar" | "contact" | "opportunity";
   source_id?: string;
@@ -69,6 +71,28 @@ function CalendarContent() {
     end_time: "",
     location: "",
     event_type: "meeting"
+  });
+
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [showNewEventDialog, setShowNewEventDialog] = useState(false);
+  const [showEditEventDialog, setShowEditEventDialog] = useState(false);
+  const [newEventForm, setNewEventForm] = useState({
+    title: "",
+    description: "",
+    event_date: format(new Date(), "yyyy-MM-dd"),
+    start_time: "",
+    end_time: "",
+    location: "",
+    event_type: "meeting"
+  });
+  const [editEventForm, setEditEventForm] = useState({
+    title: "",
+    type: "meeting" as "meeting" | "visit" | "function",
+    event_date: "",
+    start_time: "",
+    end_time: "",
+    description: "",
+    location: "",
   });
 
   useEffect(() => {
@@ -183,6 +207,7 @@ function CalendarContent() {
           start_time: event.start_time,
           end_time: event.end_time,
           location: event.location,
+          type: (event.event_type || "meeting") as "meeting" | "visit" | "function",
           event_type: (event.event_type || "other") as "meeting" | "deadline" | "milestone" | "other",
           source: "calendar" as const,
           source_id: event.id,
@@ -252,52 +277,65 @@ function CalendarContent() {
     }
   };
 
-  const handleEditEvent = async () => {
-    if (!editingEvent || editingEvent.source !== "calendar") return;
+  const handleEditEvent = (event: CalendarEvent) => {
+    setEditingEvent(event);
+    setEditEventForm({
+      title: event.title,
+      type: event.type,
+      event_date: event.event_date,
+      start_time: event.start_time || "",
+      end_time: event.end_time || "",
+      description: event.description || "",
+      location: event.location || "",
+    });
+    setShowEditEventDialog(true);
+  };
+
+  const handleSaveEditedEvent = async () => {
+    if (!editingEvent) return;
 
     try {
-      setSaving(true);
-
       const { error } = await supabase
         .from("calendar_events")
         .update({
-          title: editingEvent.title,
-          description: editingEvent.description || null,
-          event_date: editingEvent.event_date,
-          start_time: editingEvent.start_time || null,
-          end_time: editingEvent.end_time || null,
-          location: editingEvent.location || null,
-          event_type: editingEvent.event_type
+          title: editEventForm.title,
+          type: editEventForm.type,
+          event_date: editEventForm.event_date,
+          start_time: editEventForm.start_time || null,
+          end_time: editEventForm.end_time || null,
+          description: editEventForm.description || null,
+          location: editEventForm.location || null,
         })
         .eq("id", editingEvent.id);
 
       if (error) throw error;
 
-      setIsEditDialogOpen(false);
+      await fetchAllEvents();
+      setShowEditEventDialog(false);
       setEditingEvent(null);
-      fetchAllEvents();
     } catch (err) {
-      console.error("Failed to update event:", err);
+      console.error("Error updating event:", err);
       alert("Failed to update event");
-    } finally {
-      setSaving(false);
     }
   };
 
-  const handleDeleteEvent = async (eventId: string) => {
+  const handleDeleteEvent = async () => {
+    if (!editingEvent) return;
     if (!confirm("Are you sure you want to delete this event?")) return;
 
     try {
       const { error } = await supabase
         .from("calendar_events")
         .delete()
-        .eq("id", eventId);
+        .eq("id", editingEvent.id);
 
       if (error) throw error;
 
-      fetchAllEvents();
+      await fetchAllEvents();
+      setShowEditEventDialog(false);
+      setEditingEvent(null);
     } catch (err) {
-      console.error("Failed to delete event:", err);
+      console.error("Error deleting event:", err);
       alert("Failed to delete event");
     }
   };
@@ -534,17 +572,24 @@ function CalendarContent() {
                         {format(day, 'd')}
                       </div>
                       <div className="space-y-1">
-                        {dayEvents.slice(0, 3).map((event) => (
-                          <div
-                            key={event.id}
-                            onClick={() => handleEventClick(event)}
-                            className={`${event.color} text-white text-[10px] px-1.5 py-1 rounded cursor-pointer hover:opacity-80 truncate select-none shadow-sm`}
-                            title={event.title}
-                          >
-                            {event.start_time && <span className="font-medium opacity-90">{event.start_time.substring(0, 5)} </span>}
-                            {event.title}
-                          </div>
-                        ))}
+                        {dayEvents.map((event) => {
+                          const eventKey = `${event.type}-${event.id}`;
+                          return (
+                            <div
+                              key={eventKey}
+                              onClick={() => handleEditEvent(event)}
+                              className={`text-xs p-1 mb-1 rounded cursor-pointer hover:opacity-80 ${
+                                event.type === "visit"
+                                  ? "bg-blue-500 text-white"
+                                  : event.type === "function"
+                                  ? "bg-purple-500 text-white"
+                                  : "bg-green-500 text-white"
+                              }`}
+                            >
+                              {event.title}
+                            </div>
+                          );
+                        })}
                         {dayEvents.length > 3 && (
                           <div className="text-[10px] text-muted-foreground pl-1">
                             +{dayEvents.length - 3} more
@@ -701,6 +746,115 @@ function CalendarContent() {
                 </div>
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Event Dialog */}
+        <Dialog open={showEditEventDialog} onOpenChange={setShowEditEventDialog}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Edit Event</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-title">Event Title</Label>
+                <Input
+                  id="edit-title"
+                  value={editEventForm.title}
+                  onChange={(e) => setEditEventForm({ ...editEventForm, title: e.target.value })}
+                  placeholder="Enter event title"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-type">Type</Label>
+                  <Select
+                    value={editEventForm.type}
+                    onValueChange={(value: "meeting" | "visit" | "function") =>
+                      setEditEventForm({ ...editEventForm, type: value })
+                    }
+                  >
+                    <SelectTrigger id="edit-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="meeting">Meeting</SelectItem>
+                      <SelectItem value="visit">Visit</SelectItem>
+                      <SelectItem value="function">Function</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-date">Date</Label>
+                  <Input
+                    id="edit-date"
+                    type="date"
+                    value={editEventForm.event_date}
+                    onChange={(e) => setEditEventForm({ ...editEventForm, event_date: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-start-time">Start Time</Label>
+                  <Input
+                    id="edit-start-time"
+                    type="time"
+                    value={editEventForm.start_time}
+                    onChange={(e) => setEditEventForm({ ...editEventForm, start_time: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-end-time">End Time</Label>
+                  <Input
+                    id="edit-end-time"
+                    type="time"
+                    value={editEventForm.end_time}
+                    onChange={(e) => setEditEventForm({ ...editEventForm, end_time: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-location">Location</Label>
+                <Input
+                  id="edit-location"
+                  value={editEventForm.location}
+                  onChange={(e) => setEditEventForm({ ...editEventForm, location: e.target.value })}
+                  placeholder="Enter location"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-description">Description</Label>
+                <Textarea
+                  id="edit-description"
+                  value={editEventForm.description}
+                  onChange={(e) => setEditEventForm({ ...editEventForm, description: e.target.value })}
+                  placeholder="Enter description"
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex justify-between pt-4">
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={handleDeleteEvent}
+                  className="gap-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete
+                </Button>
+                <Button type="button" onClick={handleSaveEditedEvent}>
+                  Save Changes
+                </Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
