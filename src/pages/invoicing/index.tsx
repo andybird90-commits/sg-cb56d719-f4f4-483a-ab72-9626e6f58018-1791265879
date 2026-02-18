@@ -6,6 +6,7 @@ import { invoicingService } from "@/services/invoicingService";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -88,6 +89,10 @@ export default function InvoicingPage() {
   const [invoiceMonth, setInvoiceMonth] = useState<InvoiceMonth | null>(null);
   const [invoiceItems, setInvoiceItems] = useState<InvoiceItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isLocking, setIsLocking] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [editingDescription, setEditingDescription] = useState<string | null>(null);
+  const [newDescription, setNewDescription] = useState("");
   const [profileLoading, setProfileLoading] = useState(true);
   const [showLockDialog, setShowLockDialog] = useState(false);
   const [editingItems, setEditingItems] = useState<Set<string>>(new Set());
@@ -95,7 +100,18 @@ export default function InvoicingPage() {
   // Dialog state for editing description
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
-  const [editingDescription, setEditingDescription] = useState("");
+
+  // Cash Flow state
+  const [cashFlowLoading, setCashFlowLoading] = useState(false);
+  const [collections, setCollections] = useState<any[]>([]);
+  const [weeklyData, setWeeklyData] = useState<any[]>([]);
+  const [totals, setTotals] = useState({
+    totalOutstanding: 0,
+    inTerms: 0,
+    overdue: 0,
+    collected: 0,
+    totalValue: 0
+  });
 
   const canEdit = profile?.role === "admin" || profile?.role === "director";
   const isLocked = invoiceMonth?.status === "locked";
@@ -116,6 +132,19 @@ export default function InvoicingPage() {
       loadInvoiceData();
     }
   }, [selectedYear, selectedMonth, profileLoading]);
+
+  useEffect(() => {
+    loadInvoiceData();
+  }, [selectedMonth]);
+
+  // Fetch cash flow data when needed
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const activeTab = urlParams.get('tab');
+    if (activeTab === 'cashflow') {
+      fetchCashFlowData();
+    }
+  }, []);
 
   async function loadInvoiceData() {
     try {
@@ -525,7 +554,11 @@ export default function InvoicingPage() {
             <p className="text-slate-600 mt-1">Manage invoices and payments</p>
           </div>
 
-          <Tabs defaultValue="invoices" className="space-y-6">
+          <Tabs defaultValue="invoices" className="space-y-6" onValueChange={(value) => {
+            if (value === 'cashflow') {
+              fetchCashFlowData();
+            }
+          }}>
             <TabsList>
               <TabsTrigger value="invoices">Invoices</TabsTrigger>
               <TabsTrigger value="cashflow">Cash Flow Forecast</TabsTrigger>
@@ -785,11 +818,174 @@ export default function InvoicingPage() {
             </TabsContent>
 
             <TabsContent value="cashflow" className="space-y-6">
-              <iframe 
-                src="/invoicing/cashflow" 
-                className="w-full h-[800px] border-0"
-                title="Cash Flow Forecast"
-              />
+              {cashFlowLoading ? (
+                <div className="text-center py-12">Loading cash flow data...</div>
+              ) : (
+                <>
+                  {/* Summary Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-slate-600">
+                          Total Outstanding
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">
+                          £{totals.totalOutstanding.toLocaleString()}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-blue-600">
+                          In Terms
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-blue-600">
+                          £{totals.inTerms.toLocaleString()}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-red-600">
+                          Overdue
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-red-600">
+                          £{totals.overdue.toLocaleString()}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-green-600">
+                          Collected
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-green-600">
+                          £{totals.collected.toLocaleString()}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-slate-600">
+                          Total Value
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold">
+                          £{totals.totalValue.toLocaleString()}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Weekly Breakdown */}
+                  <div className="space-y-4">
+                    {weeklyData.map((week, index) => (
+                      <Card key={index}>
+                        <CardHeader>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <CardTitle className="text-lg">
+                                W/C {format(week.weekCommencing, "dd MMM yyyy")}
+                              </CardTitle>
+                              <p className="text-sm text-slate-600 mt-1">
+                                {format(week.weekCommencing, "dd MMM")} - {format(week.weekEnding, "dd MMM yyyy")}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-2xl font-bold">
+                                £{week.total.toLocaleString()}
+                              </div>
+                              <p className="text-sm text-slate-600">
+                                {week.invoices.length} invoice{week.invoices.length !== 1 ? 's' : ''}
+                              </p>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        {week.invoices.length > 0 && (
+                          <CardContent>
+                            <div className="space-y-3">
+                              {week.invoices.map((invoice: any) => {
+                                const isOverdue = isBefore(invoice.dueDate, new Date()) && !invoice.collected;
+                                
+                                return (
+                                  <div
+                                    key={invoice.id}
+                                    className="flex items-center justify-between p-3 bg-slate-50 rounded-lg"
+                                  >
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-3">
+                                        <span className="font-semibold">{invoice.invoiceNumber}</span>
+                                        {invoice.collected ? (
+                                          <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                                            <CheckCircle2 className="w-3 h-3 mr-1" />
+                                            Collected
+                                          </Badge>
+                                        ) : isOverdue ? (
+                                          <Badge className="bg-red-100 text-red-800 hover:bg-red-100">
+                                            <AlertTriangle className="w-3 h-3 mr-1" />
+                                            Overdue
+                                          </Badge>
+                                        ) : (
+                                          <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+                                            <Clock className="w-3 h-3 mr-1" />
+                                            Pending
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      <div className="text-sm text-slate-600 mt-1">
+                                        {invoice.client} - {invoice.project}
+                                      </div>
+                                      <div className="text-xs text-slate-500 mt-1">
+                                        Issued: {format(invoice.issueDate, "dd MMM yyyy")} | 
+                                        Due: {format(invoice.dueDate, "dd MMM yyyy")} | 
+                                        Terms: {invoice.paymentTerms} days
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                      <div className="text-right">
+                                        <div className="font-semibold">
+                                          £{invoice.amount.toLocaleString()}
+                                        </div>
+                                      </div>
+                                      {!invoice.collected && (
+                                        <Button
+                                          size="sm"
+                                          onClick={() => markAsCollected(invoice.id, invoice.collectionId)}
+                                        >
+                                          Mark Collected
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </CardContent>
+                        )}
+                      </Card>
+                    ))}
+                  </div>
+
+                  {weeklyData.every(week => week.invoices.length === 0) && (
+                    <div className="text-center py-12 text-slate-600">
+                      No invoices to display
+                    </div>
+                  )}
+                </>
+              )}
             </TabsContent>
           </Tabs>
 
