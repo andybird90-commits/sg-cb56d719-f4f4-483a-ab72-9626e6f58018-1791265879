@@ -3,7 +3,7 @@ import { Layout } from "@/components/Layout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useRouter } from "next/router";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,8 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { jsPDF, autoTable } from "jspdf";
+import { format } from "date-fns";
 
 interface ProjectFinancials {
   project_id: string;
@@ -73,6 +75,8 @@ function FinancialsContent() {
   useEffect(() => {
     fetchFinancials();
   }, [selectedYear, selectedMonth]);
+
+  const totalRevenue = projectFinancials.reduce((sum, p) => sum + (p.revenue || 0), 0);
 
   const fetchFinancials = async () => {
     try {
@@ -386,6 +390,30 @@ function FinancialsContent() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const exportUserTimeBreakdownToPDF = () => {
+    const doc = new jsPDF();
+    const tableData = userTimesheetBreakdown.map(user => {
+      return {
+        user: user.user_name,
+        rate: user.hourly_rate,
+        projects: user.projects.map(proj => `${proj.project_code} (${proj.project_name})`).join(", "),
+        hours: user.total_hours,
+        cost: user.total_cost
+      };
+    });
+    autoTable(doc, {
+      head: [["User", "Rate", "Projects", "Hours", "Cost"]],
+      body: tableData,
+      theme: "grid",
+      styles: { fontSize: 10 },
+      headStyles: { fillColor: [220, 220, 220] },
+      columnStyles: {
+        projects: { cellWidth: 100 }
+      }
+    });
+    doc.save(`user-time-breakdown-${selectedMonth}-${selectedYear}.pdf`);
   };
 
   const formatCurrency = (value: number | null) => {
@@ -787,7 +815,34 @@ function FinancialsContent() {
             {/* User Time Breakdown */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base sm:text-lg">User Time Breakdown</CardTitle>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="text-base sm:text-lg">User Time Breakdown</CardTitle>
+                  </div>
+                  <Button
+                    onClick={exportUserTimeBreakdownToPDF}
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-2"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    Export PDF
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {userTimesheetBreakdown.length === 0 ? (
