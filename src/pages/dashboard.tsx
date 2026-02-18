@@ -3,15 +3,31 @@ import { Layout } from "@/components/Layout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Building2, Users, Target, Briefcase, TrendingUp, Calendar, AlertCircle, AlertTriangle, MessageSquare, ArrowUpDown, ArrowUp, ArrowDown, Eye, EyeOff } from "lucide-react";
+import { Building2, Users, Target, Briefcase, TrendingUp, Calendar, AlertCircle, AlertTriangle, MessageSquare, ArrowUpDown, ArrowUp, ArrowDown, Eye, EyeOff, Plus, Calendar as CalendarIcon, ArrowUpRight, ArrowDownRight, DollarSign, FolderKanban } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { format, addMonths, differenceInMonths } from "date-fns";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface DashboardStats {
   companiesCount: number;
@@ -129,6 +145,20 @@ function DashboardContent() {
   const [sortField, setSortField] = useState<SortField>("created_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showQuickAddEvent, setShowQuickAddEvent] = useState(false);
+  const [quickEventForm, setQuickEventForm] = useState({
+    title: "",
+    event_type: "meeting",
+    event_date: new Date().toISOString().split("T")[0],
+    start_time: "",
+    end_time: "",
+    location: "",
+    description: "",
+  });
+  const [saving, setSaving] = useState(false);
+
   useEffect(() => {
     fetchStats();
     fetchTenders();
@@ -137,7 +167,47 @@ function DashboardContent() {
     fetchUpcomingVisits();
     fetchPipelineData();
     fetchOpportunitiesTable();
-  }, []);
+  }, [profile]);
+
+  const handleQuickAddEvent = async () => {
+    if (!profile?.id || !quickEventForm.title || !quickEventForm.event_date) {
+      alert("Please fill in all required fields");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const { error } = await supabase.from("calendar_events").insert({
+        title: quickEventForm.title,
+        event_type: quickEventForm.event_type,
+        event_date: quickEventForm.event_date,
+        start_time: quickEventForm.start_time || null,
+        end_time: quickEventForm.end_time || null,
+        location: quickEventForm.location || null,
+        description: quickEventForm.description || null,
+        created_by_user_id: profile.id,
+      });
+
+      if (error) throw error;
+
+      setShowQuickAddEvent(false);
+      setQuickEventForm({
+        title: "",
+        event_type: "meeting",
+        event_date: new Date().toISOString().split("T")[0],
+        start_time: "",
+        end_time: "",
+        location: "",
+        description: "",
+      });
+      alert("Event created successfully!");
+    } catch (err) {
+      console.error("Error creating event:", err);
+      alert("Failed to create event");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const fetchStats = async () => {
     try {
@@ -729,9 +799,20 @@ function DashboardContent() {
   return (
     <Layout>
       <div className="space-y-8">
-        <div className="flex flex-col gap-3">
-          <h1 className="text-5xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground text-lg">Comprehensive overview of business operations</p>
+        <div className="p-8">
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-2">
+              <h1 className="text-4xl font-bold">Dashboard</h1>
+              <Button onClick={() => setShowQuickAddEvent(true)} className="gap-2">
+                <CalendarIcon className="h-4 w-4" />
+                <Plus className="h-4 w-4" />
+                Add Event
+              </Button>
+            </div>
+            <p className="text-slate-600">
+              Comprehensive overview of business operations
+            </p>
+          </div>
         </div>
 
         {statsError ?
@@ -1129,7 +1210,7 @@ function DashboardContent() {
             <CardHeader className="pb-4">
               <div className="flex items-center gap-3 mb-2">
                 <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                  <Calendar className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                  <CalendarIcon className="w-5 h-5 text-purple-600 dark:text-purple-400" />
                 </div>
                 <CardTitle className="text-xl">Client Visits & Functions</CardTitle>
               </div>
@@ -1303,6 +1384,113 @@ function DashboardContent() {
             }
           </CardContent>
         </Card>
+
+        {/* Quick Add Event Dialog */}
+        <Dialog open={showQuickAddEvent} onOpenChange={setShowQuickAddEvent}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Quick Add Event</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="quick-title">Event Title *</Label>
+                <Input
+                  id="quick-title"
+                  value={quickEventForm.title}
+                  onChange={(e) =>
+                    setQuickEventForm({ ...quickEventForm, title: e.target.value })
+                  }
+                  placeholder="Enter event title"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="quick-type">Type</Label>
+                <Select
+                  value={quickEventForm.event_type}
+                  onValueChange={(value) =>
+                    setQuickEventForm({ ...quickEventForm, event_type: value })
+                  }
+                >
+                  <SelectTrigger id="quick-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="meeting">Meeting</SelectItem>
+                    <SelectItem value="call">Call</SelectItem>
+                    <SelectItem value="visit">Visit</SelectItem>
+                    <SelectItem value="deadline">Deadline</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="quick-date">Date *</Label>
+                  <Input
+                    id="quick-date"
+                    type="date"
+                    value={quickEventForm.event_date}
+                    onChange={(e) =>
+                      setQuickEventForm({ ...quickEventForm, event_date: e.target.value })
+                    }
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="quick-start-time">Start Time</Label>
+                  <Input
+                    id="quick-start-time"
+                    type="time"
+                    value={quickEventForm.start_time}
+                    onChange={(e) =>
+                      setQuickEventForm({ ...quickEventForm, start_time: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="quick-location">Location</Label>
+                <Input
+                  id="quick-location"
+                  value={quickEventForm.location}
+                  onChange={(e) =>
+                    setQuickEventForm({ ...quickEventForm, location: e.target.value })
+                  }
+                  placeholder="Enter location"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="quick-description">Description</Label>
+                <Textarea
+                  id="quick-description"
+                  value={quickEventForm.description}
+                  onChange={(e) =>
+                    setQuickEventForm({ ...quickEventForm, description: e.target.value })
+                  }
+                  placeholder="Enter description"
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowQuickAddEvent(false)}
+                  disabled={saving}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleQuickAddEvent} disabled={saving}>
+                  {saving ? "Creating..." : "Create Event"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );
