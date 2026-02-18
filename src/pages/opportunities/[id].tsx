@@ -16,6 +16,14 @@ import { ArrowLeft, Edit, AlertTriangle, Trash2, CheckCircle2 } from "lucide-rea
 import Link from "next/link";
 import { OpportunityCalendar } from "@/components/OpportunityCalendar";
 import { OpportunityTimeline } from "@/components/OpportunityTimeline";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 
 interface Opportunity {
   id: string;
@@ -64,7 +72,7 @@ interface User {
 function OpportunityDetailContent() {
   const { profile } = useAuth();
   const router = useRouter();
-  const { id } = router.query;
+  const { id, returnTo } = router.query;
   const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -272,6 +280,33 @@ function OpportunityDetailContent() {
   return (
     <Layout>
       <div className="space-y-4 sm:space-y-6">
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/">Dashboard</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            {returnTo === '/calendar' ? (
+              <>
+                <BreadcrumbItem>
+                  <BreadcrumbLink href="/calendar">Calendar</BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+              </>
+            ) : (
+              <>
+                <BreadcrumbItem>
+                  <BreadcrumbLink href="/opportunities">Opportunities</BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+              </>
+            )}
+            <BreadcrumbItem>
+              <BreadcrumbPage>{opportunity?.name || 'Opportunity'}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             <button

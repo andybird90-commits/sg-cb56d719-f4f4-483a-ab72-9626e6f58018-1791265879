@@ -11,6 +11,14 @@ import { ArrowLeft, Mail, Phone, Building2, User, Briefcase, FileText, AlertTria
 import Link from "next/link";
 import { ContactCalendar } from "@/components/ContactCalendar";
 import { ContactTimeline } from "@/components/ContactTimeline";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 
 interface Contact {
   id: string;
@@ -34,7 +42,7 @@ interface Contact {
 function ContactDetailContent() {
   const { profile } = useAuth();
   const router = useRouter();
-  const { id } = router.query;
+  const { id, returnTo } = router.query;
   
   const [contact, setContact] = useState<Contact | null>(null);
   const [loading, setLoading] = useState(true);
@@ -109,6 +117,33 @@ function ContactDetailContent() {
   return (
     <Layout>
       <div className="space-y-6">
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/">Dashboard</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            {returnTo === '/calendar' ? (
+              <>
+                <BreadcrumbItem>
+                  <BreadcrumbLink href="/calendar">Calendar</BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+              </>
+            ) : (
+              <>
+                <BreadcrumbItem>
+                  <BreadcrumbLink href="/contacts">Contacts</BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+              </>
+            )}
+            <BreadcrumbItem>
+              <BreadcrumbPage>{contact?.name || 'Contact'}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+
         <div className="flex items-center justify-between">
           <div>
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
