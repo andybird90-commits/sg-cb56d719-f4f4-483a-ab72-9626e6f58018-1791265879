@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface ProjectFinancials {
   project_id: string;
@@ -24,6 +26,19 @@ interface ProjectFinancials {
   margin_percent: number;
   type: "project" | "opportunity";
   stage: string;
+}
+
+interface UserTimeBreakdown {
+  user_id: string;
+  user_name: string;
+  total_hours: number;
+  total_cost: number;
+  projects: {
+    project_id: string;
+    project_name: string;
+    hours: number;
+    cost: number;
+  }[];
 }
 
 function FinancialsContent() {
@@ -44,6 +59,7 @@ function FinancialsContent() {
   const [budgetCost, setBudgetCost] = useState<number | null>(null);
   
   const [projectFinancials, setProjectFinancials] = useState<ProjectFinancials[]>([]);
+  const [userTimesheetBreakdown, setUserTimesheetBreakdown] = useState<UserTimeBreakdown[]>([]);
 
   // Check user role - only directors and admins can access
   useEffect(() => {
@@ -84,20 +100,14 @@ function FinancialsContent() {
       const { data: projectsData, error: projectsError } = await supabase
         .from("projects")
         .select(`
-          id,
-          code,
-          name,
-          status,
-          start_date,
-          end_date,
-          agreed_fee_value,
-          client_company_id,
-          companies!projects_client_company_id_fkey (
+          *,
+          companies!client_company_id (
+            id,
             name
           )
         `)
-        .eq("status", "live")
-        .eq("archived", false);
+        .not("status", "eq", "archived")
+        .order("created_at", { ascending: false });
 
       if (projectsError) throw projectsError;
 
@@ -654,24 +664,24 @@ function FinancialsContent() {
 
                     {/* Desktop: Table View */}
                     <div className="hidden lg:block overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b">
-                            <th className="text-left p-3 text-sm font-medium text-slate-600">Code</th>
-                            <th className="text-left p-3 text-sm font-medium text-slate-600">Project</th>
-                            <th className="text-left p-3 text-sm font-medium text-slate-600">Client</th>
-                            <th className="text-center p-3 text-sm font-medium text-slate-600">Type</th>
-                            <th className="text-right p-3 text-sm font-medium text-slate-600">Revenue</th>
-                            <th className="text-right p-3 text-sm font-medium text-slate-600">Internal Cost</th>
-                            <th className="text-right p-3 text-sm font-medium text-slate-600">Subbie Cost</th>
-                            <th className="text-right p-3 text-sm font-medium text-slate-600">Total Cost</th>
-                            <th className="text-right p-3 text-sm font-medium text-slate-600">Margin</th>
-                            <th className="text-right p-3 text-sm font-medium text-slate-600">Margin %</th>
-                          </tr>
-                        </thead>
-                        <tbody>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableCell className="text-left p-3 text-sm font-medium text-slate-600">Code</TableCell>
+                            <TableCell className="text-left p-3 text-sm font-medium text-slate-600">Project</TableCell>
+                            <TableCell className="text-left p-3 text-sm font-medium text-slate-600">Client</TableCell>
+                            <TableCell className="text-center p-3 text-sm font-medium text-slate-600">Type</TableCell>
+                            <TableCell className="text-right p-3 text-sm font-medium text-slate-600">Revenue</TableCell>
+                            <TableCell className="text-right p-3 text-sm font-medium text-slate-600">Internal Cost</TableCell>
+                            <TableCell className="text-right p-3 text-sm font-medium text-slate-600">Subbie Cost</TableCell>
+                            <TableCell className="text-right p-3 text-sm font-medium text-slate-600">Total Cost</TableCell>
+                            <TableCell className="text-right p-3 text-sm font-medium text-slate-600">Margin</TableCell>
+                            <TableCell className="text-right p-3 text-sm font-medium text-slate-600">Margin %</TableCell>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
                           {projectFinancials.map((pf) => (
-                            <tr
+                            <TableRow
                               key={pf.project_id}
                               className="border-b hover:bg-slate-50 cursor-pointer"
                               onClick={() => {
@@ -682,28 +692,37 @@ function FinancialsContent() {
                                 }
                               }}
                             >
-                              <td className="p-3 text-sm font-mono text-slate-600">{pf.project_code}</td>
-                              <td className="p-3 text-sm font-medium text-slate-900">{pf.project_name}</td>
-                              <td className="p-3 text-sm text-slate-600">{pf.client_name}</td>
-                              <td className="p-3 text-center">
+                              <TableCell className="p-3 text-sm font-mono text-slate-600">{pf.project_code}</TableCell>
+                              <TableCell className="p-3 text-sm font-medium text-slate-900">{pf.project_name}</TableCell>
+                              <TableCell className="p-3 text-sm text-slate-600">{pf.client_name}</TableCell>
+                              <TableCell className="p-3 text-center">
                                 <Badge className={`text-[10px] px-2 py-0.5 ${getStageBadgeColor(pf.stage)}`}>
                                   {pf.type === "opportunity" ? "Opp" : "Project"}
                                 </Badge>
-                              </td>
-                              <td className="p-3 text-sm text-right font-medium">{formatCurrency(pf.revenue)}</td>
-                              <td className="p-3 text-sm text-right">{formatCurrency(pf.internal_cost)}</td>
-                              <td className="p-3 text-sm text-right">{formatCurrency(pf.subcontractor_cost)}</td>
-                              <td className="p-3 text-sm text-right font-medium">{formatCurrency(pf.total_cost)}</td>
-                              <td className={`p-3 text-sm text-right font-semibold ${pf.margin >= 0 ? "text-green-600" : "text-red-600"}`}>
+                              </TableCell>
+                              <TableCell className="p-3 text-sm text-right font-medium">{formatCurrency(pf.revenue)}</TableCell>
+                              <TableCell className="p-3 text-sm text-right">{formatCurrency(pf.internal_cost)}</TableCell>
+                              <TableCell className="p-3 text-sm text-right">{formatCurrency(pf.subcontractor_cost)}</TableCell>
+                              <TableCell className="p-3 text-sm text-right font-medium">{formatCurrency(pf.total_cost)}</TableCell>
+                              <TableCell className={`p-3 text-sm text-right font-semibold ${pf.margin >= 0 ? "text-green-600" : "text-red-600"}`}>
                                 {formatCurrency(pf.margin)}
-                              </td>
-                              <td className={`p-3 text-sm text-right font-semibold ${pf.margin_percent >= 0 ? "text-green-600" : "text-red-600"}`}>
+                              </TableCell>
+                              <TableCell className={`p-3 text-sm text-right font-semibold ${pf.margin_percent >= 0 ? "text-green-600" : "text-red-600"}`}>
                                 {pf.margin_percent.toFixed(1)}%
-                              </td>
-                            </tr>
+                              </TableCell>
+                            </TableRow>
                           ))}
-                        </tbody>
-                      </table>
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-right p-3 text-sm font-medium text-slate-600">Total</TableCell>
+                            <TableCell className="text-right p-3 text-sm font-medium text-slate-900">{formatCurrency(totalRevenue)}</TableCell>
+                            <TableCell className="text-right p-3 text-sm font-medium text-slate-900">{formatCurrency(totalInternalCost)}</TableCell>
+                            <TableCell className="text-right p-3 text-sm font-medium text-slate-900">{formatCurrency(totalSubcontractorCost)}</TableCell>
+                            <TableCell className="text-right p-3 text-sm font-medium text-slate-900">{formatCurrency(totalProjectCost)}</TableCell>
+                            <TableCell className="text-right p-3 text-sm font-medium text-slate-900">{formatCurrency(margin)}</TableCell>
+                            <TableCell className="text-right p-3 text-sm font-medium text-slate-900">{totalRevenue > 0 ? `${((margin / totalRevenue) * 100).toFixed(1)}%` : "—%"}</TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
                     </div>
                   </>
                 )}

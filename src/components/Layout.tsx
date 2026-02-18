@@ -201,6 +201,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </nav>
 
+      {/* Navigation */}
+      <nav className="border-b bg-white dark:bg-gray-900">
+        <div className="container mx-auto px-4">
+          <div className="flex h-16 items-center justify-center gap-6">
+          </div>
+        </div>
+      </nav>
+
       <main className="max-w-7xl mx-auto px-6 md:px-8 lg:px-12 py-8 md:py-12 animate-fade-in">
         {profileError && (
           <Alert variant="destructive" className="mb-6">
