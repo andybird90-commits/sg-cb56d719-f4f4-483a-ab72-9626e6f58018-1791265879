@@ -329,6 +329,54 @@ export type Database = {
           },
         ]
       }
+      invoice_collections: {
+        Row: {
+          collected_by_user_id: string | null
+          collected_date: string | null
+          created_at: string | null
+          due_date: string
+          id: string
+          invoice_item_id: string
+          invoice_month_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          collected_by_user_id?: string | null
+          collected_date?: string | null
+          created_at?: string | null
+          due_date: string
+          id?: string
+          invoice_item_id: string
+          invoice_month_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          collected_by_user_id?: string | null
+          collected_date?: string | null
+          created_at?: string | null
+          due_date?: string
+          id?: string
+          invoice_item_id?: string
+          invoice_month_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_collections_invoice_item_id_fkey"
+            columns: ["invoice_item_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_collections_invoice_month_id_fkey"
+            columns: ["invoice_month_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_months"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_items: {
         Row: {
           client_name: string
