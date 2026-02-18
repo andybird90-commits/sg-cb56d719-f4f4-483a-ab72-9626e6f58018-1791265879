@@ -42,6 +42,7 @@ import { useRouter } from "next/router";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar, CheckCircle2, AlertTriangle, Clock } from "lucide-react";
 import { format, addDays, startOfWeek, endOfWeek, addWeeks, isBefore, isAfter, isWithinInterval } from "date-fns";
+import { TableCell } from "@/components/ui/table";
 
 type InvoiceMonth = {
   id: string;
@@ -173,28 +174,25 @@ export default function InvoicingPage() {
     }
   }
 
-  async function fetchCashFlowData() {
+  const fetchCashFlowData = async () => {
     try {
       setCashFlowLoading(true);
 
-      // Fetch locked invoice months with items and company payment terms
-      const { data: invoiceData, error: invoiceError } = await supabase
+      // Fetch locked invoice months with items
+      const { data: lockedMonths, error: lockedError } = await supabase
         .from("invoice_months")
         .select(`
-          id,
-          month,
-          year,
-          created_at,
-          status,
+          *,
           invoice_items (
             id,
             invoice_value,
-            project_name,
+            excluded_this_month,
             project_id,
+            project_name,
             projects (
               id,
               name,
-              companies!projects_client_company_id_fkey (
+              companies (
                 id,
                 name,
                 payment_terms
@@ -203,32 +201,26 @@ export default function InvoicingPage() {
           )
         `)
         .eq("status", "locked")
-        .order("year", { ascending: false })
-        .order("month", { ascending: false });
+        .order("created_at", { ascending: false });
 
-      if (invoiceError) throw invoiceError;
+      if (lockedError) throw lockedError;
 
-      // Fetch existing collections
-      const { data: collectionsData, error: collectionsError } = await supabase
-        .from("invoice_collections")
-        .select("*");
+      // Fetch manual invoices from invoice_history
+      const { data: manualInvoices, error: manualError } = await supabase
+        .from("invoice_history")
+        .select("*")
+        .order("invoice_date", { ascending: false });
 
-      if (collectionsError) throw collectionsError;
+      if (manualError) throw manualError;
 
-      // Process data to create weekly view
       const today = new Date();
-      const weeks = [];
-      let totalOut = 0;
-      let totalInTerms = 0;
-      let totalOverdue = 0;
-      let totalCollected = 0;
-      let totalVal = 0;
+      today.setHours(0, 0, 0, 0);
 
-      // Generate next 12 weeks
+      // Initialize week structure (next 12 weeks)
+      const weeks: any[] = [];
       for (let i = 0; i < 12; i++) {
         const weekStart = startOfWeek(addWeeks(today, i), { weekStartsOn: 1 });
         const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
-        
         weeks.push({
           weekCommencing: weekStart,
           weekEnding: weekEnd,
@@ -237,35 +229,39 @@ export default function InvoicingPage() {
         });
       }
 
-      // Process each invoice month and its items
-      invoiceData?.forEach((invoiceMonth: any) => {
-        const issueDate = new Date(invoiceMonth.created_at);
+      // Initialize totals
+      let totalVal = 0;
+      let totalCollected = 0;
+      let totalOut = 0;
+      let totalOverdue = 0;
+      let totalInTerms = 0;
+
+      const allInvoices: any[] = [];
+
+      // Process system-generated invoices
+      (lockedMonths || []).forEach((month) => {
+        const issueDate = new Date(month.created_at);
         
-        invoiceMonth.invoice_items?.forEach((item: any) => {
+        (month.invoice_items || []).forEach((item: any) => {
           if (!item.invoice_value || item.excluded_this_month) return;
           
           const company = item.projects?.companies;
           const paymentTerms = company?.payment_terms || 30;
           const dueDate = addDays(issueDate, paymentTerms);
           
-          // Find collection record
-          const collection = collectionsData?.find((c: any) => 
-            c.invoice_item_id === item.id
-          );
-
           const invoiceRecord = {
             id: item.id,
-            invoiceMonthId: invoiceMonth.id,
-            invoiceNumber: `INV-${invoiceMonth.year}-${String(invoiceMonth.month).padStart(2, '0')}`,
+            invoiceMonthId: month.id,
+            invoiceNumber: `INV-${month.year}-${String(month.month).padStart(2, '0')}`,
             client: company?.name || 'Unknown',
             project: item.projects?.name || item.project_name || 'Unknown',
             issueDate,
             dueDate,
             amount: item.invoice_value,
             paymentTerms,
-            collected: !!collection?.collected_date,
-            collectedDate: collection?.collected_date,
-            collectionId: collection?.id
+            collected: false,
+            collectedDate: null,
+            is_manual: false
           };
 
           totalVal += item.invoice_value;
@@ -289,11 +285,61 @@ export default function InvoicingPage() {
               }
             });
           }
+
+          allInvoices.push(invoiceRecord);
         });
       });
 
+      // Process manual invoices
+      (manualInvoices || []).map((invoice) => {
+        const invoiceDate = new Date(invoice.invoice_date);
+        const dueDate = new Date(invoice.due_date);
+        const daysDiff = Math.floor((dueDate.getTime() - invoiceDate.getTime()) / (1000 * 60 * 60 * 24));
+        const isCollected = invoice.status === 'paid';
+        const amount = Number(invoice.gross_amount);
+        
+        const invoiceRecord = {
+          id: invoice.id,
+          invoiceNumber: invoice.invoice_number,
+          client: invoice.client_name,
+          project: invoice.project_name || 'N/A',
+          issueDate: invoiceDate,
+          dueDate: dueDate,
+          amount: amount,
+          paymentTerms: daysDiff,
+          collected: isCollected,
+          collectedDate: isCollected ? dueDate : null,
+          is_manual: true
+        };
+
+        totalVal += amount;
+
+        if (isCollected) {
+          totalCollected += amount;
+        } else {
+          totalOut += amount;
+          
+          if (isBefore(dueDate, today)) {
+            totalOverdue += amount;
+          } else {
+            totalInTerms += amount;
+          }
+
+          // Add to appropriate week
+          weeks.forEach(week => {
+            if (isWithinInterval(dueDate, { start: week.weekCommencing, end: week.weekEnding })) {
+              week.invoices.push(invoiceRecord);
+              week.total += amount;
+            }
+          });
+        }
+
+        allInvoices.push(invoiceRecord);
+      });
+
+      // Set state
       setWeeklyData(weeks);
-      setCollections(collectionsData || []);
+      setCollections(allInvoices);
       setTotals({
         totalOutstanding: totalOut,
         inTerms: totalInTerms,
@@ -311,29 +357,34 @@ export default function InvoicingPage() {
     } finally {
       setCashFlowLoading(false);
     }
-  }
+  };
 
-  async function markAsCollected(invoiceItemId: string, collectionId?: string) {
+  const markAsCollected = async (invoiceId: string, isManual?: boolean) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+      if (isManual) {
+        // First get the gross amount
+        const { data: invoiceData } = await supabase
+          .from("invoice_history")
+          .select("gross_amount")
+          .eq("id", invoiceId)
+          .single();
 
-      if (collectionId) {
-        // Update existing collection
+        // Update invoice_history for manual invoices
         const { error } = await supabase
-          .from("invoice_collections")
-          .update({
-            collected_date: new Date().toISOString(),
-            collected_by_user_id: user.id
+          .from("invoice_history")
+          .update({ 
+            status: 'paid',
+            paid_amount: invoiceData?.gross_amount || 0
           })
-          .eq("id", collectionId);
+          .eq("id", invoiceId);
 
         if (error) throw error;
       } else {
+        // For system invoices, we don't have a collection_status field yet
+        // This would need to be added to invoice_months table
         toast({
-          title: "Error",
-          description: "Collection record not found. Please refresh and try again.",
-          variant: "destructive",
+          title: "Info",
+          description: "Collection tracking for system invoices coming soon",
         });
         return;
       }
@@ -342,16 +393,17 @@ export default function InvoicingPage() {
         title: "Success",
         description: "Invoice marked as collected",
       });
-      await fetchCashFlowData();
+
+      fetchCashFlowData();
     } catch (error) {
-      console.error("Error marking invoice as collected:", error);
+      console.error("Error marking as collected:", error);
       toast({
         title: "Error",
         description: "Failed to mark invoice as collected",
         variant: "destructive",
       });
     }
-  }
+  };
 
   async function handleCreateMonth() {
     try {
@@ -1108,6 +1160,11 @@ export default function InvoicingPage() {
                                     <div className="flex-1">
                                       <div className="flex items-center gap-3">
                                         <span className="font-semibold">{invoice.invoiceNumber}</span>
+                                        {invoice.is_manual && (
+                                          <Badge variant="outline" className="text-xs">
+                                            Manual
+                                          </Badge>
+                                        )}
                                         {invoice.collected ? (
                                           <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
                                             <CheckCircle2 className="w-3 h-3 mr-1" />
@@ -1143,8 +1200,9 @@ export default function InvoicingPage() {
                                       {!invoice.collected && (
                                         <Button
                                           size="sm"
-                                          onClick={() => markAsCollected(invoice.id, invoice.collectionId)}
+                                          onClick={() => markAsCollected(invoice.id, invoice.is_manual)}
                                         >
+                                          <CheckCircle2 className="h-4 w-4 mr-1" />
                                           Mark Collected
                                         </Button>
                                       )}
