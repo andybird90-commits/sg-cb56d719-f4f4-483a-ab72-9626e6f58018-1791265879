@@ -3,18 +3,24 @@ import { Layout } from "@/components/Layout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { Calendar as CalendarIcon, Plus, ChevronLeft, ChevronRight, AlertTriangle, Trash2, Edit, Users, Target, CalendarDays } from "lucide-react";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek, parseISO } from "date-fns";
+import { Calendar as CalendarIcon, Plus, ChevronLeft, ChevronRight, Trash2, Users, Target, CalendarDays, MapPin } from "lucide-react";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, addMonths, subMonths, startOfWeek, endOfWeek, parseISO } from "date-fns";
 import { useRouter } from "next/router";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 
 interface CalendarEvent {
   id: string;
@@ -77,14 +83,12 @@ function CalendarContent() {
       const monthStart = startOfMonth(currentMonth);
       const monthEnd = endOfMonth(currentMonth);
       
-      // Expand range to include full weeks displayed
       const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
       const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
 
       const startDateStr = format(calendarStart, "yyyy-MM-dd");
       const endDateStr = format(calendarEnd, "yyyy-MM-dd");
 
-      // Fetch standalone calendar events
       const { data: calendarEvents, error: calendarError } = await supabase
         .from("calendar_events")
         .select("*")
@@ -95,7 +99,6 @@ function CalendarContent() {
 
       if (calendarError) throw calendarError;
 
-      // Fetch contact events
       const { data: contactEvents, error: contactError } = await supabase
         .from("contact_events")
         .select(`
@@ -121,7 +124,6 @@ function CalendarContent() {
 
       if (contactError) throw contactError;
 
-      // Fetch opportunity events
       const { data: opportunityEvents, error: opportunityError } = await supabase
         .from("opportunity_events")
         .select(`
@@ -144,7 +146,6 @@ function CalendarContent() {
 
       if (opportunityError) throw opportunityError;
 
-      // Combine all events into a single array
       const allEvents: CalendarEvent[] = [
         ...(contactEvents || []).map((event: any) => ({
           id: event.id,
@@ -190,14 +191,14 @@ function CalendarContent() {
         }))
       ];
 
-      // Sort by date and time
+      // Sort events: Latest/Newest first (descending)
       allEvents.sort((a, b) => {
-        const dateCompare = a.event_date.localeCompare(b.event_date);
+        const dateCompare = b.event_date.localeCompare(a.event_date);
         if (dateCompare !== 0) return dateCompare;
         
         const aTime = a.start_time || "00:00";
         const bTime = b.start_time || "00:00";
-        return aTime.localeCompare(bTime);
+        return bTime.localeCompare(aTime);
       });
 
       setEvents(allEvents);
@@ -308,9 +309,15 @@ function CalendarContent() {
 
   const handleEventClick = (event: CalendarEvent) => {
     if (event.source === "contact" && event.source_id) {
-      router.push(`/contacts/${event.source_id}`);
+      router.push({
+        pathname: `/contacts/${event.source_id}`,
+        query: { returnTo: '/calendar' }
+      });
     } else if (event.source === "opportunity" && event.source_id) {
-      router.push(`/opportunities/${event.source_id}`);
+      router.push({
+        pathname: `/opportunities/${event.source_id}`,
+        query: { returnTo: '/calendar' }
+      });
     } else if (event.source === "calendar") {
       openEditDialog(event);
     }
@@ -328,11 +335,10 @@ function CalendarContent() {
     setCurrentMonth(new Date());
   };
 
-  const monthStart = startOfMonth(currentMonth);
-  const monthEnd = endOfMonth(currentMonth);
-  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
-  const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
-  const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
+  const calendarDays = eachDayOfInterval({ 
+    start: startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 1 }), 
+    end: endOfWeek(endOfMonth(currentMonth), { weekStartsOn: 1 }) 
+  });
 
   const getEventsForDay = (day: Date) => {
     const dayStr = format(day, "yyyy-MM-dd");
@@ -363,207 +369,184 @@ function CalendarContent() {
     }
   };
 
+  const isToday = (date: Date) => {
+    const today = new Date();
+    return (
+      date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear()
+    );
+  };
+
   return (
     <Layout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-5xl font-bold tracking-tight mb-2">Calendar</h1>
-            <p className="text-muted-foreground text-lg">
-              Manage your schedule and view upcoming events
-            </p>
-          </div>
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="btn-professional">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Event
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px]">
-              <DialogHeader>
-                <DialogTitle>Add Calendar Event</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 mt-4">
-                <div>
-                  <Label htmlFor="title">Title *</Label>
-                  <Input
-                    id="title"
-                    value={newEvent.title}
-                    onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
-                    placeholder="Event title"
-                  />
-                </div>
+        <div className="flex flex-col gap-4">
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink href="/">Dashboard</BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>Calendar</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
 
-                <div>
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    value={newEvent.description}
-                    onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
-                    placeholder="Event description"
-                    rows={3}
-                  />
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex flex-col gap-1">
+              <h1 className="text-3xl font-bold tracking-tight">Calendar</h1>
+              <p className="text-muted-foreground">Manage your schedule and events</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={goToToday}>Today</Button>
+              <div className="flex items-center border rounded-md">
+                <Button variant="ghost" size="icon" onClick={previousMonth}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <div className="px-4 font-semibold min-w-[140px] text-center">
+                  {format(currentMonth, "MMMM yyyy")}
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="event_date">Date *</Label>
-                    <Input
-                      id="event_date"
-                      type="date"
-                      value={newEvent.event_date}
-                      onChange={(e) => setNewEvent({ ...newEvent, event_date: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="event_type">Type</Label>
-                    <Select
-                      value={newEvent.event_type}
-                      onValueChange={(value: any) => setNewEvent({ ...newEvent, event_type: value })}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="meeting">Meeting</SelectItem>
-                        <SelectItem value="deadline">Deadline</SelectItem>
-                        <SelectItem value="milestone">Milestone</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="start_time">Start Time</Label>
-                    <Input
-                      id="start_time"
-                      type="time"
-                      value={newEvent.start_time}
-                      onChange={(e) => setNewEvent({ ...newEvent, start_time: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="end_time">End Time</Label>
-                    <Input
-                      id="end_time"
-                      type="time"
-                      value={newEvent.end_time}
-                      onChange={(e) => setNewEvent({ ...newEvent, end_time: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="location">Location</Label>
-                  <Input
-                    id="location"
-                    value={newEvent.location}
-                    onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
-                    placeholder="Event location"
-                  />
-                </div>
-
-                <div className="flex justify-end gap-3 pt-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsAddDialogOpen(false)}
-                    disabled={saving}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleAddEvent} disabled={saving || !newEvent.title.trim()}>
-                    {saving ? "Adding..." : "Add Event"}
-                  </Button>
-                </div>
+                <Button variant="ghost" size="icon" onClick={nextMonth}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
               </div>
-            </DialogContent>
-          </Dialog>
+              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button className="gap-2">
+                    <Plus className="h-4 w-4" /> Add Event
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add New Event</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="title">Event Title</Label>
+                      <Input
+                        id="title"
+                        value={newEvent.title}
+                        onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+                        placeholder="Meeting with..."
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="type">Type</Label>
+                        <Select
+                          value={newEvent.event_type}
+                          onValueChange={(value: any) => setNewEvent({ ...newEvent, event_type: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="meeting">Meeting</SelectItem>
+                            <SelectItem value="deadline">Deadline</SelectItem>
+                            <SelectItem value="milestone">Milestone</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="date">Date</Label>
+                        <Input
+                          id="date"
+                          type="date"
+                          value={newEvent.event_date}
+                          onChange={(e) => setNewEvent({ ...newEvent, event_date: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="start_time">Start Time</Label>
+                        <Input
+                          id="start_time"
+                          type="time"
+                          value={newEvent.start_time}
+                          onChange={(e) => setNewEvent({ ...newEvent, start_time: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="end_time">End Time</Label>
+                        <Input
+                          id="end_time"
+                          type="time"
+                          value={newEvent.end_time}
+                          onChange={(e) => setNewEvent({ ...newEvent, end_time: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="location">Location</Label>
+                      <Input
+                        id="location"
+                        value={newEvent.location}
+                        onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
+                        placeholder="Office, Online, etc."
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="description">Description</Label>
+                      <Textarea
+                        id="description"
+                        value={newEvent.description}
+                        onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
+                        placeholder="Additional details..."
+                      />
+                    </div>
+                    <Button onClick={handleAddEvent} className="w-full" disabled={saving}>
+                      {saving ? "Saving..." : "Create Event"}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
         </div>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {/* Calendar Navigation */}
-        <Card className="card-professional">
-          <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Button variant="outline" size="sm" onClick={previousMonth} className="btn-professional">
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                <CardTitle className="text-2xl">
-                  {format(currentMonth, "MMMM yyyy")}
-                </CardTitle>
-                <Button variant="outline" size="sm" onClick={nextMonth} className="btn-professional">
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              </div>
-              <Button variant="outline" size="sm" onClick={goToToday} className="btn-professional">
-                Today
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="text-center py-12 text-muted-foreground">
-                Loading calendar...
-              </div>
-            ) : (
-              <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden">
-                {/* Weekday headers */}
-                {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
-                  <div
-                    key={day}
-                    className="bg-muted p-3 text-center text-sm font-semibold text-muted-foreground">
+        <div className="grid lg:grid-cols-4 gap-6">
+          <Card className="lg:col-span-3 border-none shadow-md overflow-hidden">
+            <CardContent className="p-0">
+              <div className="grid grid-cols-7 border-b bg-muted/40">
+                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
+                  <div key={day} className="p-4 text-center font-semibold text-sm text-muted-foreground">
                     {day}
                   </div>
                 ))}
-
-                {/* Calendar days */}
+              </div>
+              <div className="grid grid-cols-7 auto-rows-fr bg-card">
                 {calendarDays.map((day) => {
                   const dayEvents = getEventsForDay(day);
-                  const isToday = isSameDay(day, new Date());
                   const isCurrentMonth = isSameMonth(day, currentMonth);
-
+                  
                   return (
                     <div
-                      key={day.toISOString()}
-                      className={`bg-card p-2 min-h-[120px] ${
-                        !isCurrentMonth ? "opacity-40" : ""
-                      }`}>
-                      <div
-                        className={`text-sm font-medium mb-2 ${
-                          isToday
-                            ? "w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center"
-                            : ""
-                        }`}>
-                        {format(day, "d")}
+                      key={day.toString()}
+                      className={`min-h-[120px] p-2 border-b border-r transition-colors hover:bg-muted/10 ${
+                        !isCurrentMonth ? 'bg-muted/20 text-muted-foreground' : ''
+                      } ${isToday(day) ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
+                    >
+                      <div className={`text-right mb-2 text-sm font-medium ${isToday(day) ? 'text-blue-600 dark:text-blue-400' : ''}`}>
+                        {format(day, 'd')}
                       </div>
                       <div className="space-y-1">
                         {dayEvents.slice(0, 3).map((event) => (
                           <div
                             key={event.id}
                             onClick={() => handleEventClick(event)}
-                            className={`${event.color} text-white text-xs p-1.5 rounded cursor-pointer hover:opacity-80 transition-professional`}>
-                            <div className="flex items-center gap-1 mb-0.5">
-                              {getSourceIcon(event.source)}
-                              {event.start_time && (
-                                <span className="font-medium">
-                                  {event.start_time.substring(0, 5)}
-                                </span>
-                              )}
-                            </div>
-                            <div className="truncate font-medium">{event.title}</div>
+                            className={`${event.color} text-white text-[10px] px-1.5 py-1 rounded cursor-pointer hover:opacity-80 truncate select-none shadow-sm`}
+                            title={event.title}
+                          >
+                            {event.start_time && <span className="font-medium opacity-90">{event.start_time.substring(0, 5)} </span>}
+                            {event.title}
                           </div>
                         ))}
                         {dayEvents.length > 3 && (
-                          <div className="text-xs text-muted-foreground pl-1.5">
+                          <div className="text-[10px] text-muted-foreground pl-1">
                             +{dayEvents.length - 3} more
                           </div>
                         )}
@@ -572,150 +555,85 @@ function CalendarContent() {
                   );
                 })}
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        {/* Event List */}
-        <Card className="card-professional">
-          <CardHeader>
-            <CardTitle className="text-xl">
+          <div className="space-y-4">
+            <h3 className="font-semibold text-lg flex items-center gap-2">
+              <CalendarDays className="w-5 h-5" />
               Events for {format(currentMonth, "MMMM yyyy")}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="text-center py-8 text-muted-foreground">Loading events...</div>
-            ) : events.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No events this month
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {events.map((event) => (
-                  <div
-                    key={event.id}
-                    className="flex items-start gap-4 p-4 border border-border rounded-lg hover:bg-muted/30 transition-professional cursor-pointer"
-                    onClick={() => handleEventClick(event)}>
-                    <div className={`w-1 h-full rounded-full ${event.color} flex-shrink-0`} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-3 mb-2">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h3 className="font-semibold text-base">{event.title}</h3>
-                            <Badge variant="outline" className="text-xs">
-                              {getEventTypeLabel(event.event_type)}
-                            </Badge>
-                          </div>
-                          {event.source_name && (
-                            <p className="text-sm text-muted-foreground mb-1">
-                              {event.source_name}
-                            </p>
-                          )}
-                          {event.description && (
-                            <p className="text-sm text-muted-foreground">{event.description}</p>
-                          )}
+            </h3>
+            <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+              {events.filter(e => isSameMonth(parseISO(e.event_date), currentMonth)).length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground border rounded-lg bg-muted/20">
+                  No events this month
+                </div>
+              ) : (
+                events
+                  .filter(e => isSameMonth(parseISO(e.event_date), currentMonth))
+                  .map((event) => (
+                    <Card 
+                      key={event.id} 
+                      className="cursor-pointer hover:bg-muted/50 transition-colors border-l-4"
+                      style={{ borderLeftColor: event.color?.replace('bg-', '').replace('-500', '') === 'blue' ? '#3b82f6' : event.color?.replace('bg-', '').replace('-500', '') === 'orange' ? '#f97316' : '#a855f7' }}
+                      onClick={() => handleEventClick(event)}
+                    >
+                      <CardContent className="p-3">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <h4 className="font-medium text-sm line-clamp-1">{event.title}</h4>
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground uppercase whitespace-nowrap">
+                            {getEventTypeLabel(event.event_type)}
+                          </span>
                         </div>
-                        {event.source === "calendar" && (
-                          <div className="flex gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openEditDialog(event);
-                              }}>
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteEvent(event.id);
-                              }}>
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                        {event.source_name && (
+                          <div className="text-xs text-muted-foreground mb-2 line-clamp-1">
+                            {event.source_name}
                           </div>
                         )}
-                      </div>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <CalendarIcon className="w-4 h-4" />
-                          {format(parseISO(event.event_date), "EEE, MMM d, yyyy")}
-                        </div>
-                        {event.start_time && (
-                          <div>
-                            {event.start_time.substring(0, 5)}
-                            {event.end_time && ` - ${event.end_time.substring(0, 5)}`}
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                          <div className="flex items-center gap-1">
+                            <CalendarIcon className="w-3 h-3" />
+                            {format(parseISO(event.event_date), "EEE, MMM d")}
                           </div>
-                        )}
-                        {event.location && <div>📍 {event.location}</div>}
-                        <div className="flex items-center gap-1">
-                          {getSourceIcon(event.source)}
-                          <span className="capitalize">{event.source}</span>
+                          {event.start_time && (
+                            <div className="flex items-center gap-1">
+                              <span>{event.start_time.substring(0, 5)}</span>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-1 ml-auto">
+                            {getSourceIcon(event.source)}
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                      </CardContent>
+                    </Card>
+                  ))
+              )}
+            </div>
+          </div>
+        </div>
 
-        {/* Edit Dialog */}
-        {editingEvent && (
-          <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-            <DialogContent className="sm:max-w-[600px]">
-              <DialogHeader>
-                <DialogTitle>Edit Event</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 mt-4">
-                <div>
-                  <Label htmlFor="edit-title">Title *</Label>
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Event</DialogTitle>
+            </DialogHeader>
+            {editingEvent && (
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-title">Event Title</Label>
                   <Input
                     id="edit-title"
                     value={editingEvent.title}
-                    onChange={(e) =>
-                      setEditingEvent({ ...editingEvent, title: e.target.value })
-                    }
-                    placeholder="Event title"
+                    onChange={(e) => setEditingEvent({ ...editingEvent, title: e.target.value })}
                   />
                 </div>
-
-                <div>
-                  <Label htmlFor="edit-description">Description</Label>
-                  <Textarea
-                    id="edit-description"
-                    value={editingEvent.description || ""}
-                    onChange={(e) =>
-                      setEditingEvent({ ...editingEvent, description: e.target.value })
-                    }
-                    placeholder="Event description"
-                    rows={3}
-                  />
-                </div>
-
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="edit-event_date">Date *</Label>
-                    <Input
-                      id="edit-event_date"
-                      type="date"
-                      value={editingEvent.event_date}
-                      onChange={(e) =>
-                        setEditingEvent({ ...editingEvent, event_date: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="edit-event_type">Type</Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-type">Type</Label>
                     <Select
                       value={editingEvent.event_type}
-                      onValueChange={(value: any) =>
-                        setEditingEvent({ ...editingEvent, event_type: value })
-                      }>
+                      onValueChange={(value: any) => setEditingEvent({ ...editingEvent, event_type: value })}
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -727,71 +645,70 @@ function CalendarContent() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-date">Date</Label>
+                    <Input
+                      id="edit-date"
+                      type="date"
+                      value={editingEvent.event_date}
+                      onChange={(e) => setEditingEvent({ ...editingEvent, event_date: e.target.value })}
+                    />
+                  </div>
                 </div>
-
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
+                  <div className="space-y-2">
                     <Label htmlFor="edit-start_time">Start Time</Label>
                     <Input
                       id="edit-start_time"
                       type="time"
                       value={editingEvent.start_time || ""}
-                      onChange={(e) =>
-                        setEditingEvent({ ...editingEvent, start_time: e.target.value })
-                      }
+                      onChange={(e) => setEditingEvent({ ...editingEvent, start_time: e.target.value })}
                     />
                   </div>
-                  <div>
+                  <div className="space-y-2">
                     <Label htmlFor="edit-end_time">End Time</Label>
                     <Input
                       id="edit-end_time"
                       type="time"
                       value={editingEvent.end_time || ""}
-                      onChange={(e) =>
-                        setEditingEvent({ ...editingEvent, end_time: e.target.value })
-                      }
+                      onChange={(e) => setEditingEvent({ ...editingEvent, end_time: e.target.value })}
                     />
                   </div>
                 </div>
-
-                <div>
+                <div className="space-y-2">
                   <Label htmlFor="edit-location">Location</Label>
                   <Input
                     id="edit-location"
                     value={editingEvent.location || ""}
-                    onChange={(e) =>
-                      setEditingEvent({ ...editingEvent, location: e.target.value })
-                    }
-                    placeholder="Event location"
+                    onChange={(e) => setEditingEvent({ ...editingEvent, location: e.target.value })}
                   />
                 </div>
-
-                <div className="flex justify-end gap-3 pt-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setIsEditDialogOpen(false);
-                      setEditingEvent(null);
-                    }}
-                    disabled={saving}>
-                    Cancel
+                <div className="space-y-2">
+                  <Label htmlFor="edit-description">Description</Label>
+                  <Textarea
+                    id="edit-description"
+                    value={editingEvent.description || ""}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, description: e.target.value })}
+                  />
+                </div>
+                <div className="flex justify-between gap-4">
+                  <Button variant="destructive" onClick={() => handleDeleteEvent(editingEvent.id)} type="button">
+                    <Trash2 className="w-4 h-4 mr-2" /> Delete
                   </Button>
-                  <Button
-                    onClick={handleEditEvent}
-                    disabled={saving || !editingEvent.title.trim()}>
+                  <Button onClick={handleEditEvent} disabled={saving}>
                     {saving ? "Saving..." : "Save Changes"}
                   </Button>
                 </div>
               </div>
-            </DialogContent>
-          </Dialog>
-        )}
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );
 }
 
-export default function Calendar() {
+export default function CalendarPage() {
   return (
     <RequireAuth>
       <CalendarContent />
