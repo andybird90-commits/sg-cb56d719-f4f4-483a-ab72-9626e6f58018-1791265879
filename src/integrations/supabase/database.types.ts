@@ -126,6 +126,7 @@ export type Database = {
           id: string
           name: string
           notes: string | null
+          payment_terms: number | null
           sector: string | null
           short_name: string | null
           status: Database["public"]["Enums"]["company_status"]
@@ -137,6 +138,7 @@ export type Database = {
           id?: string
           name: string
           notes?: string | null
+          payment_terms?: number | null
           sector?: string | null
           short_name?: string | null
           status?: Database["public"]["Enums"]["company_status"]
@@ -148,6 +150,7 @@ export type Database = {
           id?: string
           name?: string
           notes?: string | null
+          payment_terms?: number | null
           sector?: string | null
           short_name?: string | null
           status?: Database["public"]["Enums"]["company_status"]

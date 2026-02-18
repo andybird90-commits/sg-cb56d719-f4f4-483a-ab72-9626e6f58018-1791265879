@@ -199,67 +199,71 @@ export const invoicingService = {
 
   async generateAndUploadPdf(
     invoiceMonth: InvoiceMonth,
-    items: InvoiceItem[]
+    invoiceItems: InvoiceItem[]
   ): Promise<string> {
-    const doc = new jsPDF();
-    const months = [
-      "January", "February", "March", "April", "May", "June",
-      "July", "August", "September", "October", "November", "December"
-    ];
-    const monthName = months[invoiceMonth.month - 1];
+    try {
+      const doc = new jsPDF();
+      const months = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ];
+      const monthName = months[invoiceMonth.month - 1];
 
-    doc.setFontSize(18);
-    doc.text(`Invoice Summary - ${monthName} ${invoiceMonth.year}`, 14, 20);
+      doc.setFontSize(18);
+      doc.text(`Invoice Summary - ${monthName} ${invoiceMonth.year}`, 14, 20);
 
-    doc.setFontSize(11);
-    doc.text(`Generated: ${new Date().toLocaleDateString("en-GB")}`, 14, 30);
+      doc.setFontSize(11);
+      doc.text(`Generated: ${new Date().toLocaleDateString("en-GB")}`, 14, 30);
 
-    const includedItems = items.filter(
-      (item) => !item.excluded_this_month && item.invoice_value !== null
-    );
+      const includedItems = invoiceItems.filter(
+        (item) => !item.excluded_this_month && item.invoice_value !== null
+      );
 
-    const tableData = includedItems.map((item) => [
-      item.project_code,
-      item.project_name,
-      item.client_name,
-      item.po_number || "—",
-      `£${(item.invoice_value || 0).toFixed(2)}`,
-      item.description || "—",
-    ]);
+      const tableData = includedItems.map((item) => [
+        item.project_code,
+        item.project_name,
+        item.client_name,
+        item.po_number || "—",
+        `£${(item.invoice_value || 0).toFixed(2)}`,
+        item.description || "—",
+      ]);
 
-    const totalValue = includedItems.reduce(
-      (sum, item) => sum + (item.invoice_value || 0),
-      0
-    );
+      const totalValue = includedItems.reduce(
+        (sum, item) => sum + (item.invoice_value || 0),
+        0
+      );
 
-    (doc as any).autoTable({
-      startY: 40,
-      head: [["Code", "Project", "Client", "PO", "Value", "Description"]],
-      body: tableData,
-      foot: [["", "", "", "TOTAL", `£${totalValue.toFixed(2)}`, ""]],
-      theme: "grid",
-      styles: { fontSize: 9 },
-      headStyles: { fillColor: [71, 85, 105] },
-      footStyles: { fillColor: [241, 245, 249], textColor: [0, 0, 0], fontStyle: "bold" },
-    });
-
-    const pdfBlob = doc.output("blob");
-    const fileName = `invoice-${invoiceMonth.year}-${String(invoiceMonth.month).padStart(2, "0")}.pdf`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("invoices")
-      .upload(fileName, pdfBlob, {
-        contentType: "application/pdf",
-        upsert: true,
+      (doc as any).autoTable({
+        startY: 40,
+        head: [["Code", "Project", "Client", "PO", "Value", "Description"]],
+        body: tableData,
+        foot: [["", "", "", "TOTAL", `£${totalValue.toFixed(2)}`, ""]],
+        theme: "grid",
+        styles: { fontSize: 9 },
+        headStyles: { fillColor: [71, 85, 105] },
+        footStyles: { fillColor: [241, 245, 249], textColor: [0, 0, 0], fontStyle: "bold" },
       });
 
-    if (uploadError) throw uploadError;
+      const pdfBlob = doc.output("blob");
+      const fileName = `invoice-${invoiceMonth.year}-${String(invoiceMonth.month).padStart(2, "0")}.pdf`;
 
-    const { data: { publicUrl } } = supabase.storage
-      .from('invoices')
-      .getPublicUrl(fileName);
+      const { error: uploadError } = await supabase.storage
+        .from("invoices")
+        .upload(fileName, pdfBlob, {
+          contentType: "application/pdf",
+          upsert: true,
+        });
 
-    return publicUrl;
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('invoices')
+        .getPublicUrl(fileName);
+
+      return publicUrl;
+    } catch (e) {
+      throw e;
+    }
   },
 
   async savePdfUrl(invoiceMonthId: string, pdfUrl: string): Promise<void> {
