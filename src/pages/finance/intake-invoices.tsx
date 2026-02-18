@@ -58,7 +58,10 @@ interface InvoiceHistory {
 
 interface FormData {
   client_name: string;
+  company_id: string;
   project_name: string;
+  project_id: string;
+  po_reference: string;
   invoice_number: string;
   invoice_date: string;
   due_date: string;
@@ -69,21 +72,7 @@ interface FormData {
   notes: string;
 }
 
-const initialFormData: FormData = {
-  client_name: "",
-  project_name: "",
-  invoice_number: "",
-  invoice_date: "",
-  due_date: "",
-  net_amount: "",
-  vat_amount: "0",
-  status: "unpaid",
-  paid_amount: "0",
-  notes: "",
-};
-
 function IntakeInvoicesContent() {
-  const { toast } = useToast();
   const [invoices, setInvoices] = useState<InvoiceHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [showUnpaidOnly, setShowUnpaidOnly] = useState(false);
@@ -121,7 +110,7 @@ function IntakeInvoicesContent() {
 
   // Validation
   const isValid = () => {
-    if (!formData.client_name.trim()) return false;
+    if (!formData.company_id) return false;
     if (!formData.invoice_number.trim()) return false;
     if (!formData.invoice_date) return false;
     if (!formData.due_date) return false;
@@ -138,14 +127,15 @@ function IntakeInvoicesContent() {
     try {
       const [companiesRes, projectsRes] = await Promise.all([
         supabase.from("companies").select("id, name").order("name"),
-        supabase.from("projects").select("id, name, company_id").order("name")
+        supabase.from("projects").select("id, name, client_company_id").order("name")
       ]);
 
       if (companiesRes.error) throw companiesRes.error;
       if (projectsRes.error) throw projectsRes.error;
 
       setCompanies(companiesRes.data || []);
-      setProjects(projectsRes.data || []);
+      // Map client_company_id to company_id for compatibility
+      setProjects((projectsRes.data || []).map(p => ({ ...p, company_id: p.client_company_id })));
     } catch (error) {
       console.error("Error fetching companies/projects:", error);
     }
@@ -203,78 +193,6 @@ function IntakeInvoicesContent() {
   const displayedInvoices = showUnpaidOnly
     ? unpaidInvoices
     : invoices;
-
-  // Save invoice
-  const saveInvoice = async (clearForm: boolean = false) => {
-    if (!isValid()) {
-      toast({
-        title: "Validation Error",
-        description: "Please fill in all required fields correctly",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      const invoiceData = {
-        client_name: formData.client_name.trim(),
-        project_name: formData.project_name.trim() || null,
-        invoice_number: formData.invoice_number.trim(),
-        invoice_date: formData.invoice_date,
-        due_date: formData.due_date,
-        net_amount: netAmount,
-        vat_amount: vatAmount,
-        status: formData.status,
-        paid_amount: parseFloat(formData.paid_amount) || 0,
-        notes: formData.notes.trim() || null,
-      };
-
-      if (editingId) {
-        // Update existing invoice
-        const { error } = await supabase
-          .from("invoice_history")
-          .update(invoiceData)
-          .eq("id", editingId);
-
-        if (error) throw error;
-
-        toast({
-          title: "Success",
-          description: "Invoice updated successfully",
-        });
-        setEditingId(null);
-      } else {
-        // Insert new invoice
-        const { error } = await supabase
-          .from("invoice_history")
-          .insert(invoiceData);
-
-        if (error) throw error;
-
-        toast({
-          title: "Success",
-          description: "Invoice saved successfully",
-        });
-      }
-
-      if (clearForm) {
-        setFormData(initialFormData);
-      }
-
-      fetchInvoices();
-    } catch (error) {
-      console.error("Error saving invoice:", error);
-      toast({
-        title: "Error",
-        description: "Failed to save invoice",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSubmit = async (saveAndAddAnother: boolean = false) => {
     // Validation
@@ -410,7 +328,21 @@ function IntakeInvoicesContent() {
 
   // Cancel edit
   const cancelEdit = () => {
-    setFormData(initialFormData);
+    setFormData({
+      client_name: "",
+      company_id: "",
+      project_name: "",
+      project_id: "",
+      po_reference: "",
+      invoice_number: "",
+      invoice_date: "",
+      due_date: "",
+      net_amount: "",
+      vat_amount: "0",
+      status: "unpaid",
+      paid_amount: "0",
+      notes: "",
+    });
     setEditingId(null);
   };
 
@@ -766,7 +698,7 @@ function IntakeInvoicesContent() {
               {editingId ? (
                 <>
                   <Button
-                    onClick={() => saveInvoice(false)}
+                    onClick={() => handleSubmit(false)}
                     disabled={loading || !isValid()}
                   >
                     <Save className="w-4 h-4 mr-2" />
@@ -784,14 +716,14 @@ function IntakeInvoicesContent() {
               ) : (
                 <>
                   <Button
-                    onClick={() => saveInvoice(false)}
+                    onClick={() => handleSubmit(false)}
                     disabled={loading || !isValid()}
                   >
                     Save Invoice
                   </Button>
                   <Button
                     variant="outline"
-                    onClick={() => saveInvoice(true)}
+                    onClick={() => handleSubmit(true)}
                     disabled={loading || !isValid()}
                   >
                     Save + Add Another
@@ -882,7 +814,7 @@ function IntakeInvoicesContent() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => editInvoice(invoice)}
+                              onClick={() => handleEdit(invoice)}
                             >
                               <Pencil className="w-4 h-4" />
                             </Button>
