@@ -110,7 +110,7 @@ function IntakeInvoicesContent() {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setInvoices(data || []);
+      setInvoices((data as InvoiceHistory[]) || []);
     } catch (error) {
       console.error("Error fetching invoices:", error);
       toast({
