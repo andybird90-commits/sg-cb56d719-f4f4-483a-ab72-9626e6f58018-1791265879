@@ -87,7 +87,7 @@ function IntakeInvoicesContent() {
   const [companyOpen, setCompanyOpen] = useState(false);
   const [projectOpen, setProjectOpen] = useState(false);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     client_name: "",
     company_id: "",
     project_name: "",
@@ -98,7 +98,7 @@ function IntakeInvoicesContent() {
     due_date: "",
     net_amount: "",
     vat_amount: "0",
-    status: "unpaid" as const,
+    status: "unpaid",
     paid_amount: "0",
     notes: "",
   });
