@@ -63,51 +63,108 @@ function CashFlowContent() {
       setLoading(true);
       setError(null);
 
-      // Fetch all invoices with their collections
-      const { data, error: fetchError } = await supabase
-        .from("invoicing")
+      // Fetch locked invoice months with their items
+      const { data: invoiceMonths, error: monthsError } = await supabase
+        .from("invoice_months")
         .select(`
-          *,
-          companies!invoicing_company_id_fkey (name, payment_terms),
-          projects!invoicing_project_id_fkey (project_name),
-          invoice_collections (
+          id,
+          year,
+          month,
+          status,
+          invoice_items (
             id,
-            due_date,
-            collected_date,
-            collected_by_user_id
+            project_id,
+            project_name,
+            project_code,
+            client_name,
+            invoice_value,
+            description,
+            po_number,
+            excluded_this_month,
+            created_at,
+            projects!invoice_items_project_id_fkey (
+              id,
+              name,
+              client_company_id,
+              companies!projects_client_company_id_fkey (
+                name,
+                payment_terms
+              )
+            ),
+            invoice_collections (
+              id,
+              due_date,
+              collected_date,
+              collected_by_user_id
+            )
           )
         `)
-        .order("issue_date", { ascending: true });
+        .eq("status", "locked")
+        .order("year", { ascending: false })
+        .order("month", { ascending: false });
 
-      if (fetchError) throw fetchError;
+      if (monthsError) throw monthsError;
 
-      // For invoices without collections, create them based on payment terms
-      const invoicesWithCollections = await Promise.all(
-        (data || []).map(async (invoice: any) => {
-          if (!invoice.invoice_collections || invoice.invoice_collections.length === 0) {
-            // Calculate due date based on payment terms
-            const paymentTerms = invoice.companies?.payment_terms || 30;
-            const dueDate = format(addDays(new Date(invoice.issue_date), paymentTerms), "yyyy-MM-dd");
+      // Flatten invoice items and create collections where needed
+      const allInvoices: InvoiceWithCollection[] = [];
+      
+      for (const month of invoiceMonths || []) {
+        for (const item of month.invoice_items || []) {
+          if (item.excluded_this_month || !item.invoice_value) continue;
 
-            // Create collection record
-            const { data: collectionData, error: collectionError } = await supabase
+          const company = item.projects?.companies;
+          const paymentTerms = company?.payment_terms || 30;
+          
+          // Calculate invoice issue date (first day of the month)
+          const issueDate = new Date(month.year, month.month - 1, 1);
+          const invoiceNumber = `${item.project_code || 'INV'}-${month.year}-${String(month.month).padStart(2, '0')}`;
+
+          // Check if collection exists, if not create it
+          let collection = item.invoice_collections?.[0];
+          
+          if (!collection) {
+            const dueDate = format(addDays(issueDate, paymentTerms), "yyyy-MM-dd");
+            
+            const { data: newCollection, error: collectionError } = await supabase
               .from("invoice_collections")
               .insert({
-                invoicing_id: invoice.id,
+                invoice_month_id: month.id,
+                invoice_item_id: item.id,
                 due_date: dueDate,
               })
               .select()
               .single();
 
-            if (!collectionError && collectionData) {
-              invoice.invoice_collections = [collectionData];
+            if (!collectionError && newCollection) {
+              collection = newCollection;
             }
           }
-          return invoice as InvoiceWithCollection;
-        })
-      );
 
-      setInvoices(invoicesWithCollections);
+          allInvoices.push({
+            id: item.id,
+            invoice_number: invoiceNumber,
+            issue_date: format(issueDate, "yyyy-MM-dd"),
+            total_amount: Number(item.invoice_value),
+            company_id: item.projects?.client_company_id || '',
+            project_id: item.project_id,
+            companies: {
+              name: company?.name || item.client_name,
+              payment_terms: paymentTerms
+            },
+            projects: {
+              project_name: item.project_name
+            },
+            invoice_collections: collection ? [{
+              id: collection.id,
+              due_date: collection.due_date,
+              collected_date: collection.collected_date,
+              collected_by_user_id: collection.collected_by_user_id
+            }] : []
+          });
+        }
+      }
+
+      setInvoices(allInvoices);
     } catch (err) {
       console.error("Failed to load cash flow data", err);
       setError("Failed to load cash flow data");
