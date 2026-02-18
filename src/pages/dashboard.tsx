@@ -958,116 +958,6 @@ function DashboardContent() {
           </CardContent>
         </Card>
 
-        {/* Live Opportunities & High Potentials Table */}
-        <Card className="card-professional">
-          <CardHeader className="pb-6">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
-                <Target className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-              </div>
-              <CardTitle className="text-2xl">Live Opportunities & High Potentials</CardTitle>
-            </div>
-            <p className="text-sm text-muted-foreground">Active pipeline opportunities - Click column headers to sort</p>
-          </CardHeader>
-          <CardContent>
-            {opportunitiesTableError ?
-              <ErrorState message={opportunitiesTableError} /> :
-              opportunitiesTableLoading ?
-              <div className="text-center py-12 text-muted-foreground">
-                Loading opportunities...
-              </div> :
-              opportunitiesTable.length === 0 ?
-              <div className="text-center py-12 text-muted-foreground">
-                No active opportunities in pipeline
-              </div> :
-              <div className="overflow-x-auto -mx-6">
-                <table className="w-full min-w-[900px]">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Reference</th>
-                      <SortableHeader field="name" label="Opportunity Name" />
-                      <SortableHeader field="company" label="Company" />
-                      <SortableHeader field="stage" label="Stage" />
-                      <SortableHeader field="value" label="Value" />
-                      <SortableHeader field="due_date" label="Due Date" />
-                      <SortableHeader field="start_date" label="Start Date" />
-                      <SortableHeader field="end_date" label="Finish Date" />
-                      <SortableHeader field="probability" label="Probability" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedOpportunities.map((opp) =>
-                      <tr
-                        key={opp.id}
-                        className="border-b border-border hover:bg-muted/30 cursor-pointer transition-professional"
-                        onClick={() => router.push(`/opportunities/${opp.id}`)}>
-                        <td className="py-3 px-4 text-sm text-muted-foreground font-mono">
-                          {opp.project_reference || "—"}
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="font-medium text-sm">{opp.name}</div>
-                        </td>
-                        <td className="py-3 px-4 text-sm">
-                          {opp.companies?.name || "—"}
-                        </td>
-                        <td className="py-3 px-4">
-                          <Badge className={`${getStageColor(opp.stage)} text-xs font-medium`}>
-                            {opp.stage === "high_potential" ? "High Potential" : opp.stage}
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-4 text-right text-sm font-semibold">
-                          {opp.expected_fee_value ? formatCurrency(opp.expected_fee_value) : "—"}
-                        </td>
-                        <td className="py-3 px-4 text-sm">
-                          {formatDate(opp.tender_due_date)}
-                        </td>
-                        <td className="py-3 px-4 text-sm">
-                          {formatDate(opp.expected_start_date)}
-                        </td>
-                        <td className="py-3 px-4 text-sm">
-                          {formatDate(opp.expected_end_date)}
-                        </td>
-                        <td className="py-3 px-4 text-right text-sm">
-                          {opp.probability_percent !== null ? `${opp.probability_percent}%` : "—"}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                  <tfoot>
-                    <tr className="border-t-2 bg-muted/50">
-                      <td colSpan={4} className="py-4 px-4 text-sm font-bold">
-                        Totals:
-                      </td>
-                      <td className="py-4 px-4 text-right text-sm">
-                        {(() => {
-                          const highPotentialTotal = opportunitiesTable
-                            .filter((opp) => opp.stage === "high_potential")
-                            .reduce((sum, opp) => sum + (opp.expected_fee_value || 0), 0);
-                          const bidTotal = opportunitiesTable
-                            .filter((opp) => opp.stage === "bid")
-                            .reduce((sum, opp) => sum + (opp.expected_fee_value || 0), 0);
-
-                          return (
-                            <div className="space-y-1.5">
-                              <div className="text-blue-600 dark:text-blue-400 font-semibold">
-                                High Potential: {formatCurrency(highPotentialTotal)}
-                              </div>
-                              <div className="text-amber-600 dark:text-amber-400 font-semibold">
-                                Bids: {formatCurrency(bidTotal)}
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </td>
-                      <td colSpan={4}></td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            }
-          </CardContent>
-        </Card>
-
         {/* Two Column Layout for Cards */}
         <div className="grid lg:grid-cols-2 gap-6">
           {/* Upcoming Tenders */}
@@ -1303,6 +1193,116 @@ function DashboardContent() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Live Opportunities & High Potentials Table */}
+        <Card className="card-professional">
+          <CardHeader className="pb-6">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                <Target className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+              </div>
+              <CardTitle className="text-2xl">Live Opportunities & High Potentials</CardTitle>
+            </div>
+            <p className="text-sm text-muted-foreground">Active pipeline opportunities - Click column headers to sort</p>
+          </CardHeader>
+          <CardContent>
+            {opportunitiesTableError ?
+              <ErrorState message={opportunitiesTableError} /> :
+              opportunitiesTableLoading ?
+              <div className="text-center py-12 text-muted-foreground">
+                Loading opportunities...
+              </div> :
+              opportunitiesTable.length === 0 ?
+              <div className="text-center py-12 text-muted-foreground">
+                No active opportunities in pipeline
+              </div> :
+              <div className="overflow-x-auto -mx-6">
+                <table className="w-full min-w-[900px]">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left py-3 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Reference</th>
+                      <SortableHeader field="name" label="Opportunity Name" />
+                      <SortableHeader field="company" label="Company" />
+                      <SortableHeader field="stage" label="Stage" />
+                      <SortableHeader field="value" label="Value" />
+                      <SortableHeader field="due_date" label="Due Date" />
+                      <SortableHeader field="start_date" label="Start Date" />
+                      <SortableHeader field="end_date" label="Finish Date" />
+                      <SortableHeader field="probability" label="Probability" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedOpportunities.map((opp) =>
+                      <tr
+                        key={opp.id}
+                        className="border-b border-border hover:bg-muted/30 cursor-pointer transition-professional"
+                        onClick={() => router.push(`/opportunities/${opp.id}`)}>
+                        <td className="py-3 px-4 text-sm text-muted-foreground font-mono">
+                          {opp.project_reference || "—"}
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="font-medium text-sm">{opp.name}</div>
+                        </td>
+                        <td className="py-3 px-4 text-sm">
+                          {opp.companies?.name || "—"}
+                        </td>
+                        <td className="py-3 px-4">
+                          <Badge className={`${getStageColor(opp.stage)} text-xs font-medium`}>
+                            {opp.stage === "high_potential" ? "High Potential" : opp.stage}
+                          </Badge>
+                        </td>
+                        <td className="py-3 px-4 text-right text-sm font-semibold">
+                          {opp.expected_fee_value ? formatCurrency(opp.expected_fee_value) : "—"}
+                        </td>
+                        <td className="py-3 px-4 text-sm">
+                          {formatDate(opp.tender_due_date)}
+                        </td>
+                        <td className="py-3 px-4 text-sm">
+                          {formatDate(opp.expected_start_date)}
+                        </td>
+                        <td className="py-3 px-4 text-sm">
+                          {formatDate(opp.expected_end_date)}
+                        </td>
+                        <td className="py-3 px-4 text-right text-sm">
+                          {opp.probability_percent !== null ? `${opp.probability_percent}%` : "—"}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 bg-muted/50">
+                      <td colSpan={4} className="py-4 px-4 text-sm font-bold">
+                        Totals:
+                      </td>
+                      <td className="py-4 px-4 text-right text-sm">
+                        {(() => {
+                          const highPotentialTotal = opportunitiesTable
+                            .filter((opp) => opp.stage === "high_potential")
+                            .reduce((sum, opp) => sum + (opp.expected_fee_value || 0), 0);
+                          const bidTotal = opportunitiesTable
+                            .filter((opp) => opp.stage === "bid")
+                            .reduce((sum, opp) => sum + (opp.expected_fee_value || 0), 0);
+
+                          return (
+                            <div className="space-y-1.5">
+                              <div className="text-blue-600 dark:text-blue-400 font-semibold">
+                                High Potential: {formatCurrency(highPotentialTotal)}
+                              </div>
+                              <div className="text-amber-600 dark:text-amber-400 font-semibold">
+                                Bids: {formatCurrency(bidTotal)}
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </td>
+                      <td colSpan={4}></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            }
+          </CardContent>
+        </Card>
       </div>
     </Layout>
   );

@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-empty-object-type */
+ 
 export type Json =
   | string
   | number
@@ -1135,6 +1135,7 @@ export type Database = {
         Row: {
           code: string | null
           created_at: string
+          created_by_user_id: string | null
           description: string
           id: string
           po_number: string | null
@@ -1146,6 +1147,7 @@ export type Database = {
         Insert: {
           code?: string | null
           created_at?: string
+          created_by_user_id?: string | null
           description: string
           id?: string
           po_number?: string | null
@@ -1157,6 +1159,7 @@ export type Database = {
         Update: {
           code?: string | null
           created_at?: string
+          created_by_user_id?: string | null
           description?: string
           id?: string
           po_number?: string | null
@@ -1166,6 +1169,13 @@ export type Database = {
           value?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "variations_created_by_user_id_fkey"
+            columns: ["created_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "variations_project_id_fkey"
             columns: ["project_id"]
