@@ -31,10 +31,12 @@ interface ProjectFinancials {
 interface UserTimeBreakdown {
   user_id: string;
   user_name: string;
+  hourly_rate: number;
   total_hours: number;
   total_cost: number;
   projects: {
     project_id: string;
+    project_code: string;
     project_name: string;
     hours: number;
     cost: number;
@@ -216,7 +218,10 @@ function FinancialsContent() {
         .select(`
           hours,
           project_id,
+          user_id,
           profiles!timesheets_user_id_fkey (
+            id,
+            full_name,
             default_hourly_cost_rate
           )
         `)
@@ -234,6 +239,52 @@ function FinancialsContent() {
           (timesheetsByProject.get(ts.project_id) || 0) + cost
         );
       });
+
+      // Build user time breakdown
+      const userTimeMap = new Map<string, UserTimeBreakdown>();
+      (timesheetsData || []).forEach((ts: any) => {
+        const userId = ts.user_id;
+        const userName = ts.profiles?.full_name || "Unknown User";
+        const hourlyRate = ts.profiles?.default_hourly_cost_rate || 0;
+        const cost = ts.hours * hourlyRate;
+
+        // Find project details
+        const project = projectsData?.find(p => p.id === ts.project_id);
+        const projectCode = project?.code || "—";
+        const projectName = project?.name || "Unknown Project";
+
+        if (!userTimeMap.has(userId)) {
+          userTimeMap.set(userId, {
+            user_id: userId,
+            user_name: userName,
+            hourly_rate: hourlyRate,
+            total_hours: 0,
+            total_cost: 0,
+            projects: []
+          });
+        }
+
+        const userBreakdown = userTimeMap.get(userId)!;
+        userBreakdown.total_hours += ts.hours;
+        userBreakdown.total_cost += cost;
+
+        // Check if project already exists in user's breakdown
+        const existingProject = userBreakdown.projects.find(p => p.project_id === ts.project_id);
+        if (existingProject) {
+          existingProject.hours += ts.hours;
+          existingProject.cost += cost;
+        } else {
+          userBreakdown.projects.push({
+            project_id: ts.project_id,
+            project_code: projectCode,
+            project_name: projectName,
+            hours: ts.hours,
+            cost: cost
+          });
+        }
+      });
+
+      setUserTimesheetBreakdown(Array.from(userTimeMap.values()));
 
       // Fetch subcontractor costs (only for projects)
       const { data: costsData, error: costsError } = await supabase
@@ -667,16 +718,16 @@ function FinancialsContent() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableCell className="text-left p-3 text-sm font-medium text-slate-600">Code</TableCell>
-                            <TableCell className="text-left p-3 text-sm font-medium text-slate-600">Project</TableCell>
-                            <TableCell className="text-left p-3 text-sm font-medium text-slate-600">Client</TableCell>
-                            <TableCell className="text-center p-3 text-sm font-medium text-slate-600">Type</TableCell>
-                            <TableCell className="text-right p-3 text-sm font-medium text-slate-600">Revenue</TableCell>
-                            <TableCell className="text-right p-3 text-sm font-medium text-slate-600">Internal Cost</TableCell>
-                            <TableCell className="text-right p-3 text-sm font-medium text-slate-600">Subbie Cost</TableCell>
-                            <TableCell className="text-right p-3 text-sm font-medium text-slate-600">Total Cost</TableCell>
-                            <TableCell className="text-right p-3 text-sm font-medium text-slate-600">Margin</TableCell>
-                            <TableCell className="text-right p-3 text-sm font-medium text-slate-600">Margin %</TableCell>
+                            <TableHead className="text-left">Code</TableHead>
+                            <TableHead className="text-left">Project</TableHead>
+                            <TableHead className="text-left">Client</TableHead>
+                            <TableHead className="text-center">Type</TableHead>
+                            <TableHead className="text-right">Revenue</TableHead>
+                            <TableHead className="text-right">Internal Cost</TableHead>
+                            <TableHead className="text-right">Subbie Cost</TableHead>
+                            <TableHead className="text-right">Total Cost</TableHead>
+                            <TableHead className="text-right">Margin</TableHead>
+                            <TableHead className="text-right">Margin %</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -692,35 +743,137 @@ function FinancialsContent() {
                                 }
                               }}
                             >
-                              <TableCell className="p-3 text-sm font-mono text-slate-600">{pf.project_code}</TableCell>
-                              <TableCell className="p-3 text-sm font-medium text-slate-900">{pf.project_name}</TableCell>
-                              <TableCell className="p-3 text-sm text-slate-600">{pf.client_name}</TableCell>
-                              <TableCell className="p-3 text-center">
+                              <TableCell className="font-mono text-slate-600">{pf.project_code}</TableCell>
+                              <TableCell className="font-medium text-slate-900">{pf.project_name}</TableCell>
+                              <TableCell className="text-slate-600">{pf.client_name}</TableCell>
+                              <TableCell className="text-center">
                                 <Badge className={`text-[10px] px-2 py-0.5 ${getStageBadgeColor(pf.stage)}`}>
                                   {pf.type === "opportunity" ? "Opp" : "Project"}
                                 </Badge>
                               </TableCell>
-                              <TableCell className="p-3 text-sm text-right font-medium">{formatCurrency(pf.revenue)}</TableCell>
-                              <TableCell className="p-3 text-sm text-right">{formatCurrency(pf.internal_cost)}</TableCell>
-                              <TableCell className="p-3 text-sm text-right">{formatCurrency(pf.subcontractor_cost)}</TableCell>
-                              <TableCell className="p-3 text-sm text-right font-medium">{formatCurrency(pf.total_cost)}</TableCell>
-                              <TableCell className={`p-3 text-sm text-right font-semibold ${pf.margin >= 0 ? "text-green-600" : "text-red-600"}`}>
+                              <TableCell className="text-right font-medium">{formatCurrency(pf.revenue)}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(pf.internal_cost)}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(pf.subcontractor_cost)}</TableCell>
+                              <TableCell className="text-right font-medium">{formatCurrency(pf.total_cost)}</TableCell>
+                              <TableCell className={`text-right font-semibold ${pf.margin >= 0 ? "text-green-600" : "text-red-600"}`}>
                                 {formatCurrency(pf.margin)}
                               </TableCell>
-                              <TableCell className={`p-3 text-sm text-right font-semibold ${pf.margin_percent >= 0 ? "text-green-600" : "text-red-600"}`}>
+                              <TableCell className={`text-right font-semibold ${pf.margin_percent >= 0 ? "text-green-600" : "text-red-600"}`}>
                                 {pf.margin_percent.toFixed(1)}%
                               </TableCell>
                             </TableRow>
                           ))}
-                          <TableRow>
-                            <TableCell colSpan={4} className="text-right p-3 text-sm font-medium text-slate-600">Total</TableCell>
-                            <TableCell className="text-right p-3 text-sm font-medium text-slate-900">{formatCurrency(totalRevenue)}</TableCell>
-                            <TableCell className="text-right p-3 text-sm font-medium text-slate-900">{formatCurrency(totalInternalCost)}</TableCell>
-                            <TableCell className="text-right p-3 text-sm font-medium text-slate-900">{formatCurrency(totalSubcontractorCost)}</TableCell>
-                            <TableCell className="text-right p-3 text-sm font-medium text-slate-900">{formatCurrency(totalProjectCost)}</TableCell>
-                            <TableCell className="text-right p-3 text-sm font-medium text-slate-900">{formatCurrency(margin)}</TableCell>
-                            <TableCell className="text-right p-3 text-sm font-medium text-slate-900">{totalRevenue > 0 ? `${((margin / totalRevenue) * 100).toFixed(1)}%` : "—%"}</TableCell>
+                          <TableRow className="bg-slate-50 font-semibold">
+                            <TableCell colSpan={4} className="text-right">TOTAL</TableCell>
+                            <TableCell className="text-right">{formatCurrency(totalRevenue)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(totalInternalCost)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(totalSubcontractorCost)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(totalProjectCost)}</TableCell>
+                            <TableCell className={`text-right ${margin >= 0 ? "text-green-600" : "text-red-600"}`}>
+                              {formatCurrency(margin)}
+                            </TableCell>
+                            <TableCell className={`text-right ${margin >= 0 ? "text-green-600" : "text-red-600"}`}>
+                              {totalRevenue > 0 ? `${((margin / totalRevenue) * 100).toFixed(1)}%` : "—"}
+                            </TableCell>
                           </TableRow>
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* User Time Breakdown */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base sm:text-lg">User Time Breakdown</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {userTimesheetBreakdown.length === 0 ? (
+                  <div className="text-center py-8 text-slate-600 text-sm">
+                    No timesheet data for this month
+                  </div>
+                ) : (
+                  <>
+                    {/* Mobile: Card View */}
+                    <div className="block lg:hidden space-y-4">
+                      {userTimesheetBreakdown.map((user) => (
+                        <Card key={user.user_id}>
+                          <CardContent className="p-4">
+                            <div className="space-y-3">
+                              <div className="border-b pb-2">
+                                <div className="font-semibold text-slate-900">{user.user_name}</div>
+                                <div className="text-xs text-slate-500">
+                                  {formatCurrency(user.hourly_rate)}/hour
+                                </div>
+                                <div className="text-sm font-medium text-slate-700 mt-1">
+                                  {user.total_hours.toFixed(1)} hrs • {formatCurrency(user.total_cost)}
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                {user.projects.map((proj) => (
+                                  <div key={proj.project_id} className="flex justify-between items-center text-xs">
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-mono text-slate-500">{proj.project_code}</div>
+                                      <div className="text-slate-700 truncate">{proj.project_name}</div>
+                                    </div>
+                                    <div className="text-right ml-2">
+                                      <div className="font-medium">{proj.hours.toFixed(1)} hrs</div>
+                                      <div className="text-slate-600">{formatCurrency(proj.cost)}</div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+
+                    {/* Desktop: Table View */}
+                    <div className="hidden lg:block overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-left">User</TableHead>
+                            <TableHead className="text-right">Hourly Rate</TableHead>
+                            <TableHead className="text-left">Project Code</TableHead>
+                            <TableHead className="text-left">Project Name</TableHead>
+                            <TableHead className="text-right">Hours</TableHead>
+                            <TableHead className="text-right">Cost</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {userTimesheetBreakdown.map((user) => (
+                            <>
+                              {user.projects.map((proj, idx) => (
+                                <TableRow key={`${user.user_id}-${proj.project_id}`} className="hover:bg-slate-50">
+                                  {idx === 0 ? (
+                                    <>
+                                      <TableCell className="font-medium text-slate-900" rowSpan={user.projects.length}>
+                                        {user.user_name}
+                                      </TableCell>
+                                      <TableCell className="text-right text-slate-600" rowSpan={user.projects.length}>
+                                        {formatCurrency(user.hourly_rate)}
+                                      </TableCell>
+                                    </>
+                                  ) : null}
+                                  <TableCell className="font-mono text-slate-600">{proj.project_code}</TableCell>
+                                  <TableCell className="text-slate-700">{proj.project_name}</TableCell>
+                                  <TableCell className="text-right font-medium">{proj.hours.toFixed(1)}</TableCell>
+                                  <TableCell className="text-right font-medium">{formatCurrency(proj.cost)}</TableCell>
+                                </TableRow>
+                              ))}
+                              <TableRow className="bg-slate-50">
+                                <TableCell colSpan={4} className="text-right font-semibold text-slate-700">
+                                  {user.user_name} Total
+                                </TableCell>
+                                <TableCell className="text-right font-semibold">{user.total_hours.toFixed(1)}</TableCell>
+                                <TableCell className="text-right font-semibold">{formatCurrency(user.total_cost)}</TableCell>
+                              </TableRow>
+                            </>
+                          ))}
                         </TableBody>
                       </Table>
                     </div>
