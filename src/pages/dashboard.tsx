@@ -1,9 +1,6 @@
-import { RequireAuth } from "@/components/RequireAuth";
-import { Layout } from "@/components/Layout";
 import { useAuth } from "@/contexts/AuthContext";
-import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { Layout } from "@/components/Layout";
+import { RequireAuth } from "@/components/RequireAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -883,6 +880,8 @@ function DashboardContent() {
             </Link>
           </div>
         }
+
+        <PaymentAlerts />
 
         {/* Pipeline Chart */}
         <Card className="card-professional">
