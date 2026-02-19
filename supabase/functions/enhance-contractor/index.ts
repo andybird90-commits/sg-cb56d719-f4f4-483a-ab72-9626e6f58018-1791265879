@@ -105,26 +105,32 @@ Deno.serve(async (req) => {
           notes: contractor.notes,
         };
         
-        let promptParts = [];
-        promptParts.push("Analyze this contractor data and suggest improvements for missing fields only.");
-        promptParts.push("CURRENT DATA:");
-        promptParts.push(JSON.stringify(currentData, null, 2));
+        let promptText = "Analyze this contractor data and suggest improvements for missing fields only.";
+        promptText += "
+
+CURRENT DATA:
+";
+        promptText += JSON.stringify(currentData, null, 2);
         
         if (companiesHouseData) {
-          promptParts.push("COMPANIES HOUSE DATA:");
-          promptParts.push(JSON.stringify(companiesHouseData, null, 2));
+          promptText += "
+
+COMPANIES HOUSE DATA:
+";
+          promptText += JSON.stringify(companiesHouseData, null, 2);
         }
         
         if (braveSearchData && braveSearchData.web && braveSearchData.web.results) {
-          promptParts.push("WEB SEARCH RESULTS:");
-          promptParts.push(JSON.stringify(braveSearchData.web.results.slice(0, 3), null, 2));
+          promptText += "
+
+WEB SEARCH RESULTS:
+";
+          promptText += JSON.stringify(braveSearchData.web.results.slice(0, 3), null, 2);
         }
         
-        promptParts.push("Return JSON with suggested values for null/empty fields only. Include confidence score 0-100.");
-        
-        const promptText = promptParts.join("
+        promptText += "
 
-");
+Return JSON with suggested values for null/empty fields only. Include confidence score 0-100.";
 
         const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
@@ -177,12 +183,13 @@ Deno.serve(async (req) => {
       if (aiAnalysis.notes) {
         const aiNotesPrefix = "AI Enhancement: ";
         const existingNotes = contractor.notes || "";
-        const newNotes = existingNotes 
-          ? existingNotes + "
+        if (existingNotes) {
+          updates.notes = existingNotes + "
 
-" + aiNotesPrefix + aiAnalysis.notes
-          : aiNotesPrefix + aiAnalysis.notes;
-        updates.notes = newNotes;
+" + aiNotesPrefix + aiAnalysis.notes;
+        } else {
+          updates.notes = aiNotesPrefix + aiAnalysis.notes;
+        }
       }
     }
 
