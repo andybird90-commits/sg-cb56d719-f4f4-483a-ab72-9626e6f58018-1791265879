@@ -4,7 +4,7 @@ import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Home, Building2, Users, FileText, Calendar as CalendarIcon, Clock, DollarSign, Target, Settings, LogOut, Menu, ChevronDown, Archive, LayoutDashboard, Briefcase, PoundSterling, User, BarChart3 } from "lucide-react";
+import { Home, Building2, Users, FileText, Calendar as CalendarIcon, Clock, DollarSign, Target, Settings, LogOut, Menu, ChevronDown, Archive, LayoutDashboard, Briefcase, PoundSterling, User, BarChart3, Radar } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import Image from "next/image";
 import { useState } from "react";
@@ -35,7 +35,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { href: "/contacts", icon: Users, label: "Contacts" },
     { href: "/opportunities", icon: Target, label: "Opportunities" },
     { href: "/projects", icon: Briefcase, label: "Projects" },
-    { href: "/pipeline", icon: BarChart3, label: "Pipeline" },
+    { href: "/contractor-radar", icon: Radar, label: "Radar" },
     { href: "/calendar", icon: CalendarIcon, label: "Calendar" },
     { href: "/timesheets/my", icon: Clock, label: "Timesheets" },
     { href: "/financials", icon: PoundSterling, label: "Financials" },
