@@ -328,7 +328,7 @@ export default function ContractorRadarPage() {
                             <div className="text-sm text-muted-foreground">Radar Score</div>
                             <div className="text-2xl font-bold flex items-center gap-1">
                               <TrendingUp className="h-5 w-5" />
-                              {contractor.radar_score.toFixed(1)}
+                              {contractor.radar_score?.toFixed(1) ?? '0.0'}
                             </div>
                           </div>
                           {contractor.enhancement_confidence !== null && (
