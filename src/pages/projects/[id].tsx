@@ -188,7 +188,7 @@ function ProjectDetailContent() {
     description: "",
     cost_amount: "",
     cost_date: "",
-    variation_id: "",
+    variation_id: "none",
   });
 
   const canEdit = !!profile;
@@ -900,7 +900,7 @@ function ProjectDetailContent() {
           description: costForm.description || null,
           cost_amount: parseFloat(costForm.cost_amount),
           cost_date: costForm.cost_date,
-          variation_id: costForm.variation_id || null,
+          variation_id: costForm.variation_id === "none" ? null : costForm.variation_id,
         })
         .eq("id", editingCost.id);
 
@@ -917,7 +917,7 @@ function ProjectDetailContent() {
           description: costForm.description || null,
           cost_amount: parseFloat(costForm.cost_amount),
           cost_date: costForm.cost_date,
-          variation_id: costForm.variation_id || null,
+          variation_id: costForm.variation_id === "none" ? null : costForm.variation_id,
         });
 
       if (error) {
@@ -934,7 +934,7 @@ function ProjectDetailContent() {
       description: "",
       cost_amount: "",
       cost_date: "",
-      variation_id: "",
+      variation_id: "none",
     });
   };
 
@@ -945,7 +945,7 @@ function ProjectDetailContent() {
       description: cost.description || "",
       cost_amount: cost.cost_amount.toString(),
       cost_date: cost.cost_date,
-      variation_id: cost.variation_id || "",
+      variation_id: cost.variation_id || "none",
     });
     setCostFormOpen(true);
   };
@@ -1669,7 +1669,7 @@ function ProjectDetailContent() {
                           description: "",
                           cost_amount: "",
                           cost_date: "",
-                          variation_id: "",
+                          variation_id: "none",
                         });
                       }}>
                         <Plus className="w-4 h-4" />
@@ -1736,7 +1736,7 @@ function ProjectDetailContent() {
                               <SelectValue placeholder="None" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="">None</SelectItem>
+                              <SelectItem value="none">None</SelectItem>
                               {variations.map((v) => (
                                 <SelectItem key={v.id} value={v.id}>
                                   {v.code}
