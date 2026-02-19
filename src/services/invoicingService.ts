@@ -199,102 +199,101 @@ export const invoicingService = {
 
   async generateAndUploadPdf(
     invoiceMonth: InvoiceMonth,
-    invoiceItems: InvoiceItem[]
+    items: InvoiceItem[]
   ): Promise<string> {
-    try {
-      const doc = new jsPDF();
-      const months = [
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December"
-      ];
-      const monthName = months[invoiceMonth.month - 1];
+    const { jsPDF } = await import("jspdf");
+    await import("jspdf-autotable");
 
-      doc.setFontSize(18);
-      doc.text(`Invoice Summary - ${monthName} ${invoiceMonth.year}`, 14, 20);
+    const doc = new jsPDF("l", "mm", "a4");
+    const months = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+    const monthName = months[invoiceMonth.month - 1];
 
-      doc.setFontSize(11);
-      doc.text(`Generated: ${new Date().toLocaleDateString("en-GB")}`, 14, 30);
+    doc.setFontSize(18);
+    doc.text(`Invoice Summary - ${monthName} ${invoiceMonth.year}`, 14, 20);
 
-      const includedItems = invoiceItems.filter(
-        (item) => !item.excluded_this_month && item.invoice_value !== null
-      );
+    doc.setFontSize(11);
+    doc.text(`Generated: ${new Date().toLocaleDateString("en-GB")}`, 14, 30);
 
-      // Table headers
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(9);
-      const headers = ["Project", "Client", "Value", "Description"];
-      const colWidths = [50, 50, 30, 60];
-      let yPos = 40;
-      let xPos = 20;
+    const includedItems = items.filter(
+      (item) => !item.excluded_this_month && item.invoice_value !== null
+    );
+
+    // Table headers
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    const headers = ["Project", "Client", "Value", "Description"];
+    const colWidths = [50, 50, 30, 60];
+    let yPos = 40;
+    let xPos = 20;
+    
+    headers.forEach((header, i) => {
+      doc.text(header, xPos, yPos);
+      xPos += colWidths[i];
+    });
+    
+    yPos += 5;
+    doc.setFont("helvetica", "normal");
+    
+    // Table rows
+    includedItems.forEach((item) => {
+      if (yPos > 270) {
+        doc.addPage();
+        yPos = 20;
+      }
       
-      headers.forEach((header, i) => {
-        doc.text(header, xPos, yPos);
+      xPos = 20;
+      const rowData = [
+        item.project_name,
+        item.client_name,
+        `£${item.invoice_value?.toFixed(2) || "0.00"}`,
+        item.description || ""
+      ];
+      
+      rowData.forEach((data, i) => {
+        const lines = doc.splitTextToSize(data, colWidths[i] - 2);
+        doc.text(lines, xPos, yPos);
         xPos += colWidths[i];
       });
       
-      yPos += 5;
-      doc.setFont("helvetica", "normal");
-      
-      // Table rows
-      includedItems.forEach((item) => {
-        if (yPos > 270) {
-          doc.addPage();
-          yPos = 20;
-        }
-        
-        xPos = 20;
-        const rowData = [
-          item.project_name,
-          item.client_name,
-          `£${item.invoice_value?.toFixed(2) || "0.00"}`,
-          item.description || ""
-        ];
-        
-        rowData.forEach((data, i) => {
-          const lines = doc.splitTextToSize(data, colWidths[i] - 2);
-          doc.text(lines, xPos, yPos);
-          xPos += colWidths[i];
-        });
-        
-        yPos += 8;
+      yPos += 8;
+    });
+
+    const totalValue = includedItems.reduce(
+      (sum, item) => sum + (item.invoice_value || 0),
+      0
+    );
+
+    (doc as any).autoTable({
+      startY: 40,
+      head: [["Code", "Project", "Client", "PO", "Email Contact", "Address", "Project Number", "Project Owner", "Payment Terms", "Value", "Description"]],
+      body: [],
+      foot: [["", "", "", "", "", "", "", "", "TOTAL", `£${totalValue.toFixed(2)}`, ""]],
+      theme: "grid",
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [71, 85, 105] },
+      footStyles: { fillColor: [241, 245, 249], textColor: [0, 0, 0], fontStyle: "bold" },
+    });
+
+    const pdfBlob = doc.output("blob");
+    const fileName = `invoice-${invoiceMonth.year}-${String(invoiceMonth.month).padStart(2, "0")}.pdf`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("invoices")
+      .upload(fileName, pdfBlob, {
+        contentType: "application/pdf",
+        upsert: true,
       });
 
-      const totalValue = includedItems.reduce(
-        (sum, item) => sum + (item.invoice_value || 0),
-        0
-      );
+    if (uploadError) throw uploadError;
 
-      (doc as any).autoTable({
-        startY: 40,
-        head: [["Code", "Project", "Client", "PO", "Value", "Description"]],
-        body: [],
-        foot: [["", "", "", "TOTAL", `£${totalValue.toFixed(2)}`, ""]],
-        theme: "grid",
-        styles: { fontSize: 9 },
-        headStyles: { fillColor: [71, 85, 105] },
-        footStyles: { fillColor: [241, 245, 249], textColor: [0, 0, 0], fontStyle: "bold" },
-      });
+    const { data: { publicUrl } } = supabase.storage
+      .from('invoices')
+      .getPublicUrl(fileName);
 
-      const pdfBlob = doc.output("blob");
-      const fileName = `invoice-${invoiceMonth.year}-${String(invoiceMonth.month).padStart(2, "0")}.pdf`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("invoices")
-        .upload(fileName, pdfBlob, {
-          contentType: "application/pdf",
-          upsert: true,
-        });
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('invoices')
-        .getPublicUrl(fileName);
-
-      return publicUrl;
-    } catch (e) {
-      throw e;
-    }
+    return publicUrl;
   },
 
   async savePdfUrl(invoiceMonthId: string, pdfUrl: string): Promise<void> {
