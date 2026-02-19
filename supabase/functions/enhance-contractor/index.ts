@@ -75,12 +75,7 @@ serve(async (req) => {
 
     console.log(`Enhancing contractor: ${contractor.name}`);
 
-    // 2. Mock AI Enhancement (Since we don't have OpenAI key guaranteed in this context, 
-    // we'll implement a robust mock or use OpenAI if key exists)
-    // For this fix, I will simulate the "AI" return to ensure the DB update logic works perfectly.
-    // In a real scenario, you'd call OpenAI here.
-    
-    // Check if OpenAI key exists
+    // 2. Mock AI Enhancement (Simulated logic or OpenAI if key exists)
     const openAiKey = Deno.env.get("OPENAI_API_KEY");
     let enhancedData: any = {};
 
