@@ -6,48 +6,42 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface Contractor {
-  id: string;
-  name: string;
-  region?: string;
-  postcode?: string;
-  address?: string;
-  sic_code?: string;
-  employees?: number;
-  turnover_gbp?: number;
-  notes?: string;
-}
-
-// Helper to parse loose number/range strings into DB-friendly numbers
-function parseNumeric(value: string | number | undefined | null): number | null {
-  if (value === undefined || value === null) return null;
+// Helper to parse numeric values from strings like "10-50", "100+", "£1m", etc.
+function parseNumeric(value: any): number | null {
+  if (value === null || value === undefined) return null;
   if (typeof value === 'number') return value;
   
-  const str = String(value).toLowerCase().trim();
+  const str = String(value).trim();
   if (!str) return null;
 
-  // Handle ranges like "10-50" -> take lower bound 10
+  // Handle ranges like "10-50" -> return lower bound 10
   if (str.includes('-')) {
     const parts = str.split('-');
-    const lower = parseFloat(parts[0].replace(/[^0-9.]/g, ''));
-    return isNaN(lower) ? null : lower;
+    const lower = parseNumeric(parts[0]);
+    return lower;
   }
 
-  // Handle "1m", "10k"
-  let multiplier = 1;
-  if (str.includes('k')) multiplier = 1000;
-  if (str.includes('m')) multiplier = 1000000;
-  if (str.includes('b')) multiplier = 1000000000;
+  // Remove currency and commas
+  const clean = str.replace(/[£$,]/g, '').toLowerCase();
 
-  // Remove currency and non-numeric chars (keep dot)
-  const clean = str.replace(/[^0-9.]/g, '');
+  // Handle suffixes
+  if (clean.endsWith('k')) {
+    return parseFloat(clean) * 1000;
+  }
+  if (clean.endsWith('m')) {
+    return parseFloat(clean) * 1000000;
+  }
+  if (clean.endsWith('b')) {
+    return parseFloat(clean) * 1000000000;
+  }
+
+  // Parse generic number
   const num = parseFloat(clean);
-
-  return isNaN(num) ? null : num * multiplier;
+  return isNaN(num) ? null : num;
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
+  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -64,112 +58,103 @@ serve(async (req) => {
       throw new Error("contractorId is required");
     }
 
-    // 1. Fetch current contractor data
+    console.log(`Enhancing contractor: ${contractorId}`);
+
+    // 1. Get current contractor data
     const { data: contractor, error: fetchError } = await supabaseClient
       .from("me_contractors")
       .select("*")
       .eq("id", contractorId)
       .single();
 
-    if (fetchError) throw fetchError;
+    if (fetchError || !contractor) {
+      throw new Error(`Contractor not found: ${fetchError?.message}`);
+    }
 
-    console.log(`Enhancing contractor: ${contractor.name}`);
-
-    // 2. Mock AI Enhancement (Simulated logic or OpenAI if key exists)
+    let aiUpdates = {};
     const openAiKey = Deno.env.get("OPENAI_API_KEY");
-    let enhancedData: any = {};
 
     if (openAiKey) {
-      // Call OpenAI
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${openAiKey}`,
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          messages: [
-            {
-              role: "system",
-              content: `You are a business data enrichment assistant. 
-              Analyze the company name and existing data. 
-              Return a JSON object with: region, postcode (approx), address (HQ), sic_code, employees (number), turnover_gbp (number), notes (summary).
-              Ensure employees and turnover_gbp are numbers. If range, provide average.
-              Return ONLY JSON.`
-            },
-            {
-              role: "user",
-              content: `Enhance this UK contractor: ${JSON.stringify(contractor)}`
-            }
-          ],
-          response_format: { type: "json_object" }
-        }),
-      });
-
-      const aiData = await response.json();
-      if (aiData.choices && aiData.choices[0]) {
-        try {
-          enhancedData = JSON.parse(aiData.choices[0].message.content);
-        } catch (e) {
-          console.error("Failed to parse AI response", e);
+      console.log("Using OpenAI for enhancement...");
+      try {
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${openAiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            messages: [
+              {
+                role: "system",
+                content: "You are a data enrichment assistant. Return JSON only. Suggest likely employee count (number or range), turnover (with currency), and SIC code based on the company name and region."
+              },
+              {
+                role: "user",
+                content: `Company: ${contractor.name}, Region: ${contractor.region || "UK"}. Return JSON with keys: employees, turnover_gbp, sic_code, enhancement_confidence (0-100), notes.`
+              }
+            ],
+            response_format: { type: "json_object" }
+          }),
+        });
+        
+        const data = await response.json();
+        if (data.choices && data.choices[0]) {
+           aiUpdates = JSON.parse(data.choices[0].message.content);
         }
+      } catch (e) {
+        console.error("OpenAI error:", e);
+        // Fallback if AI fails
       }
     } else {
-      console.log("No OPENAI_API_KEY, using rule-based enhancement");
-      // Fallback/Mock enhancement
-      enhancedData = {
-        region: contractor.region || "Unknown Region",
-        employees: "10-50", // Simulating the problem case
-        turnover_gbp: "£1M - £2M" // Simulating the problem case
+      console.log("No OpenAI key, using mock data...");
+      // Mock data for stability if no key
+      aiUpdates = {
+        employees: "10-50",
+        turnover_gbp: "£1m",
+        sic_code: "43210",
+        enhancement_confidence: 75,
+        notes: "Auto-enhanced (Mock)"
       };
     }
 
-    // 3. Process and Validate Data
-    const updates: any = {
-      last_enhanced_at: new Date().toISOString(),
-      enhancement_confidence: 85, // Mock confidence
+    // Merge with existing data, preferring AI updates but handling nulls
+    // Crucially: Parse the numerics!
+    const updates = {
+      // Only update fields if AI provided them, else keep existing or set null
+      employees: parseNumeric((aiUpdates as any).employees) ?? contractor.employees,
+      turnover_gbp: parseNumeric((aiUpdates as any).turnover_gbp) ?? contractor.turnover_gbp,
+      sic_code: (aiUpdates as any).sic_code || contractor.sic_code,
+      enhancement_confidence: (aiUpdates as any).enhancement_confidence || 50,
+      notes: (aiUpdates as any).notes || "Enhanced via Softgen",
+      last_enhanced_at: new Date().toISOString()
     };
 
-    if (enhancedData.region) updates.region = enhancedData.region;
-    if (enhancedData.postcode) updates.postcode = enhancedData.postcode;
-    if (enhancedData.address) updates.address = enhancedData.address;
-    if (enhancedData.sic_code) updates.sic_code = enhancedData.sic_code;
-    if (enhancedData.notes) updates.notes = enhancedData.notes;
+    console.log("Applying updates to DB:", JSON.stringify(updates));
 
-    // CRITICAL FIX: Safe Parsing for Integers/Numerics
-    if (enhancedData.employees) {
-      updates.employees = parseNumeric(enhancedData.employees);
-    }
-    if (enhancedData.turnover_gbp) {
-      updates.turnover_gbp = parseNumeric(enhancedData.turnover_gbp);
-    }
-
-    console.log("Updating DB with:", updates);
-
-    // 4. Update Database
     const { error: updateError } = await supabaseClient
       .from("me_contractors")
       .update(updates)
       .eq("id", contractorId);
 
     if (updateError) {
-      console.error("DB Update Error:", updateError);
-      throw updateError;
+      throw new Error(`DB Update failed: ${updateError.message}`);
     }
 
-    // 5. Trigger Radar Score Recalculation (if exists)
+    // Trigger Radar Score Recalculation
     try {
-      await supabaseClient.functions.invoke("recalculate-contractor-radar-score", {
+       await supabaseClient.functions.invoke('recalculate-contractor-radar-score', {
         body: { contractorId }
-      });
+       });
     } catch (e) {
       console.warn("Failed to trigger radar score recalc", e);
     }
 
-    return new Response(JSON.stringify({ success: true, data: updates }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ success: true, data: updates }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
 
   } catch (error) {
     console.error("Error:", error);
