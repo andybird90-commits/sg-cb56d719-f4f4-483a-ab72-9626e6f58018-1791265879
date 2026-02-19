@@ -20,6 +20,7 @@ interface Company {
   status: string;
   created_at: string;
   added_by_user_id: string | null;
+  company_number: string | null;
   added_by_profile?: {
     full_name: string | null;
     email: string;
@@ -174,6 +175,11 @@ function CompaniesContent() {
                       </div>
                       {company.sector && (
                         <p className="text-sm text-slate-600">{company.sector}</p>
+                      )}
+                      {company.company_number && (
+                        <p className="text-xs text-slate-500 mt-1">
+                          Company No: {company.company_number}
+                        </p>
                       )}
                       {company.added_by_user_id && (
                         <p className="text-xs text-slate-500 mt-1">

@@ -122,9 +122,11 @@ export type Database = {
       companies: {
         Row: {
           added_by_user_id: string | null
+          address: string | null
           company_number: string | null
           created_at: string
           id: string
+          linkedin_url: string | null
           name: string
           notes: string | null
           payment_terms: number | null
@@ -132,12 +134,16 @@ export type Database = {
           short_name: string | null
           status: Database["public"]["Enums"]["company_status"]
           updated_at: string
+          vat_number: string | null
+          website: string | null
         }
         Insert: {
           added_by_user_id?: string | null
+          address?: string | null
           company_number?: string | null
           created_at?: string
           id?: string
+          linkedin_url?: string | null
           name: string
           notes?: string | null
           payment_terms?: number | null
@@ -145,12 +151,16 @@ export type Database = {
           short_name?: string | null
           status?: Database["public"]["Enums"]["company_status"]
           updated_at?: string
+          vat_number?: string | null
+          website?: string | null
         }
         Update: {
           added_by_user_id?: string | null
+          address?: string | null
           company_number?: string | null
           created_at?: string
           id?: string
+          linkedin_url?: string | null
           name?: string
           notes?: string | null
           payment_terms?: number | null
@@ -158,6 +168,8 @@ export type Database = {
           short_name?: string | null
           status?: Database["public"]["Enums"]["company_status"]
           updated_at?: string
+          vat_number?: string | null
+          website?: string | null
         }
         Relationships: [
           {

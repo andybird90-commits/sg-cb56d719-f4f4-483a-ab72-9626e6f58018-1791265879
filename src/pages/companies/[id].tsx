@@ -26,6 +26,10 @@ interface Company {
   notes: string | null;
   added_by_user_id: string | null;
   company_number: string | null;
+  address: string | null;
+  vat_number: string | null;
+  website_url: string | null;
+  linkedin_url: string | null;
   added_by_profile?: {
     full_name: string | null;
     email: string;
@@ -70,6 +74,10 @@ function CompanyDetailContent() {
     notes: string;
     added_by_user_id: string;
     company_number: string;
+    address: string;
+    vat_number: string;
+    website_url: string;
+    linkedin_url: string;
   }>({
     name: "",
     short_name: "",
@@ -79,6 +87,10 @@ function CompanyDetailContent() {
     notes: "",
     added_by_user_id: "",
     company_number: "",
+    address: "",
+    vat_number: "",
+    website_url: "",
+    linkedin_url: "",
   });
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
@@ -150,6 +162,10 @@ function CompanyDetailContent() {
         notes: companyData.notes || "",
         added_by_user_id: companyData.added_by_user_id || "",
         company_number: companyData.company_number || "",
+        address: companyData.address || "",
+        vat_number: companyData.vat_number || "",
+        website_url: companyData.website_url || "",
+        linkedin_url: companyData.linkedin_url || "",
       });
     } catch (err) {
       console.error("Failed to load company data", err);
@@ -175,6 +191,10 @@ function CompanyDetailContent() {
           notes: editData.notes || null,
           added_by_user_id: editData.added_by_user_id || null,
           company_number: editData.company_number || null,
+          address: editData.address || null,
+          vat_number: editData.vat_number || null,
+          website_url: editData.website_url || null,
+          linkedin_url: editData.linkedin_url || null,
         })
         .eq("id", id);
 
@@ -395,6 +415,49 @@ function CompanyDetailContent() {
                           placeholder="e.g. 12345678"
                         />
                       </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="vat_number">VAT Number</Label>
+                        <Input
+                          id="vat_number"
+                          value={editData.vat_number}
+                          onChange={(e) => setEditData({ ...editData, vat_number: e.target.value })}
+                          placeholder="e.g. GB123456789"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="website_url">Website</Label>
+                        <Input
+                          id="website_url"
+                          type="url"
+                          value={editData.website_url}
+                          onChange={(e) => setEditData({ ...editData, website_url: e.target.value })}
+                          placeholder="https://example.com"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="linkedin_url">LinkedIn</Label>
+                        <Input
+                          id="linkedin_url"
+                          type="url"
+                          value={editData.linkedin_url}
+                          onChange={(e) => setEditData({ ...editData, linkedin_url: e.target.value })}
+                          placeholder="https://linkedin.com/company/example"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="address">Address</Label>
+                      <Textarea
+                        id="address"
+                        value={editData.address}
+                        onChange={(e) => setEditData({ ...editData, address: e.target.value })}
+                        rows={3}
+                        placeholder="Full company address"
+                      />
                     </div>
 
                     <div className="space-y-2">
@@ -460,7 +523,45 @@ function CompanyDetailContent() {
                           <div className="text-slate-900">{company.company_number}</div>
                         </div>
                       )}
+                      {company.vat_number && (
+                        <div>
+                          <div className="text-sm font-medium text-slate-500">VAT Number</div>
+                          <div className="text-slate-900">{company.vat_number}</div>
+                        </div>
+                      )}
+                      {company.website_url && (
+                        <div>
+                          <div className="text-sm font-medium text-slate-500">Website</div>
+                          <a 
+                            href={company.website_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 hover:underline break-all"
+                          >
+                            {company.website_url}
+                          </a>
+                        </div>
+                      )}
+                      {company.linkedin_url && (
+                        <div>
+                          <div className="text-sm font-medium text-slate-500">LinkedIn</div>
+                          <a 
+                            href={company.linkedin_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 hover:underline break-all"
+                          >
+                            {company.linkedin_url}
+                          </a>
+                        </div>
+                      )}
                     </div>
+                    {company.address && (
+                      <div>
+                        <div className="text-sm font-medium text-slate-500 mb-1">Address</div>
+                        <div className="text-slate-900 whitespace-pre-wrap">{company.address}</div>
+                      </div>
+                    )}
                     {company.notes && (
                       <div>
                         <div className="text-sm font-medium text-slate-500 mb-1">Notes</div>
