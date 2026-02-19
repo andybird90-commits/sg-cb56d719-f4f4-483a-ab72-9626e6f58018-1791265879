@@ -22,10 +22,6 @@ interface Project {
   companies?: {
     name: string;
   };
-  added_by_profile?: {
-    full_name: string | null;
-    email: string;
-  };
 }
 
 function ProjectsContent() {
@@ -62,10 +58,6 @@ function ProjectsContent() {
           *,
           companies!projects_client_company_id_fkey(
             name
-          ),
-          added_by_profile:profiles!projects_added_by_user_id_fkey(
-            full_name,
-            email
           )
         `)
         .eq("archived", false)
@@ -287,13 +279,6 @@ function ProjectsContent() {
                         {project.po_number && (
                           <p className="text-xs text-slate-500 mb-2">
                             PO: <span className="font-mono">{project.po_number}</span>
-                          </p>
-                        )}
-                        
-                        {/* Owner */}
-                        {project.added_by_profile && (
-                          <p className="text-xs text-slate-500 mb-2">
-                            Owner: {project.added_by_profile.full_name || project.added_by_profile.email}
                           </p>
                         )}
                         
