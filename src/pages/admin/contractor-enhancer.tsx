@@ -128,17 +128,17 @@ export default function ContractorEnhancerPage() {
       const contractorId = selectedIds[i];
       
       try {
-        console.log(`Starting enhancement for ${contractorId}...`);
+        console.log(`[Enhance] Starting for contractor ID: ${contractorId}`);
         
         // Call the enhancement Edge Function
         const { data, error } = await supabase.functions.invoke("enhance-contractor", {
           body: { contractorId }
         });
 
-        console.log("Enhancement response:", { data, error });
+        console.log(`[Enhance] Response for ${contractorId}:`, { data, error });
 
         if (error) {
-          console.error("Enhancement Invoke Error:", error);
+          console.error(`[Enhance] Error for ${contractorId}:`, error);
           throw error;
         }
 

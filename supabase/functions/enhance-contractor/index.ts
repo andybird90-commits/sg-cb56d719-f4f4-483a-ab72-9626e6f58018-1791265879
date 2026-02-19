@@ -19,7 +19,14 @@ Deno.serve(async (req) => {
     );
 
     // 2. Parse Input
-    const { contractorId } = await req.json();
+    let body;
+    try {
+      body = await req.json();
+    } catch (e) {
+      throw new Error("Invalid JSON body");
+    }
+
+    const { contractorId } = body;
     console.log(`[Enhance] Started for contractorId: ${contractorId}`);
 
     if (!contractorId) {
@@ -35,7 +42,7 @@ Deno.serve(async (req) => {
 
     if (fetchError || !contractor) {
       console.error("[Enhance] Contractor not found:", fetchError);
-      throw new Error("Contractor not found");
+      throw new Error("Contractor not found in database");
     }
 
     const companyName = contractor.name;
@@ -46,7 +53,7 @@ Deno.serve(async (req) => {
     let companiesHouseData = null;
     let searchResults = [];
 
-    // A. Companies House
+    // A. Companies House (if configured)
     const chApiKey = Deno.env.get("COMPANIES_HOUSE_API_KEY");
     if (companyNumber && chApiKey) {
       try {
@@ -62,11 +69,9 @@ Deno.serve(async (req) => {
       } catch (e) {
         console.error("[Enhance] CH Fetch failed:", e);
       }
-    } else {
-      console.log("[Enhance] Skipping CH (Missing number or key)");
     }
 
-    // B. Brave Search
+    // B. Brave Search (if configured)
     const braveKey = Deno.env.get("BRAVE_SEARCH_API_KEY");
     if (braveKey) {
       try {
@@ -88,14 +93,13 @@ Deno.serve(async (req) => {
       } catch (e) {
         console.error("[Enhance] Search failed:", e);
       }
-    } else {
-      console.log("[Enhance] Skipping Search (Missing key)");
     }
 
     // 5. AI Analysis
     const openAiKey = Deno.env.get("OPENAI_API_KEY");
     if (!openAiKey) {
-      throw new Error("OpenAI API Key not configured");
+      console.error("[Enhance] OPENAI_API_KEY missing");
+      throw new Error("OpenAI API Key not configured on server");
     }
 
     const systemPrompt = "You are an expert UK construction industry data analyst.";
@@ -110,8 +114,8 @@ Return JSON with these fields ONLY:
 - postcode: (string) Registered postcode
 - address: (string) Full registered address
 - sic_code: (string) Primary SIC code
-- employees: (number) Estimated employee count
-- turnover_gbp: (number) Estimated annual turnover
+- employees: (string) Estimated employee count (e.g. "10-50")
+- turnover_gbp: (string) Estimated annual turnover (e.g. "£1M-£5M")
 - notes: (string) A brief 2-sentence summary
 - confidence: (number) 0-100 score of data quality`;
 
@@ -135,27 +139,40 @@ Return JSON with these fields ONLY:
     if (!aiResponse.ok) {
       const errText = await aiResponse.text();
       console.error("[Enhance] OpenAI Error:", errText);
-      throw new Error(`OpenAI error: ${aiResponse.status}`);
+      throw new Error(`OpenAI error: ${aiResponse.status} - ${errText}`);
     }
 
     const aiData = await aiResponse.json();
-    const result = JSON.parse(aiData.choices[0].message.content);
+    let result;
+    try {
+      result = JSON.parse(aiData.choices[0].message.content);
+    } catch (e) {
+      console.error("[Enhance] Failed to parse AI response");
+      throw new Error("Invalid AI response format");
+    }
     console.log("[Enhance] AI Analysis complete:", JSON.stringify(result));
 
     // 6. Update Database
+    // Build update object dynamically
     const updates: Record<string, any> = {
       last_enhanced_at: new Date().toISOString(),
-      enhancement_confidence: result.confidence || 50,
-      companies_house_raw: companiesHouseData || contractor.companies_house_raw || {}
+      enhancement_confidence: result.confidence || 50
     };
+    
+    if (companiesHouseData) {
+        updates.companies_house_raw = companiesHouseData;
+    }
 
-    // Only update fields if they have values
     if (result.region) updates.region = result.region;
     if (result.postcode) updates.postcode = result.postcode;
     if (result.address) updates.address = result.address;
     if (result.sic_code) updates.sic_code = result.sic_code;
-    if (result.employees) updates.employees = result.employees;
-    if (result.turnover_gbp) updates.turnover_gbp = result.turnover_gbp;
+    
+    // Handle employees and turnover as strings since that's what we asked for
+    // Check if table expects numbers or strings. Assuming strings based on flexible schema or we parse.
+    // Actually, looking at previous schema, employees/turnover might be text.
+    if (result.employees) updates.employees = String(result.employees);
+    if (result.turnover_gbp) updates.turnover_gbp = String(result.turnover_gbp);
     
     // Append notes
     if (result.notes) {
@@ -173,7 +190,7 @@ ${newNote}` : newNote;
 
     if (updateError) {
       console.error("[Enhance] DB Update failed:", updateError);
-      throw new Error(`Update failed: ${updateError.message}`);
+      throw new Error(`DB Update failed: ${updateError.message}`);
     }
 
     // 7. Trigger Radar Score Recalculation
@@ -194,7 +211,7 @@ ${newNote}` : newNote;
   } catch (error) {
     console.error("[Enhance] Fatal Error:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message || "Internal Server Error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
