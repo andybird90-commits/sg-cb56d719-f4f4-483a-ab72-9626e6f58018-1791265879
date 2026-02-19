@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { jsPDF } from "jspdf";
 import { autoTable } from "jspdf-autotable";
 import { format } from "date-fns";
+import { FileText } from "lucide-react";
 
 interface ProjectFinancials {
   project_id: string;
@@ -506,6 +507,14 @@ function FinancialsContent() {
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Financials</h1>
             <p className="text-sm sm:text-base text-slate-600 mt-1">Monthly financial overview</p>
           </div>
+          <Button
+            onClick={() => router.push("/finance/intake-invoices")}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <FileText className="h-4 w-4" />
+            Intake Invoices
+          </Button>
         </div>
 
         {/* Month/Year Selector - Stack on mobile */}
