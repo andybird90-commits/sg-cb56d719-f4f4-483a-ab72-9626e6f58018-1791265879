@@ -617,6 +617,259 @@ export type Database = {
           },
         ]
       }
+      me_contractor_capabilities: {
+        Row: {
+          capability: string
+          contractor_id: string
+          created_at: string | null
+          experience_years: number | null
+          id: string
+          notes: string | null
+        }
+        Insert: {
+          capability: string
+          contractor_id: string
+          created_at?: string | null
+          experience_years?: number | null
+          id?: string
+          notes?: string | null
+        }
+        Update: {
+          capability?: string
+          contractor_id?: string
+          created_at?: string | null
+          experience_years?: number | null
+          id?: string
+          notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "me_contractor_capabilities_contractor_id_fkey"
+            columns: ["contractor_id"]
+            isOneToOne: false
+            referencedRelation: "me_contractor_radar_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "me_contractor_capabilities_contractor_id_fkey"
+            columns: ["contractor_id"]
+            isOneToOne: false
+            referencedRelation: "me_contractors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      me_contractor_contacts: {
+        Row: {
+          contractor_id: string
+          created_at: string | null
+          email: string | null
+          id: string
+          is_primary: boolean | null
+          name: string
+          notes: string | null
+          phone: string | null
+          role: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          contractor_id: string
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          is_primary?: boolean | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          role?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          contractor_id?: string
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          is_primary?: boolean | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          role?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "me_contractor_contacts_contractor_id_fkey"
+            columns: ["contractor_id"]
+            isOneToOne: false
+            referencedRelation: "me_contractor_radar_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "me_contractor_contacts_contractor_id_fkey"
+            columns: ["contractor_id"]
+            isOneToOne: false
+            referencedRelation: "me_contractors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      me_contractor_radar_scores: {
+        Row: {
+          contractor_id: string
+          created_at: string | null
+          data_completeness: number | null
+          fit_geo: number | null
+          fit_size: number | null
+          fit_specialism: number | null
+          id: string
+          last_calculated_at: string | null
+          performance: number | null
+          radar_score: number | null
+          relationship_heat: number | null
+        }
+        Insert: {
+          contractor_id: string
+          created_at?: string | null
+          data_completeness?: number | null
+          fit_geo?: number | null
+          fit_size?: number | null
+          fit_specialism?: number | null
+          id?: string
+          last_calculated_at?: string | null
+          performance?: number | null
+          radar_score?: number | null
+          relationship_heat?: number | null
+        }
+        Update: {
+          contractor_id?: string
+          created_at?: string | null
+          data_completeness?: number | null
+          fit_geo?: number | null
+          fit_size?: number | null
+          fit_specialism?: number | null
+          id?: string
+          last_calculated_at?: string | null
+          performance?: number | null
+          radar_score?: number | null
+          relationship_heat?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "me_contractor_radar_scores_contractor_id_fkey"
+            columns: ["contractor_id"]
+            isOneToOne: true
+            referencedRelation: "me_contractor_radar_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "me_contractor_radar_scores_contractor_id_fkey"
+            columns: ["contractor_id"]
+            isOneToOne: true
+            referencedRelation: "me_contractors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      me_contractor_relationships: {
+        Row: {
+          contractor_id: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          interaction_date: string
+          interaction_type: string
+          notes: string | null
+          rating: number | null
+        }
+        Insert: {
+          contractor_id: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          interaction_date: string
+          interaction_type: string
+          notes?: string | null
+          rating?: number | null
+        }
+        Update: {
+          contractor_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          interaction_date?: string
+          interaction_type?: string
+          notes?: string | null
+          rating?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "me_contractor_relationships_contractor_id_fkey"
+            columns: ["contractor_id"]
+            isOneToOne: false
+            referencedRelation: "me_contractor_radar_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "me_contractor_relationships_contractor_id_fkey"
+            columns: ["contractor_id"]
+            isOneToOne: false
+            referencedRelation: "me_contractors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "me_contractor_relationships_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      me_contractors: {
+        Row: {
+          address: string | null
+          created_at: string | null
+          employees: number | null
+          id: string
+          name: string
+          notes: string | null
+          postcode: string | null
+          region: string | null
+          sic_code: string | null
+          status: string | null
+          turnover_gbp: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string | null
+          employees?: number | null
+          id?: string
+          name: string
+          notes?: string | null
+          postcode?: string | null
+          region?: string | null
+          sic_code?: string | null
+          status?: string | null
+          turnover_gbp?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          created_at?: string | null
+          employees?: number | null
+          id?: string
+          name?: string
+          notes?: string | null
+          postcode?: string | null
+          region?: string | null
+          sic_code?: string | null
+          status?: string | null
+          turnover_gbp?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       monthly_budgets: {
         Row: {
           budget_cost: number | null
@@ -1424,7 +1677,31 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      me_contractor_radar_view: {
+        Row: {
+          capabilities: string[] | null
+          created_at: string | null
+          data_completeness: number | null
+          employees: number | null
+          fit_geo: number | null
+          fit_size: number | null
+          fit_specialism: number | null
+          id: string | null
+          last_contact_at: string | null
+          name: string | null
+          notes: string | null
+          performance: number | null
+          postcode: string | null
+          radar_score: number | null
+          region: string | null
+          relationship_heat: number | null
+          sic_code: string | null
+          status: string | null
+          turnover_gbp: number | null
+          updated_at: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       generate_opportunity_reference: { Args: never; Returns: string }
