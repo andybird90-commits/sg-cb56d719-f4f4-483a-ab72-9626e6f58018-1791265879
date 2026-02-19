@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Plus, ChevronRight, Briefcase, AlertTriangle, Search } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, ChevronRight, Briefcase, AlertTriangle, Search, Filter } from "lucide-react";
 import Link from "next/link";
 
 interface Project {
@@ -17,8 +18,13 @@ interface Project {
   project_reference: string;
   name: string;
   status: string;
+  po_number: string | null;
   companies?: {
     name: string;
+  };
+  added_by_profile?: {
+    full_name: string | null;
+    email: string;
   };
 }
 
@@ -30,6 +36,8 @@ function ProjectsContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [sortBy, setSortBy] = useState<"reference" | "name" | "status">("reference");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
 
   // Everyone can create/edit, only directors/admins can delete
   const canEdit = !!profile;
@@ -41,7 +49,7 @@ function ProjectsContent() {
 
   useEffect(() => {
     filterProjects();
-  }, [projects, searchTerm]);
+  }, [projects, searchTerm, sortBy, filterStatus]);
 
   const fetchProjects = async () => {
     try {
@@ -54,6 +62,10 @@ function ProjectsContent() {
           *,
           companies!projects_client_company_id_fkey(
             name
+          ),
+          added_by_profile:profiles!projects_added_by_user_id_fkey(
+            full_name,
+            email
           )
         `)
         .eq("archived", false)
@@ -61,42 +73,7 @@ function ProjectsContent() {
 
       if (fetchError) throw fetchError;
       
-      // Sort projects: P26xxx first (ascending), then P25xxx (ascending), then others alphabetically
-      const sortedData = ((data as any) || []).sort((a: any, b: any) => {
-        const aRef = a.project_reference || '';
-        const bRef = b.project_reference || '';
-        
-        // Extract year and number from references like "P26001"
-        const aMatch = aRef.match(/^P(\d{2})(\d+)$/);
-        const bMatch = bRef.match(/^P(\d{2})(\d+)$/);
-        
-        // If both have valid references
-        if (aMatch && bMatch) {
-          const aYear = parseInt(aMatch[1]);
-          const bYear = parseInt(bMatch[1]);
-          const aNum = parseInt(aMatch[2]);
-          const bNum = parseInt(bMatch[2]);
-          
-          // Sort by year descending (26 before 25)
-          if (aYear !== bYear) {
-            return bYear - aYear;
-          }
-          
-          // Within same year, sort by number descending (002, 001)
-          return bNum - aNum;
-        }
-        
-        // If only A has a valid reference, A comes first
-        if (aMatch) return -1;
-        
-        // If only B has a valid reference, B comes first
-        if (bMatch) return 1;
-        
-        // If neither has a valid reference, sort alphabetically by name
-        return (a.name || '').localeCompare(b.name || '');
-      });
-      
-      setProjects(sortedData);
+      setProjects((data as any) || []);
     } catch (err) {
       console.error("Failed to load projects data", err);
       setError("Failed to load projects");
@@ -106,18 +83,63 @@ function ProjectsContent() {
   };
 
   const filterProjects = () => {
-    if (!searchTerm) {
-      setFilteredProjects(projects);
-      return;
-    }
+    let filtered = [...projects];
 
-    const filtered = projects.filter((project) => {
+    // Apply search filter
+    if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
-      return (
+      filtered = filtered.filter((project) =>
         (project.project_reference && project.project_reference.toLowerCase().includes(searchLower)) ||
         project.name.toLowerCase().includes(searchLower) ||
-        project.companies?.name.toLowerCase().includes(searchLower)
+        project.companies?.name.toLowerCase().includes(searchLower) ||
+        (project.po_number && project.po_number.toLowerCase().includes(searchLower))
       );
+    }
+
+    // Apply status filter
+    if (filterStatus !== "all") {
+      filtered = filtered.filter((project) => project.status === filterStatus);
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case "reference":
+          // Sort by project reference (P26xxx first, then P25xxx, etc.)
+          const aRef = a.project_reference || '';
+          const bRef = b.project_reference || '';
+          
+          const aMatch = aRef.match(/^P(\d{2})(\d+)$/);
+          const bMatch = bRef.match(/^P(\d{2})(\d+)$/);
+          
+          if (aMatch && bMatch) {
+            const aYear = parseInt(aMatch[1]);
+            const bYear = parseInt(bMatch[1]);
+            const aNum = parseInt(aMatch[2]);
+            const bNum = parseInt(bMatch[2]);
+            
+            if (aYear !== bYear) {
+              return bYear - aYear;
+            }
+            
+            return bNum - aNum;
+          }
+          
+          if (aMatch) return -1;
+          if (bMatch) return 1;
+          
+          return (a.name || '').localeCompare(b.name || '');
+          
+        case "name":
+          return (a.name || '').localeCompare(b.name || '');
+          
+        case "status":
+          const statusOrder = ["live", "pipeline", "on_hold", "completed", "cancelled"];
+          return statusOrder.indexOf(a.status) - statusOrder.indexOf(b.status);
+          
+        default:
+          return 0;
+      }
     });
 
     setFilteredProjects(filtered);
@@ -161,15 +183,50 @@ function ProjectsContent() {
           </Button>
         </div>
 
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-          <Input
-            placeholder="Search by job number, client, or project name..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+        {/* Search, Filter, and Sort Controls */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Search */}
+          <div className="relative md:col-span-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+            <Input
+              placeholder="Search projects..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+
+          {/* Status Filter */}
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-slate-500 flex-shrink-0" />
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger>
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="live">Live</SelectItem>
+                <SelectItem value="pipeline">Pipeline</SelectItem>
+                <SelectItem value="on_hold">On Hold</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Sort */}
+          <div>
+            <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="reference">Job Number</SelectItem>
+                <SelectItem value="name">Name A-Z</SelectItem>
+                <SelectItem value="status">Status</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* Error State */}
@@ -225,6 +282,20 @@ function ProjectsContent() {
                         
                         {/* Client */}
                         <p className="text-sm text-slate-600 mb-2">{project.companies?.name}</p>
+                        
+                        {/* PO Number */}
+                        {project.po_number && (
+                          <p className="text-xs text-slate-500 mb-2">
+                            PO: <span className="font-mono">{project.po_number}</span>
+                          </p>
+                        )}
+                        
+                        {/* Owner */}
+                        {project.added_by_profile && (
+                          <p className="text-xs text-slate-500 mb-2">
+                            Owner: {project.added_by_profile.full_name || project.added_by_profile.email}
+                          </p>
+                        )}
                         
                         {/* Status Badge */}
                         <Badge className={`${getStatusColor(project.status)} w-fit text-xs`}>
