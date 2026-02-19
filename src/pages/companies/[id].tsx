@@ -25,6 +25,7 @@ interface Company {
   payment_terms: number | null;
   notes: string | null;
   added_by_user_id: string | null;
+  company_number: string | null;
   added_by_profile?: {
     full_name: string | null;
     email: string;
@@ -68,6 +69,7 @@ function CompanyDetailContent() {
     payment_terms: number;
     notes: string;
     added_by_user_id: string;
+    company_number: string;
   }>({
     name: "",
     short_name: "",
@@ -76,6 +78,7 @@ function CompanyDetailContent() {
     payment_terms: 30,
     notes: "",
     added_by_user_id: "",
+    company_number: "",
   });
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
@@ -146,6 +149,7 @@ function CompanyDetailContent() {
         payment_terms: companyData.payment_terms || 30,
         notes: companyData.notes || "",
         added_by_user_id: companyData.added_by_user_id || "",
+        company_number: companyData.company_number || "",
       });
     } catch (err) {
       console.error("Failed to load company data", err);
@@ -170,6 +174,7 @@ function CompanyDetailContent() {
           payment_terms: editData.payment_terms,
           notes: editData.notes || null,
           added_by_user_id: editData.added_by_user_id || null,
+          company_number: editData.company_number || null,
         })
         .eq("id", id);
 
@@ -380,6 +385,16 @@ function CompanyDetailContent() {
                           onChange={(e) => setEditData({ ...editData, sector: e.target.value })}
                         />
                       </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="company_number">Company Number</Label>
+                        <Input
+                          id="company_number"
+                          value={editData.company_number}
+                          onChange={(e) => setEditData({ ...editData, company_number: e.target.value })}
+                          placeholder="e.g. 12345678"
+                        />
+                      </div>
                     </div>
 
                     <div className="space-y-2">
@@ -437,6 +452,12 @@ function CompanyDetailContent() {
                         <div>
                           <div className="text-sm font-medium text-slate-500">Payment Terms</div>
                           <div className="text-slate-900">{company.payment_terms} days</div>
+                        </div>
+                      )}
+                      {company.company_number && (
+                        <div>
+                          <div className="text-sm font-medium text-slate-500">Company Number</div>
+                          <div className="text-slate-900">{company.company_number}</div>
                         </div>
                       )}
                     </div>

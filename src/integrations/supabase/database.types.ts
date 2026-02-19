@@ -122,6 +122,7 @@ export type Database = {
       companies: {
         Row: {
           added_by_user_id: string | null
+          company_number: string | null
           created_at: string
           id: string
           name: string
@@ -134,6 +135,7 @@ export type Database = {
         }
         Insert: {
           added_by_user_id?: string | null
+          company_number?: string | null
           created_at?: string
           id?: string
           name: string
@@ -146,6 +148,7 @@ export type Database = {
         }
         Update: {
           added_by_user_id?: string | null
+          company_number?: string | null
           created_at?: string
           id?: string
           name?: string
