@@ -121,6 +121,7 @@ export type Database = {
       }
       companies: {
         Row: {
+          accounts_email: string | null
           added_by_user_id: string | null
           address: string | null
           company_number: string | null
@@ -138,6 +139,7 @@ export type Database = {
           website: string | null
         }
         Insert: {
+          accounts_email?: string | null
           added_by_user_id?: string | null
           address?: string | null
           company_number?: string | null
@@ -155,6 +157,7 @@ export type Database = {
           website?: string | null
         }
         Update: {
+          accounts_email?: string | null
           added_by_user_id?: string | null
           address?: string | null
           company_number?: string | null

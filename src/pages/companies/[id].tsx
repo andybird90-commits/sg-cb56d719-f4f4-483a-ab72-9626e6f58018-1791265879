@@ -8,32 +8,25 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Mail, Phone, AlertTriangle, Edit, Trash2 } from "lucide-react";
+import { ArrowLeft, Mail, Phone, AlertTriangle, Edit, Trash2, Linkedin } from "lucide-react";
 import Link from "next/link";
 import type React from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
 interface Company {
   id: string;
   name: string;
-  short_name: string | null;
-  sector: string | null;
-  status: string;
-  payment_terms: number | null;
-  notes: string | null;
-  added_by_user_id: string | null;
-  company_number: string | null;
-  address: string | null;
-  vat_number: string | null;
-  website_url: string | null;
-  linkedin_url: string | null;
-  added_by_profile?: {
-    full_name: string | null;
-    email: string;
-  } | null;
+  short_name?: string | null;
+  address?: string | null;
+  vat_number?: string | null;
+  company_number?: string | null;
+  website?: string | null;
+  linkedin_url?: string | null;
+  accounts_email?: string | null;
+  notes?: string | null;
+  created_at: string;
 }
 
 interface Contact {
@@ -52,12 +45,6 @@ interface Opportunity {
   expected_fee_value: number | null;
 }
 
-interface User {
-  id: string;
-  full_name: string | null;
-  email: string;
-}
-
 function CompanyDetailContent() {
   const { profile } = useAuth();
   const router = useRouter();
@@ -65,36 +52,19 @@ function CompanyDetailContent() {
   
   const [company, setCompany] = useState<Company | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [editData, setEditData] = useState<{
-    name: string;
-    short_name: string;
-    sector: string;
-    status: "active" | "prospect" | "inactive";
-    payment_terms: number;
-    notes: string;
-    added_by_user_id: string;
-    company_number: string;
-    address: string;
-    vat_number: string;
-    website_url: string;
-    linkedin_url: string;
-  }>({
+  const [formData, setFormData] = useState({
     name: "",
     short_name: "",
-    sector: "",
-    status: "prospect",
-    payment_terms: 30,
-    notes: "",
-    added_by_user_id: "",
-    company_number: "",
     address: "",
     vat_number: "",
-    website_url: "",
+    company_number: "",
+    website: "",
     linkedin_url: "",
+    accounts_email: "",
+    notes: "",
   });
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
   
   const [companyLoading, setCompanyLoading] = useState(true);
   const [companyError, setCompanyError] = useState<string | null>(null);
@@ -105,31 +75,16 @@ function CompanyDetailContent() {
   const [opportunitiesLoading, setOpportunitiesLoading] = useState(true);
   const [opportunitiesError, setOpportunitiesError] = useState<string | null>(null);
 
-  const canEdit = !!profile; // Everyone can edit
-  const canDelete = profile?.role === "admin" || profile?.role === "director"; // Only admins/directors can delete
+  const canEdit = !!profile;
+  const canDelete = profile?.role === "admin" || profile?.role === "director";
 
   useEffect(() => {
     if (id && typeof id === "string") {
       fetchCompanyData(id);
       fetchContactsData(id);
       fetchOpportunitiesData(id);
-      fetchUsers();
     }
   }, [id]);
-
-  const fetchUsers = async () => {
-    try {
-      const { data, error: usersError } = await supabase
-        .from("profiles")
-        .select("id, full_name, email")
-        .order("full_name");
-
-      if (usersError) throw usersError;
-      setUsers(data || []);
-    } catch (err) {
-      console.error("Failed to load users", err);
-    }
-  };
 
   const fetchCompanyData = async (companyId: string) => {
     try {
@@ -138,34 +93,25 @@ function CompanyDetailContent() {
 
       const { data, error } = await supabase
         .from("companies")
-        .select(`
-          *,
-          added_by_profile:profiles (
-            full_name,
-            email
-          )
-        `)
+        .select("*")
         .eq("id", companyId)
         .single();
 
       if (error) throw error;
       if (!data) throw new Error("Company not found");
       
-      const companyData = data as unknown as Company;
+      const companyData = data as Company;
       setCompany(companyData);
-      setEditData({
+      setFormData({
         name: companyData.name,
         short_name: companyData.short_name || "",
-        sector: companyData.sector || "",
-        status: companyData.status as "active" | "prospect" | "inactive",
-        payment_terms: companyData.payment_terms || 30,
-        notes: companyData.notes || "",
-        added_by_user_id: companyData.added_by_user_id || "",
-        company_number: companyData.company_number || "",
         address: companyData.address || "",
         vat_number: companyData.vat_number || "",
-        website_url: companyData.website_url || "",
+        company_number: companyData.company_number || "",
+        website: companyData.website || "",
         linkedin_url: companyData.linkedin_url || "",
+        accounts_email: companyData.accounts_email || "",
+        notes: companyData.notes || "",
       });
     } catch (err) {
       console.error("Failed to load company data", err);
@@ -175,7 +121,7 @@ function CompanyDetailContent() {
     }
   };
 
-  const handleUpdate = async (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id || typeof id !== "string") return;
 
@@ -183,18 +129,15 @@ function CompanyDetailContent() {
       const { error } = await supabase
         .from("companies")
         .update({
-          name: editData.name,
-          short_name: editData.short_name || null,
-          sector: editData.sector || null,
-          status: editData.status,
-          payment_terms: editData.payment_terms,
-          notes: editData.notes || null,
-          added_by_user_id: editData.added_by_user_id || null,
-          company_number: editData.company_number || null,
-          address: editData.address || null,
-          vat_number: editData.vat_number || null,
-          website_url: editData.website_url || null,
-          linkedin_url: editData.linkedin_url || null,
+          name: formData.name,
+          short_name: formData.short_name || null,
+          address: formData.address || null,
+          vat_number: formData.vat_number || null,
+          company_number: formData.company_number || null,
+          website: formData.website || null,
+          linkedin_url: formData.linkedin_url || null,
+          accounts_email: formData.accounts_email || null,
+          notes: formData.notes || null,
         })
         .eq("id", id);
 
@@ -268,19 +211,6 @@ function CompanyDetailContent() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "active":
-        return "bg-green-100 text-green-800";
-      case "prospect":
-        return "bg-blue-100 text-blue-800";
-      case "inactive":
-        return "bg-slate-100 text-slate-800";
-      default:
-        return "bg-slate-100 text-slate-800";
-    }
-  };
-
   const formatCurrency = (value: number | null) => {
     if (!value) return "—";
     return new Intl.NumberFormat("en-GB", {
@@ -318,12 +248,7 @@ function CompanyDetailContent() {
           ) : (
             <>
               <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                  <CardTitle className="text-xl sm:text-2xl">{company.name}</CardTitle>
-                  <Badge className={getStatusColor(company.status)}>
-                    {company.status}
-                  </Badge>
-                </div>
+                <CardTitle className="text-xl sm:text-2xl">{company.name}</CardTitle>
                 <div className="flex items-center gap-2">
                   {canEdit && !isEditing && (
                     <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="gap-2">
@@ -341,68 +266,24 @@ function CompanyDetailContent() {
               </CardHeader>
               <CardContent>
                 {isEditing ? (
-                  <form onSubmit={handleUpdate} className="space-y-4">
+                  <form onSubmit={handleSave} className="space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="name">Company Name *</Label>
                         <Input
                           id="name"
-                          value={editData.name}
-                          onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                          value={formData.name}
+                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                           required
                         />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="status">Status</Label>
-                        <Select
-                          value={editData.status}
-                          onValueChange={(value: "active" | "prospect" | "inactive") => setEditData({ ...editData, status: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="active">Active</SelectItem>
-                            <SelectItem value="prospect">Prospect</SelectItem>
-                            <SelectItem value="inactive">Inactive</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="payment_terms">Payment Terms</Label>
-                        <Select
-                          value={editData.payment_terms.toString()}
-                          onValueChange={(value) => setEditData({ ...editData, payment_terms: parseInt(value) })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="14">14 days</SelectItem>
-                            <SelectItem value="30">30 days</SelectItem>
-                            <SelectItem value="45">45 days</SelectItem>
-                            <SelectItem value="60">60 days</SelectItem>
-                          </SelectContent>
-                        </Select>
                       </div>
 
                       <div className="space-y-2">
                         <Label htmlFor="short_name">Short Name</Label>
                         <Input
                           id="short_name"
-                          value={editData.short_name}
-                          onChange={(e) => setEditData({ ...editData, short_name: e.target.value })}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="sector">Sector</Label>
-                        <Input
-                          id="sector"
-                          value={editData.sector}
-                          onChange={(e) => setEditData({ ...editData, sector: e.target.value })}
+                          value={formData.short_name}
+                          onChange={(e) => setFormData({ ...formData, short_name: e.target.value })}
                         />
                       </div>
 
@@ -410,8 +291,8 @@ function CompanyDetailContent() {
                         <Label htmlFor="company_number">Company Number</Label>
                         <Input
                           id="company_number"
-                          value={editData.company_number}
-                          onChange={(e) => setEditData({ ...editData, company_number: e.target.value })}
+                          value={formData.company_number}
+                          onChange={(e) => setFormData({ ...formData, company_number: e.target.value })}
                           placeholder="e.g. 12345678"
                         />
                       </div>
@@ -420,31 +301,42 @@ function CompanyDetailContent() {
                         <Label htmlFor="vat_number">VAT Number</Label>
                         <Input
                           id="vat_number"
-                          value={editData.vat_number}
-                          onChange={(e) => setEditData({ ...editData, vat_number: e.target.value })}
+                          value={formData.vat_number}
+                          onChange={(e) => setFormData({ ...formData, vat_number: e.target.value })}
                           placeholder="e.g. GB123456789"
                         />
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="website_url">Website</Label>
+                        <Label htmlFor="website">Website</Label>
                         <Input
-                          id="website_url"
+                          id="website"
                           type="url"
-                          value={editData.website_url}
-                          onChange={(e) => setEditData({ ...editData, website_url: e.target.value })}
+                          value={formData.website}
+                          onChange={(e) => setFormData({ ...formData, website: e.target.value })}
                           placeholder="https://example.com"
                         />
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="linkedin_url">LinkedIn</Label>
+                        <Label htmlFor="linkedin_url">LinkedIn Profile</Label>
                         <Input
                           id="linkedin_url"
                           type="url"
-                          value={editData.linkedin_url}
-                          onChange={(e) => setEditData({ ...editData, linkedin_url: e.target.value })}
-                          placeholder="https://linkedin.com/company/example"
+                          placeholder="https://linkedin.com/company/..."
+                          value={formData.linkedin_url}
+                          onChange={(e) => setFormData({ ...formData, linkedin_url: e.target.value })}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="accounts_email">Accounts/Invoicing Email</Label>
+                        <Input
+                          id="accounts_email"
+                          type="email"
+                          placeholder="accounts@company.com"
+                          value={formData.accounts_email}
+                          onChange={(e) => setFormData({ ...formData, accounts_email: e.target.value })}
                         />
                       </div>
                     </div>
@@ -453,8 +345,8 @@ function CompanyDetailContent() {
                       <Label htmlFor="address">Address</Label>
                       <Textarea
                         id="address"
-                        value={editData.address}
-                        onChange={(e) => setEditData({ ...editData, address: e.target.value })}
+                        value={formData.address}
+                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                         rows={3}
                         placeholder="Full company address"
                       />
@@ -464,29 +356,10 @@ function CompanyDetailContent() {
                       <Label htmlFor="notes">Notes</Label>
                       <Textarea
                         id="notes"
-                        value={editData.notes}
-                        onChange={(e) => setEditData({ ...editData, notes: e.target.value })}
+                        value={formData.notes}
+                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                         rows={4}
                       />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="added_by_user_id">Added by</Label>
-                      <Select
-                        value={editData.added_by_user_id}
-                        onValueChange={(value) => setEditData({ ...editData, added_by_user_id: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select user (optional)" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {users.map((user) => (
-                            <SelectItem key={user.id} value={user.id}>
-                              {user.full_name || user.email}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-3">
@@ -505,18 +378,6 @@ function CompanyDetailContent() {
                           <div className="text-slate-900">{company.short_name}</div>
                         </div>
                       )}
-                      {company.sector && (
-                        <div>
-                          <div className="text-sm font-medium text-slate-500">Sector</div>
-                          <div className="text-slate-900">{company.sector}</div>
-                        </div>
-                      )}
-                      {company.payment_terms && (
-                        <div>
-                          <div className="text-sm font-medium text-slate-500">Payment Terms</div>
-                          <div className="text-slate-900">{company.payment_terms} days</div>
-                        </div>
-                      )}
                       {company.company_number && (
                         <div>
                           <div className="text-sm font-medium text-slate-500">Company Number</div>
@@ -529,16 +390,16 @@ function CompanyDetailContent() {
                           <div className="text-slate-900">{company.vat_number}</div>
                         </div>
                       )}
-                      {company.website_url && (
+                      {company.website && (
                         <div>
                           <div className="text-sm font-medium text-slate-500">Website</div>
                           <a 
-                            href={company.website_url} 
+                            href={company.website} 
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="text-blue-600 hover:text-blue-800 hover:underline break-all"
                           >
-                            {company.website_url}
+                            {company.website}
                           </a>
                         </div>
                       )}
@@ -549,9 +410,22 @@ function CompanyDetailContent() {
                             href={company.linkedin_url} 
                             target="_blank" 
                             rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-800 hover:underline break-all"
+                            className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-2"
                           >
-                            {company.linkedin_url}
+                            <Linkedin className="w-4 h-4" />
+                            <span>Company Profile</span>
+                          </a>
+                        </div>
+                      )}
+                      {company.accounts_email && (
+                        <div>
+                          <div className="text-sm font-medium text-slate-500">Accounts Email</div>
+                          <a 
+                            href={`mailto:${company.accounts_email}`}
+                            className="text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-2"
+                          >
+                            <Mail className="w-4 h-4" />
+                            <span>{company.accounts_email}</span>
                           </a>
                         </div>
                       )}
@@ -571,14 +445,6 @@ function CompanyDetailContent() {
                   </div>
                 )}
               </CardContent>
-
-              {company.added_by_user_id && !isEditing && (
-                <div className="px-6 pb-4 border-t pt-4">
-                  <div className="text-xs text-slate-500">
-                    Added by {company.added_by_profile?.full_name || company.added_by_profile?.email || "Unknown"}
-                  </div>
-                </div>
-              )}
             </>
           )}
         </Card>

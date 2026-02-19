@@ -35,10 +35,13 @@ interface Project {
   archived?: boolean;
   companies?: {
     name: string;
+    accounts_email?: string;
+    payment_terms?: number;
   };
   opportunities?: {
     id: string;
     name: string;
+    enquiry_number?: string;
   };
 }
 
@@ -223,7 +226,8 @@ function ProjectDetailContent() {
         .from("projects")
         .select(`
           *,
-          companies!projects_client_company_id_fkey(id, name, short_name),
+          companies!projects_client_company_id_fkey(id, name, short_name, accounts_email, payment_terms),
+          opportunities(id, name, enquiry_number),
           project_activities(*),
           variations(*),
           subcontractor_costs(*),
@@ -1312,6 +1316,33 @@ function ProjectDetailContent() {
                         </div>
                       )}
 
+                      {project.opportunities?.enquiry_number && (
+                        <div>
+                          <div className="text-sm font-medium text-slate-500 mb-1">Enquiry Number</div>
+                          <div className="text-slate-900 font-mono">
+                            {project.opportunities.enquiry_number}
+                          </div>
+                        </div>
+                      )}
+
+                      {project.companies?.accounts_email && (
+                        <div>
+                          <div className="text-sm font-medium text-slate-500 mb-1">Accounts Email</div>
+                          <a href={`mailto:${project.companies.accounts_email}`} className="text-blue-600 hover:text-blue-800 hover:underline break-all">
+                            {project.companies.accounts_email}
+                          </a>
+                        </div>
+                      )}
+
+                      {project.companies?.payment_terms && (
+                        <div>
+                          <div className="text-sm font-medium text-slate-500 mb-1">Payment Terms</div>
+                          <div className="text-slate-900">
+                            {project.companies.payment_terms} days
+                          </div>
+                        </div>
+                      )}
+
                       {project.agreed_fee_value && (
                         <div>
                           <div className="text-sm font-medium text-slate-500 mb-1">Agreed Fee</div>
@@ -1634,19 +1665,11 @@ function ProjectDetailContent() {
                             </div>
 
                             <div className="flex gap-3">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => {
-                                  setVariationFormOpen(false);
-                                  setEditingVariation(null);
-                                  setVariationForm({ description: "", value: "", status: "proposed", po_number: "" });
-                                }}
-                              >
-                                Cancel
-                              </Button>
                               <Button type="submit">
                                 {editingVariation ? "Update" : "Create"}
+                              </Button>
+                              <Button type="button" variant="outline" onClick={() => setVariationFormOpen(false)}>
+                                Cancel
                               </Button>
                             </div>
                           </form>
