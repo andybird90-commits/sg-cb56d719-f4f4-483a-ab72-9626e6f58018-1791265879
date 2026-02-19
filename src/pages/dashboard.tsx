@@ -885,7 +885,7 @@ function DashboardContent() {
           </div>
         }
 
-        <PaymentAlerts />
+        <PaymentAlerts userRole={profile?.role || ""} />
 
         {/* Pipeline Chart */}
         <Card className="card-professional">
