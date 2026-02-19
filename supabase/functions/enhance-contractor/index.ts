@@ -93,11 +93,7 @@ Deno.serve(async (req) => {
       if (openaiKey) {
         console.log("Analyzing with OpenAI...");
         
-        const promptParts = [];
-        promptParts.push("Analyze this contractor data and suggest improvements for missing fields only.");
-        promptParts.push("");
-        promptParts.push("CURRENT DATA:");
-        promptParts.push(JSON.stringify({
+        const currentData = {
           name: contractor.name,
           region: contractor.region,
           postcode: contractor.postcode,
@@ -107,24 +103,27 @@ Deno.serve(async (req) => {
           turnover_gbp: contractor.turnover_gbp,
           status: contractor.status,
           notes: contractor.notes,
-        }, null, 2));
+        };
+        
+        let promptParts = [];
+        promptParts.push("Analyze this contractor data and suggest improvements for missing fields only.");
+        promptParts.push("CURRENT DATA:");
+        promptParts.push(JSON.stringify(currentData, null, 2));
         
         if (companiesHouseData) {
-          promptParts.push("");
           promptParts.push("COMPANIES HOUSE DATA:");
           promptParts.push(JSON.stringify(companiesHouseData, null, 2));
         }
         
         if (braveSearchData && braveSearchData.web && braveSearchData.web.results) {
-          promptParts.push("");
           promptParts.push("WEB SEARCH RESULTS:");
           promptParts.push(JSON.stringify(braveSearchData.web.results.slice(0, 3), null, 2));
         }
         
-        promptParts.push("");
         promptParts.push("Return JSON with suggested values for null/empty fields only. Include confidence score 0-100.");
         
-        const userPrompt = promptParts.join("
+        const promptText = promptParts.join("
+
 ");
 
         const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -137,7 +136,7 @@ Deno.serve(async (req) => {
             model: "gpt-4o-mini",
             messages: [
               { role: "system", content: "You are a data enrichment specialist. Return only valid JSON with this exact structure: {region, postcode, address, sic_code, employees, turnover_gbp, notes, confidence}" },
-              { role: "user", content: userPrompt },
+              { role: "user", content: promptText },
             ],
             temperature: 0.3,
           }),
@@ -178,9 +177,11 @@ Deno.serve(async (req) => {
       if (aiAnalysis.notes) {
         const aiNotesPrefix = "AI Enhancement: ";
         const existingNotes = contractor.notes || "";
-        const newNotes = existingNotes ? existingNotes + "
+        const newNotes = existingNotes 
+          ? existingNotes + "
 
-" + aiNotesPrefix + aiAnalysis.notes : aiNotesPrefix + aiAnalysis.notes;
+" + aiNotesPrefix + aiAnalysis.notes
+          : aiNotesPrefix + aiAnalysis.notes;
         updates.notes = newNotes;
       }
     }
@@ -203,14 +204,14 @@ Deno.serve(async (req) => {
 
     try {
       console.log("Triggering radar score recalculation...");
-      const { error: recalcError } = await supabaseClient.functions.invoke(
+      const recalcResult = await supabaseClient.functions.invoke(
         "recalculate-contractor-radar-score",
         {
           body: { contractorId },
         }
       );
-      if (recalcError) {
-        console.error("Error recalculating radar score:", recalcError);
+      if (recalcResult.error) {
+        console.error("Error recalculating radar score:", recalcResult.error);
       } else {
         console.log("Radar score recalculated successfully");
       }
