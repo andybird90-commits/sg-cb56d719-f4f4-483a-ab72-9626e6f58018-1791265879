@@ -152,6 +152,9 @@ function AdminContent() {
             <Link href="/admin/budgets">
               <Button variant="outline" className="w-full sm:w-auto">Monthly Budgets</Button>
             </Link>
+            <Link href="/admin/contractor-import">
+              <Button variant="outline" className="w-full sm:w-auto">Contractor Import</Button>
+            </Link>
           </div>
         </div>
 
