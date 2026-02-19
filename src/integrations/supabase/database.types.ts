@@ -637,6 +637,7 @@ export type Database = {
           contact_id: string | null
           created_at: string
           description: string | null
+          enquiry_number: string | null
           expected_end_date: string | null
           expected_fee_value: number | null
           expected_start_date: string | null
@@ -662,6 +663,7 @@ export type Database = {
           contact_id?: string | null
           created_at?: string
           description?: string | null
+          enquiry_number?: string | null
           expected_end_date?: string | null
           expected_fee_value?: number | null
           expected_start_date?: string | null
@@ -687,6 +689,7 @@ export type Database = {
           contact_id?: string | null
           created_at?: string
           description?: string | null
+          enquiry_number?: string | null
           expected_end_date?: string | null
           expected_fee_value?: number | null
           expected_start_date?: string | null

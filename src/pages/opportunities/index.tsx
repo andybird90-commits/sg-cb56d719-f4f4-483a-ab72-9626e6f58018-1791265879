@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, ChevronRight, Building2, AlertTriangle, Search, CheckCircle2, Target, TrendingUp, Calendar, Filter, AlertCircle } from "lucide-react";
 import Link from "next/link";
 
@@ -29,12 +30,19 @@ interface Opportunity {
   created_at: string;
   added_by_user_id?: string;
   archived?: boolean;
+  enquiry_number?: string | null;
+  contact_id?: string | null;
   companies?: {
     name: string;
   };
   added_by_profile?: {
     full_name: string;
     email?: string;
+  };
+  contacts?: {
+    name: string;
+    email?: string;
+    phone?: string;
   };
 }
 
@@ -47,6 +55,8 @@ function OpportunitiesContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [sortBy, setSortBy] = useState<"name" | "date" | "value" | "stage">("date");
+  const [filterStage, setFilterStage] = useState<string>("all");
 
   // Everyone can create/edit, only directors/admins can delete
   const canEdit = !!user;
@@ -58,7 +68,7 @@ function OpportunitiesContent() {
 
   useEffect(() => {
     filterOpportunities();
-  }, [opportunities, searchTerm]);
+  }, [opportunities, searchTerm, sortBy, filterStage]);
 
   const fetchOpportunities = async () => {
     try {
@@ -73,6 +83,11 @@ function OpportunitiesContent() {
           added_by_profile:profiles!opportunities_added_by_user_id_fkey (
             full_name,
             email
+          ),
+          contacts (
+            name,
+            email,
+            phone
           )
         `)
         .eq("archived", false)
@@ -90,18 +105,37 @@ function OpportunitiesContent() {
   };
 
   const filterOpportunities = () => {
-    if (!searchTerm) {
-      setFilteredOpportunities(opportunities);
-      return;
-    }
+    let filtered = [...opportunities];
 
-    const filtered = opportunities.filter((opp) => {
+    // Apply search filter
+    if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
-      return (
+      filtered = filtered.filter((opp) =>
         opp.name.toLowerCase().includes(searchLower) ||
         opp.companies?.name.toLowerCase().includes(searchLower) ||
-        opp.stage.toLowerCase().includes(searchLower)
+        opp.stage.toLowerCase().includes(searchLower) ||
+        opp.enquiry_number?.toLowerCase().includes(searchLower)
       );
+    }
+
+    // Apply stage filter
+    if (filterStage !== "all") {
+      filtered = filtered.filter((opp) => opp.stage === filterStage);
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case "name":
+          return a.name.localeCompare(b.name);
+        case "value":
+          return (b.expected_fee_value || 0) - (a.expected_fee_value || 0);
+        case "stage":
+          return a.stage.localeCompare(b.stage);
+        case "date":
+        default:
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      }
     });
 
     setFilteredOpportunities(filtered);
@@ -522,15 +556,45 @@ function OpportunitiesContent() {
           </Button>
         </div>
 
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-          <Input
-            placeholder="Search by name, company, stage, or status..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+        {/* Search, Filter, and Sort Controls */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="relative md:col-span-2">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+            <Input
+              placeholder="Search by name, company, stage, or enquiry number..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          
+          <div className="flex gap-2">
+            <Select value={filterStage} onValueChange={setFilterStage}>
+              <SelectTrigger>
+                <Filter className="w-4 h-4 mr-2" />
+                <SelectValue placeholder="Filter by stage" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Stages</SelectItem>
+                <SelectItem value="lead">Lead</SelectItem>
+                <SelectItem value="in_bid">In Bid</SelectItem>
+                <SelectItem value="high_potential">High Potential</SelectItem>
+                <SelectItem value="secured">Secured</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="date">Recent First</SelectItem>
+                <SelectItem value="name">Name A-Z</SelectItem>
+                <SelectItem value="value">Highest Value</SelectItem>
+                <SelectItem value="stage">Stage</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* Error State */}
@@ -581,17 +645,44 @@ function OpportunitiesContent() {
                           </div>
                         </div>
                         
+                        {opp.enquiry_number && (
+                          <div className="text-sm font-mono text-blue-600 mb-2">
+                            {opp.enquiry_number}
+                          </div>
+                        )}
+                        
                         <p className="text-sm text-slate-600 mb-2">{opp.companies?.name}</p>
                         
-                        <div className="flex items-center gap-2 text-sm">
-                          <span className="text-slate-500">Expected Value:</span>
-                          <span className="font-semibold text-slate-900">
-                            {formatCurrency(opp.expected_fee_value)}
-                          </span>
+                        {opp.contacts && (
+                          <div className="text-sm text-slate-600 mb-2 space-y-1">
+                            <div className="font-medium">{opp.contacts.name}</div>
+                            {opp.contacts.email && (
+                              <div className="text-xs">{opp.contacts.email}</div>
+                            )}
+                            {opp.contacts.phone && (
+                              <div className="text-xs">{opp.contacts.phone}</div>
+                            )}
+                          </div>
+                        )}
+                        
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-slate-500">Expected Value:</span>
+                            <span className="font-semibold text-slate-900">
+                              {formatCurrency(opp.expected_fee_value)}
+                            </span>
+                          </div>
+                          
+                          {opp.tender_due_date && (
+                            <div className="flex items-center gap-2">
+                              <Calendar className="w-3 h-3 text-slate-400" />
+                              <span className="text-slate-600">Due: {formatDate(opp.tender_due_date)}</span>
+                            </div>
+                          )}
                         </div>
 
                         {opp.added_by_user_id && (
-                          <div className="text-xs text-slate-500 mt-1">
+                          <div className="text-xs text-slate-500 mt-2 pt-2 border-t">
                             Added by {opp.added_by_profile?.full_name || opp.added_by_profile?.email || "Unknown"}
                           </div>
                         )}
