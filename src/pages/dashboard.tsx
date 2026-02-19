@@ -1,7 +1,6 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { Layout } from "@/components/Layout";
 import { RequireAuth } from "@/components/RequireAuth";
-import { PaymentAlerts } from "@/components/PaymentAlerts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -885,8 +884,6 @@ function DashboardContent() {
           </div>
         }
 
-        <PaymentAlerts userRole={profile?.role || ""} />
-
         {/* Pipeline Chart */}
         <Card className="card-professional">
           <CardHeader className="pb-6">
@@ -1042,8 +1039,10 @@ function DashboardContent() {
           </CardContent>
         </Card>
 
+        <PaymentAlerts userRole={profile?.role || ""} />
+
         {/* Two Column Layout for Cards */}
-        <div className="grid lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Upcoming Tenders */}
           <Card className="card-professional">
             <CardHeader className="pb-4">
@@ -1132,7 +1131,7 @@ function DashboardContent() {
                       <div className="text-xs text-muted-foreground mb-2">
                         {opp.companies?.name}
                       </div>
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <span>{formatDate(opp.created_at)}</span>
                         {opp.expected_fee_value &&
                           <span className="font-semibold">

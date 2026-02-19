@@ -213,7 +213,7 @@ export function PaymentAlerts({ userRole }: PaymentAlertsProps) {
               <Clock className="h-5 w-5" />
               Payment Alerts
             </CardTitle>
-            <Link href="/invoicing?tab=cashflow">
+            <Link href="/invoicing/cashflow">
               <Button variant="outline" size="sm">
                 <ExternalLink className="h-4 w-4 mr-2" />
                 View Cash Flow
@@ -246,7 +246,7 @@ export function PaymentAlerts({ userRole }: PaymentAlertsProps) {
             <Clock className="h-5 w-5" />
             Payment Alerts
           </CardTitle>
-          <Link href="/invoicing?tab=cashflow">
+          <Link href="/invoicing/cashflow">
             <Button variant="outline" size="sm">
               <ExternalLink className="h-4 w-4 mr-2" />
               View Cash Flow
