@@ -192,10 +192,11 @@ function ProjectDetailContent() {
   const canDelete = profile?.role === "admin" || profile?.role === "director";
 
   useEffect(() => {
-    if (id && typeof id === "string") {
-      fetchProjectData(id);
+    if (router.isReady && router.query.id) {
+      fetchProjectData();
+      fetchCompanies();
     }
-  }, [id]);
+  }, [router.isReady, router.query.id]);
 
   useEffect(() => {
     fetchCompanies();
@@ -215,19 +216,18 @@ function ProjectDetailContent() {
     setCompanies(data || []);
   };
 
-  const fetchProjectData = async (projectId: string) => {
+  const fetchProjectData = async () => {
     try {
       setProjectLoading(true);
       setProjectError(null);
-
-      console.log("Fetching project:", projectId);
+      const projectId = router.query.id as string;
 
       const { data: projectData, error: projectError } = await supabase
-        .from("projects")
+        .from("projects" as any)
         .select(`
           *,
           companies!projects_client_company_id_fkey(id, name, short_name, accounts_email, payment_terms),
-          opportunities(id, name, enquiry_number),
+          opportunities!projects_opportunity_id_fkey(id, name, enquiry_number),
           project_activities(*),
           variations(*),
           subcontractor_costs(*),
@@ -278,30 +278,29 @@ function ProjectDetailContent() {
         .order("year", { ascending: true })
         .order("month", { ascending: true });
 
-      setProject(projectData as Project);
+      setProject(projectData as any);
       setActivities(activitiesData || []);
       setVariations(variationsData || []);
       setCosts(costsData || []);
       setPhasingData((phasingDataResult as unknown as PhasingRow[]) || []);
       
-      // Initialize project form with loaded data
+      const typedProject = projectData as any;
       setProjectForm({
-        code: projectData.code || "",
-        project_reference: projectData.project_reference || "",
-        name: projectData.name || "",
-        client_company_id: projectData.client_company_id || "",
-        status: projectData.status || "",
-        start_date: projectData.start_date || "",
-        end_date: projectData.end_date || "",
-        agreed_fee_value: projectData.agreed_fee_value?.toString() || "",
-        po_number: projectData.po_number || "",
-        notes: projectData.notes || "",
+        code: typedProject.code || "",
+        project_reference: typedProject.project_reference || "",
+        name: typedProject.name || "",
+        client_company_id: typedProject.client_company_id || "",
+        status: typedProject.status || "",
+        start_date: typedProject.start_date || "",
+        end_date: typedProject.end_date || "",
+        agreed_fee_value: typedProject.agreed_fee_value?.toString() || "",
+        po_number: typedProject.po_number || "",
+        notes: typedProject.notes || "",
       });
       
-      // Generate months grid
-      generateMonthsGrid(projectData as Project, (phasingDataResult as unknown as PhasingRow[]) || []);
+      generateMonthsGrid(projectData as any, (phasingDataResult as unknown as PhasingRow[]) || []);
     } catch (err) {
-      console.error("Failed to load project data", err);
+      console.error("Error in fetchProjectData:", err);
       setProjectError("Failed to load project");
     } finally {
       setProjectLoading(false);
@@ -410,7 +409,7 @@ function ProjectDetailContent() {
         // Redirect back to projects list after archiving
         router.push("/projects");
       } else {
-        await fetchProjectData(id);
+        await fetchProjectData();
         setIsEditingProject(false);
       }
     } catch (err) {
@@ -544,7 +543,7 @@ function ProjectDetailContent() {
       }
       
       // Refresh data but stay on the same page
-      await fetchProjectData(id);
+      await fetchProjectData();
       
       toast({
         title: "Phasing saved",
@@ -637,7 +636,7 @@ function ProjectDetailContent() {
     }
     
     // Refresh data
-    await fetchProjectData(id);
+    await fetchProjectData();
   };
 
   const handleClearPhasing = async () => {
@@ -658,7 +657,7 @@ function ProjectDetailContent() {
     }
     
     // Refresh data
-    await fetchProjectData(id);
+    await fetchProjectData();
   };
 
   // Activity handlers
@@ -700,7 +699,7 @@ function ProjectDetailContent() {
       }
     }
 
-    await fetchProjectData(id);
+    await fetchProjectData();
     setActivityFormOpen(false);
     setEditingActivity(null);
     setActivityForm({
@@ -738,7 +737,7 @@ function ProjectDetailContent() {
     }
 
     if (id && typeof id === "string") {
-      await fetchProjectData(id);
+      await fetchProjectData();
     }
   };
 
@@ -782,7 +781,7 @@ function ProjectDetailContent() {
 
       setVariationFormOpen(false);
       setVariationForm({ description: "", value: "", status: "pending", po_number: "" });
-      await fetchProjectData(id as string);
+      await fetchProjectData();
 
       toast({
         title: "Success",
@@ -843,7 +842,7 @@ function ProjectDetailContent() {
 
       if (error) throw error;
 
-      await fetchProjectData(id as string);
+      await fetchProjectData();
 
       toast({
         title: "Success",
@@ -901,7 +900,7 @@ function ProjectDetailContent() {
       });
 
       if (id && typeof id === "string") {
-        await fetchProjectData(id);
+        await fetchProjectData();
       }
     } catch (err) {
       console.error("Failed to delete variation", err);
@@ -952,7 +951,7 @@ function ProjectDetailContent() {
       }
     }
 
-    await fetchProjectData(id);
+    await fetchProjectData();
     setCostFormOpen(false);
     setEditingCost(null);
     setCostForm({
@@ -990,7 +989,7 @@ function ProjectDetailContent() {
     }
 
     if (id && typeof id === "string") {
-      await fetchProjectData(id);
+      await fetchProjectData();
     }
   };
 

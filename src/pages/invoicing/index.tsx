@@ -71,12 +71,40 @@ type InvoiceItem = {
   created_by: string;
   created_at: string;
   updated_at: string;
+  accounts_email?: string | null;
+  client_address?: string | null;
+  enquiry_number?: string | null;
+  project_reference?: string | null;
+  project_owner_name?: string | null;
+  payment_terms?: number | null;
 };
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December"
 ];
+
+interface ProjectForInvoicing {
+  id: string;
+  name: string;
+  project_reference?: string;
+  po_number?: string;
+  client_company_id: string;
+  opportunity_id?: string;
+  companies?: {
+    name: string;
+    address?: string;
+    accounts_email?: string;
+    payment_terms?: number;
+  };
+  opportunities?: {
+    enquiry_number?: string;
+  };
+  profiles?: {
+    full_name?: string;
+    email?: string;
+  };
+}
 
 export default function InvoicingPage() {
   const { user, profile } = useAuth();
@@ -621,25 +649,44 @@ export default function InvoicingPage() {
 
       // 1. Get all active projects for this period with client details
       const { data: projects, error: projectsError } = await supabase
-        .from("projects")
+        .from("projects" as any)
         .select(`
           id,
-          code,
           name,
-          agreed_fee_value,
+          code,
+          project_reference,
+          po_number,
+          client_company_id,
+          opportunity_id,
           start_date,
           end_date,
-          po_number,
+          agreed_fee_value,
+          added_by_user_id,
           companies!projects_client_company_id_fkey (
-            name
+            name,
+            address,
+            accounts_email,
+            payment_terms
+          ),
+          opportunities!projects_opportunity_id_fkey (
+            enquiry_number
+          ),
+          profiles!projects_added_by_user_id_fkey (
+            full_name,
+            email
           )
         `)
-        .eq("archived", false);
+        .eq("status", "live")
+        .eq("archived", false)
+        .order("name", { ascending: true });
 
       if (projectsError) throw projectsError;
 
+      // Type cast to handle the complex query result
+      const typedProjects = (projects || []) as any[];
+
       // Filter for projects active in this month (start <= month_end AND end >= month_start)
-      const activeProjects = (projects || []).filter(p => {
+      const activeProjects = typedProjects.filter(p => {
         if (!p.start_date || !p.end_date) return false;
         const start = new Date(p.start_date);
         const end = new Date(p.end_date);
@@ -700,6 +747,12 @@ export default function InvoicingPage() {
             invoice_value: monthlyRevenue,
             project_code: p.code || "",
             po_number: p.po_number || existingItem.po_number,
+            accounts_email: p.companies?.accounts_email || null,
+            client_address: p.companies?.address || null,
+            enquiry_number: p.opportunities?.enquiry_number || null,
+            project_reference: p.project_reference || null,
+            project_owner_name: p.profiles?.full_name || null,
+            payment_terms: p.companies?.payment_terms || null,
           });
         } else {
           // CREATE: New item for this project
@@ -712,7 +765,13 @@ export default function InvoicingPage() {
             invoice_value: monthlyRevenue,
             description: "",
             excluded_this_month: false,
-            po_number: p.po_number
+            po_number: p.po_number,
+            accounts_email: p.companies?.accounts_email || null,
+            client_address: p.companies?.address || null,
+            enquiry_number: p.opportunities?.enquiry_number || null,
+            project_reference: p.project_reference || null,
+            project_owner_name: p.profiles?.full_name || null,
+            payment_terms: p.companies?.payment_terms || null,
           });
         }
       }
@@ -916,6 +975,24 @@ export default function InvoicingPage() {
                                 PO Number
                               </th>
                               <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                                Email Contact
+                              </th>
+                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                                Address
+                              </th>
+                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                                Estimate Number
+                              </th>
+                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                                Project Number
+                              </th>
+                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                                Project Owner
+                              </th>
+                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
+                                Payment Terms
+                              </th>
+                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
                                 Invoice Value (from Monthly Phasing)
                               </th>
                               <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
@@ -949,6 +1026,33 @@ export default function InvoicingPage() {
                                 <td className="px-4 py-3 text-sm">{item.client_name}</td>
                                 <td className="px-4 py-3 text-sm">
                                   {item.po_number || "—"}
+                                </td>
+                                <td className="px-4 py-3 text-sm">
+                                  {item.accounts_email ? (
+                                    <a
+                                      href={`mailto:${item.accounts_email}`}
+                                      className="text-blue-600 hover:underline"
+                                    >
+                                      {item.accounts_email}
+                                    </a>
+                                  ) : (
+                                    "—"
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 text-sm max-w-xs truncate" title={item.client_address || ""}>
+                                  {item.client_address || "—"}
+                                </td>
+                                <td className="px-4 py-3 text-sm font-mono">
+                                  {item.enquiry_number || "—"}
+                                </td>
+                                <td className="px-4 py-3 text-sm font-mono">
+                                  {item.project_reference || "—"}
+                                </td>
+                                <td className="px-4 py-3 text-sm">
+                                  {item.project_owner_name || "—"}
+                                </td>
+                                <td className="px-4 py-3 text-sm">
+                                  {item.payment_terms ? `${item.payment_terms} days` : "—"}
                                 </td>
                                 <td className="px-4 py-3">
                                   <div className="flex items-center gap-2">
