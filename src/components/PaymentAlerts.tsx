@@ -205,7 +205,34 @@ export function PaymentAlerts({ userRole }: PaymentAlertsProps) {
   }
 
   if (alerts.length === 0) {
-    return null;
+    return (
+      <Card className="mb-6">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Payment Alerts
+            </CardTitle>
+            <Link href="/invoicing?tab=cashflow">
+              <Button variant="outline" size="sm">
+                <ExternalLink className="h-4 w-4 mr-2" />
+                View Cash Flow
+              </Button>
+            </Link>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+            <p className="text-sm text-green-800 font-medium">
+              ✓ All payments are on track
+            </p>
+            <p className="text-xs text-green-700 mt-1">
+              No overdue or upcoming payments within 7 days
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   const overdueAlerts = alerts.filter(a => a.isOverdue);
