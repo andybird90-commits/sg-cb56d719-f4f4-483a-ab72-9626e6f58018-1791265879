@@ -6,77 +6,47 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Helper to parse numeric values from strings like "10-50", "100+", "£1m", etc.
-function parseNumeric(value: any): number | null {
-  if (value === null || value === undefined) return null;
-  if (typeof value === 'number') return value;
-  
-  const str = String(value).trim();
-  if (!str) return null;
-
-  // Handle ranges like "10-50" -> return lower bound 10
-  if (str.includes('-')) {
-    const parts = str.split('-');
-    const lower = parseNumeric(parts[0]);
-    return lower;
-  }
-
-  // Remove currency and commas
-  const clean = str.replace(/[£$,]/g, '').toLowerCase();
-
-  // Handle suffixes
-  if (clean.endsWith('k')) {
-    return parseFloat(clean) * 1000;
-  }
-  if (clean.endsWith('m')) {
-    return parseFloat(clean) * 1000000;
-  }
-  if (clean.endsWith('b')) {
-    return parseFloat(clean) * 1000000000;
-  }
-
-  // Parse generic number
-  const num = parseFloat(clean);
-  return isNaN(num) ? null : num;
-}
-
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
-
     const { contractorId } = await req.json();
+    console.log("[Enhance] Request received for contractorId:", contractorId);
 
     if (!contractorId) {
       throw new Error("contractorId is required");
     }
 
-    console.log(`Enhancing contractor: ${contractorId}`);
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // 1. Get current contractor data
-    const { data: contractor, error: fetchError } = await supabaseClient
+    // Get contractor details
+    const { data: contractor, error: fetchError } = await supabase
       .from("me_contractors")
       .select("*")
       .eq("id", contractorId)
       .single();
 
     if (fetchError || !contractor) {
+      console.error("[Enhance] Contractor fetch error:", fetchError);
       throw new Error(`Contractor not found: ${fetchError?.message}`);
     }
 
-    let aiUpdates = {};
+    console.log("[Enhance] Contractor fetched:", contractor.name);
+
+    // Check for API keys
     const openAiKey = Deno.env.get("OPENAI_API_KEY");
+    console.log("[Enhance] OpenAI API Key available:", !!openAiKey);
+    console.log("[Enhance] OpenAI API Key (first 10 chars):", openAiKey?.substring(0, 10));
+
+    let enhancedData: any = {};
 
     if (openAiKey) {
-      console.log("Using OpenAI for enhancement...");
       try {
+        console.log("[Enhance] Calling OpenAI API...");
         const response = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
           headers: {
@@ -84,82 +54,119 @@ serve(async (req) => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "gpt-4o-mini",
+            model: "gpt-4o", 
             messages: [
               {
                 role: "system",
-                content: "You are a data enrichment assistant. Return JSON only. Suggest likely employee count (number or range), turnover (with currency), and SIC code based on the company name and region."
+                content: "You are a data enrichment assistant. Return a JSON object with fields: region, postcode, address, sic_code, employees (number or range), turnover_gbp (number or range with currency), notes (summary). Estimate if exact data unavailable."
               },
               {
                 role: "user",
-                content: `Company: ${contractor.name}, Region: ${contractor.region || "UK"}. Return JSON with keys: employees, turnover_gbp, sic_code, enhancement_confidence (0-100), notes.`
+                content: `Enhance data for UK contractor: ${contractor.name} in ${contractor.region || "UK"}. Current info: ${JSON.stringify(contractor)}`
               }
             ],
             response_format: { type: "json_object" }
-          }),
+          })
         });
         
-        const data = await response.json();
-        if (data.choices && data.choices[0]) {
-           aiUpdates = JSON.parse(data.choices[0].message.content);
+        const aiData = await response.json();
+        console.log("[Enhance] OpenAI Response Status:", response.status);
+        console.log("[Enhance] OpenAI Response:", JSON.stringify(aiData));
+        
+        if (aiData.choices && aiData.choices[0]) {
+          const content = aiData.choices[0].message.content;
+          console.log("[Enhance] AI Content:", content);
+          enhancedData = JSON.parse(content);
+          console.log("[Enhance] Parsed AI Data:", JSON.stringify(enhancedData));
+        } else {
+          console.error("[Enhance] No choices in OpenAI response");
+          enhancedData = { notes: "AI Enhancement failed - no response", enhancement_confidence: 0 };
         }
-      } catch (e) {
-        console.error("OpenAI error:", e);
-        // Fallback if AI fails
+      } catch (err) {
+        console.error("[Enhance] OpenAI API Error:", err);
+        enhancedData = { notes: `AI Enhancement failed: ${err.message}`, enhancement_confidence: 0 };
       }
     } else {
-      console.log("No OpenAI key, using mock data...");
-      // Mock data for stability if no key
-      aiUpdates = {
-        employees: "10-50",
-        turnover_gbp: "£1m",
-        sic_code: "43210",
-        enhancement_confidence: 75,
-        notes: "Auto-enhanced (Mock)"
+      console.log("[Enhance] No OpenAI API Key, using mock data");
+      enhancedData = {
+        notes: "AI Enhancement skipped (No API Key).",
+        enhancement_confidence: 0
       };
     }
 
-    // Merge with existing data, preferring AI updates but handling nulls
-    // Crucially: Parse the numerics!
-    const updates = {
-      // Only update fields if AI provided them, else keep existing or set null
-      employees: parseNumeric((aiUpdates as any).employees) ?? contractor.employees,
-      turnover_gbp: parseNumeric((aiUpdates as any).turnover_gbp) ?? contractor.turnover_gbp,
-      sic_code: (aiUpdates as any).sic_code || contractor.sic_code,
-      enhancement_confidence: (aiUpdates as any).enhancement_confidence || 50,
-      notes: (aiUpdates as any).notes || "Enhanced via Softgen",
-      last_enhanced_at: new Date().toISOString()
+    // Helper to parse numeric fields safely
+    const parseNumeric = (value: any): number | null => {
+      if (!value) return null;
+      const str = String(value).toLowerCase();
+      // Remove currency and commas
+      const clean = str.replace(/[£$,]/g, "");
+      
+      // Handle K/M/B suffixes
+      let multiplier = 1;
+      if (clean.includes("k")) multiplier = 1000;
+      else if (clean.includes("m")) multiplier = 1000000;
+      else if (clean.includes("b")) multiplier = 1000000000;
+      
+      // Remove letters and split ranges (e.g. "10-50" -> 10)
+      const numStr = clean.replace(/[a-z]/g, "").trim();
+      const parts = numStr.split("-");
+      const num = parseFloat(parts[0]);
+      
+      if (isNaN(num)) return null;
+      return Math.round(num * multiplier);
     };
 
-    console.log("Applying updates to DB:", JSON.stringify(updates));
+    const updates: any = {
+      last_enhanced_at: new Date().toISOString(),
+      enhancement_confidence: enhancedData.confidence || 85,
+    };
 
-    const { error: updateError } = await supabaseClient
+    // Map AI fields to DB columns safely
+    if (enhancedData.region) updates.region = enhancedData.region;
+    if (enhancedData.postcode) updates.postcode = enhancedData.postcode;
+    if (enhancedData.address) updates.address = enhancedData.address;
+    if (enhancedData.sic_code) updates.sic_code = enhancedData.sic_code;
+    if (enhancedData.notes) updates.notes = enhancedData.notes;
+    
+    // Numeric fields with parsing
+    const employees = parseNumeric(enhancedData.employees);
+    if (employees !== null) updates.employees = employees;
+
+    const turnover = parseNumeric(enhancedData.turnover_gbp || enhancedData.turnover);
+    if (turnover !== null) updates.turnover_gbp = turnover;
+
+    console.log("[Enhance] Final updates to send to DB:", JSON.stringify(updates));
+
+    // Update DB
+    const { error: updateError } = await supabase
       .from("me_contractors")
       .update(updates)
       .eq("id", contractorId);
 
     if (updateError) {
+      console.error("[Enhance] DB Update error:", updateError);
       throw new Error(`DB Update failed: ${updateError.message}`);
     }
 
-    // Trigger Radar Score Recalculation
+    console.log("[Enhance] DB updated successfully");
+
+    // Try to trigger score recalculation (ignore error if RPC missing)
     try {
-       await supabaseClient.functions.invoke('recalculate-contractor-radar-score', {
-        body: { contractorId }
-       });
+      await supabase.rpc('recalculate_radar_score', { contractor_id: contractorId });
+      console.log("[Enhance] Radar score recalculated");
     } catch (e) {
-      console.warn("Failed to trigger radar score recalc", e);
+      console.warn("[Enhance] Recalculate score failed:", e);
     }
 
     return new Response(
-      JSON.stringify({ success: true, data: updates }),
+      JSON.stringify({ success: true, updates }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
   } catch (error) {
-    console.error("Error:", error);
+    console.error("[Enhance] Fatal error:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
