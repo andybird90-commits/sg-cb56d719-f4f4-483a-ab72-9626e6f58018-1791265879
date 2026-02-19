@@ -93,31 +93,39 @@ Deno.serve(async (req) => {
       if (openaiKey) {
         console.log("Analyzing with OpenAI...");
         
-        const systemPrompt = "You are a data enrichment specialist. Return only valid JSON with this exact structure: {region, postcode, address, sic_code, employees, turnover_gbp, notes, confidence}";
+        const promptParts = [];
+        promptParts.push("Analyze this contractor data and suggest improvements for missing fields only.");
+        promptParts.push("");
+        promptParts.push("CURRENT DATA:");
+        promptParts.push(JSON.stringify({
+          name: contractor.name,
+          region: contractor.region,
+          postcode: contractor.postcode,
+          address: contractor.address,
+          sic_code: contractor.sic_code,
+          employees: contractor.employees,
+          turnover_gbp: contractor.turnover_gbp,
+          status: contractor.status,
+          notes: contractor.notes,
+        }, null, 2));
         
-        const userPrompt = `Analyze this contractor data and suggest improvements for missing fields only.
-
-CURRENT DATA:
-${JSON.stringify({
-  name: contractor.name,
-  region: contractor.region,
-  postcode: contractor.postcode,
-  address: contractor.address,
-  sic_code: contractor.sic_code,
-  employees: contractor.employees,
-  turnover_gbp: contractor.turnover_gbp,
-  status: contractor.status,
-  notes: contractor.notes,
-}, null, 2)}
-
-${companiesHouseData ? `COMPANIES HOUSE DATA:
-${JSON.stringify(companiesHouseData, null, 2)}
-` : ""}
-${braveSearchData ? `WEB SEARCH RESULTS:
-${JSON.stringify(braveSearchData.web?.results?.slice(0, 3) || [], null, 2)}
-` : ""}
-
-Return JSON with suggested values for null/empty fields only. Include confidence score 0-100.`;
+        if (companiesHouseData) {
+          promptParts.push("");
+          promptParts.push("COMPANIES HOUSE DATA:");
+          promptParts.push(JSON.stringify(companiesHouseData, null, 2));
+        }
+        
+        if (braveSearchData) {
+          promptParts.push("");
+          promptParts.push("WEB SEARCH RESULTS:");
+          promptParts.push(JSON.stringify(braveSearchData.web?.results?.slice(0, 3) || [], null, 2));
+        }
+        
+        promptParts.push("");
+        promptParts.push("Return JSON with suggested values for null/empty fields only. Include confidence score 0-100.");
+        
+        const userPrompt = promptParts.join("
+");
 
         const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
@@ -128,7 +136,7 @@ Return JSON with suggested values for null/empty fields only. Include confidence
           body: JSON.stringify({
             model: "gpt-4o-mini",
             messages: [
-              { role: "system", content: systemPrompt },
+              { role: "system", content: "You are a data enrichment specialist. Return only valid JSON with this exact structure: {region, postcode, address, sic_code, employees, turnover_gbp, notes, confidence}" },
               { role: "user", content: userPrompt },
             ],
             temperature: 0.3,
@@ -168,11 +176,11 @@ Return JSON with suggested values for null/empty fields only. Include confidence
       if (!contractor.employees && aiAnalysis.employees) updates.employees = aiAnalysis.employees;
       if (!contractor.turnover_gbp && aiAnalysis.turnover_gbp) updates.turnover_gbp = aiAnalysis.turnover_gbp;
       if (aiAnalysis.notes) {
-        updates.notes = contractor.notes 
-          ? contractor.notes + "
+        const aiNotesPrefix = "AI Enhancement: ";
+        const existingNotes = contractor.notes || "";
+        updates.notes = existingNotes ? `${existingNotes}
 
-AI Enhancement: " + aiAnalysis.notes
-          : "AI Enhancement: " + aiAnalysis.notes;
+${aiNotesPrefix}${aiAnalysis.notes}` : `${aiNotesPrefix}${aiAnalysis.notes}`;
       }
     }
 
