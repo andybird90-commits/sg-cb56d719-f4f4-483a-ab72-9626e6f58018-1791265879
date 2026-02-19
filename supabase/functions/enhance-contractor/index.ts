@@ -105,32 +105,30 @@ Deno.serve(async (req) => {
           notes: contractor.notes,
         };
         
-        let promptText = "Analyze this contractor data and suggest improvements for missing fields only.";
-        promptText += "
-
-CURRENT DATA:
-";
-        promptText += JSON.stringify(currentData, null, 2);
+        const promptParts = [
+          "Analyze this contractor data and suggest improvements for missing fields only.",
+          "",
+          "CURRENT DATA:",
+          JSON.stringify(currentData, null, 2)
+        ];
         
         if (companiesHouseData) {
-          promptText += "
-
-COMPANIES HOUSE DATA:
-";
-          promptText += JSON.stringify(companiesHouseData, null, 2);
+          promptParts.push("");
+          promptParts.push("COMPANIES HOUSE DATA:");
+          promptParts.push(JSON.stringify(companiesHouseData, null, 2));
         }
         
         if (braveSearchData && braveSearchData.web && braveSearchData.web.results) {
-          promptText += "
-
-WEB SEARCH RESULTS:
-";
-          promptText += JSON.stringify(braveSearchData.web.results.slice(0, 3), null, 2);
+          promptParts.push("");
+          promptParts.push("WEB SEARCH RESULTS:");
+          promptParts.push(JSON.stringify(braveSearchData.web.results.slice(0, 3), null, 2));
         }
         
-        promptText += "
-
-Return JSON with suggested values for null/empty fields only. Include confidence score 0-100.";
+        promptParts.push("");
+        promptParts.push("Return JSON with suggested values for null/empty fields only. Include confidence score 0-100.");
+        
+        const promptText = promptParts.join("
+");
 
         const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
@@ -183,13 +181,10 @@ Return JSON with suggested values for null/empty fields only. Include confidence
       if (aiAnalysis.notes) {
         const aiNotesPrefix = "AI Enhancement: ";
         const existingNotes = contractor.notes || "";
-        if (existingNotes) {
-          updates.notes = existingNotes + "
+        const newNotes = existingNotes ? existingNotes + "
 
-" + aiNotesPrefix + aiAnalysis.notes;
-        } else {
-          updates.notes = aiNotesPrefix + aiAnalysis.notes;
-        }
+" + aiNotesPrefix + aiAnalysis.notes : aiNotesPrefix + aiAnalysis.notes;
+        updates.notes = newNotes;
       }
     }
 
