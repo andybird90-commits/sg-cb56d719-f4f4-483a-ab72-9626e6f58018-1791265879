@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowLeft, Mail, Phone, Building2, User, Briefcase, FileText, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Mail, Phone, Building2, User, Briefcase, FileText, AlertTriangle, Linkedin } from "lucide-react";
 import Link from "next/link";
 import { ContactCalendar } from "@/components/ContactCalendar";
 import { ContactTimeline } from "@/components/ContactTimeline";
@@ -25,6 +25,8 @@ interface Contact {
   name: string;
   email: string | null;
   phone: string | null;
+  landline: string | null;
+  linkedin_url: string | null;
   job_title: string | null;
   notes: string | null;
   company_id: string;
@@ -203,6 +205,35 @@ function ContactDetailContent() {
                       <div className="text-xs text-slate-500">Phone</div>
                       <a href={`tel:${contact.phone}`} className="text-sm font-medium text-blue-600 hover:underline">
                         {contact.phone}
+                      </a>
+                    </div>
+                  </div>
+                )}
+
+                {contact.landline && (
+                  <div className="flex items-center gap-3">
+                    <Phone className="w-4 h-4 text-slate-400" />
+                    <div>
+                      <div className="text-xs text-slate-500">Landline</div>
+                      <a href={`tel:${contact.landline}`} className="text-sm font-medium text-blue-600 hover:underline">
+                        {contact.landline}
+                      </a>
+                    </div>
+                  </div>
+                )}
+
+                {contact.linkedin_url && (
+                  <div className="flex items-center gap-3">
+                    <Linkedin className="w-4 h-4 text-slate-400" />
+                    <div>
+                      <div className="text-xs text-slate-500">LinkedIn</div>
+                      <a 
+                        href={contact.linkedin_url} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-sm font-medium text-blue-600 hover:underline break-all"
+                      >
+                        View Profile
                       </a>
                     </div>
                   </div>

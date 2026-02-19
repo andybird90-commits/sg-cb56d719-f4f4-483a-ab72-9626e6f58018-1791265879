@@ -12,7 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Mail, Phone, Building2, User, Briefcase, AlertTriangle, FileText, Edit, Trash2 } from "lucide-react";
+import { Plus, Search, Mail, Phone, Building2, User, Briefcase, AlertTriangle, FileText, Edit, Trash2, Linkedin } from "lucide-react";
 import { ContactCalendar } from "@/components/ContactCalendar";
 
 interface Contact {
@@ -20,6 +20,8 @@ interface Contact {
   name: string;
   email: string | null;
   phone: string | null;
+  landline: string | null;
+  linkedin_url: string | null;
   job_title: string | null;
   notes: string | null;
   company_id: string;
@@ -60,6 +62,8 @@ function ContactsContent() {
     name: "",
     email: "",
     phone: "",
+    landline: "",
+    linkedin_url: "",
     job_title: "",
     notes: "",
     company_id: "",
@@ -155,6 +159,8 @@ function ContactsContent() {
             name: formData.name,
             email: formData.email || null,
             phone: formData.phone || null,
+            landline: formData.landline || null,
+            linkedin_url: formData.linkedin_url || null,
             job_title: formData.job_title || null,
             notes: formData.notes || null,
             company_id: formData.company_id,
@@ -169,6 +175,8 @@ function ContactsContent() {
           name: formData.name,
           email: formData.email || null,
           phone: formData.phone || null,
+          landline: formData.landline || null,
+          linkedin_url: formData.linkedin_url || null,
           job_title: formData.job_title || null,
           notes: formData.notes || null,
           company_id: formData.company_id,
@@ -180,7 +188,7 @@ function ContactsContent() {
 
       setFormOpen(false);
       setEditingId(null);
-      setFormData({ name: "", email: "", phone: "", job_title: "", notes: "", company_id: "", added_by_user_id: "" });
+      setFormData({ name: "", email: "", phone: "", landline: "", linkedin_url: "", job_title: "", notes: "", company_id: "", added_by_user_id: "" });
       fetchData();
     } catch (err) {
       console.error("Failed to save contact", err);
@@ -194,6 +202,8 @@ function ContactsContent() {
       name: contact.name,
       email: contact.email || "",
       phone: contact.phone || "",
+      landline: contact.landline || "",
+      linkedin_url: contact.linkedin_url || "",
       job_title: contact.job_title || "",
       notes: contact.notes || "",
       company_id: contact.company_id,
@@ -221,7 +231,7 @@ function ContactsContent() {
 
   const openNewContactForm = () => {
     setEditingId(null);
-    setFormData({ name: "", email: "", phone: "", job_title: "", notes: "", company_id: "", added_by_user_id: "" });
+    setFormData({ name: "", email: "", phone: "", landline: "", linkedin_url: "", job_title: "", notes: "", company_id: "", added_by_user_id: "" });
     setFormOpen(true);
   };
 
@@ -302,6 +312,27 @@ function ContactsContent() {
                       id="phone"
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="landline">Landline</Label>
+                    <Input
+                      id="landline"
+                      value={formData.landline}
+                      onChange={(e) => setFormData({ ...formData, landline: e.target.value })}
+                      placeholder="Office/landline number"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="linkedin_url">LinkedIn Profile</Label>
+                    <Input
+                      id="linkedin_url"
+                      type="url"
+                      value={formData.linkedin_url}
+                      onChange={(e) => setFormData({ ...formData, linkedin_url: e.target.value })}
+                      placeholder="https://linkedin.com/in/username"
                     />
                   </div>
 
@@ -477,6 +508,26 @@ function ContactsContent() {
                         >
                           <Phone className="w-4 h-4 flex-shrink-0" />
                           <span>{contact.phone}</span>
+                        </a>
+                      )}
+                      {contact.landline && (
+                        <a 
+                          href={`tel:${contact.landline}`}
+                          className="flex items-center gap-2 text-sm text-slate-600 hover:text-blue-600 transition-colors"
+                        >
+                          <Phone className="w-4 h-4 flex-shrink-0" />
+                          <span>{contact.landline} <span className="text-xs text-slate-400">(Landline)</span></span>
+                        </a>
+                      )}
+                      {contact.linkedin_url && (
+                        <a 
+                          href={contact.linkedin_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 transition-colors"
+                        >
+                          <Linkedin className="w-4 h-4 flex-shrink-0" />
+                          <span>LinkedIn Profile</span>
                         </a>
                       )}
                     </div>

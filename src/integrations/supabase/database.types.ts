@@ -301,6 +301,8 @@ export type Database = {
           email: string | null
           id: string
           job_title: string | null
+          landline: string | null
+          linkedin_url: string | null
           name: string
           notes: string | null
           phone: string | null
@@ -313,6 +315,8 @@ export type Database = {
           email?: string | null
           id?: string
           job_title?: string | null
+          landline?: string | null
+          linkedin_url?: string | null
           name: string
           notes?: string | null
           phone?: string | null
@@ -325,6 +329,8 @@ export type Database = {
           email?: string | null
           id?: string
           job_title?: string | null
+          landline?: string | null
+          linkedin_url?: string | null
           name?: string
           notes?: string | null
           phone?: string | null
