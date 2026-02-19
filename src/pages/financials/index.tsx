@@ -66,6 +66,8 @@ function FinancialsContent() {
   
   const [projectFinancials, setProjectFinancials] = useState<ProjectFinancials[]>([]);
   const [userTimesheetBreakdown, setUserTimesheetBreakdown] = useState<UserTimeBreakdown[]>([]);
+  const [allSubcontractorCosts, setAllSubcontractorCosts] = useState<any[]>([]);
+  const [actualSubcontractorTotal, setActualSubcontractorTotal] = useState(0);
 
   // Check user role - only directors and admins can access
   useEffect(() => {
@@ -308,6 +310,34 @@ function FinancialsContent() {
         );
       });
 
+      // CRITICAL FIX: Also fetch ALL subcontractor costs for the month (including projects outside date range)
+      // This gives accurate cash flow view - costs incurred in this month regardless of project timing
+      const { data: allCostsData, error: allCostsError } = await supabase
+        .from("subcontractor_costs")
+        .select(`
+          cost_amount,
+          cost_date,
+          supplier_name,
+          description,
+          projects!inner (
+            id,
+            code,
+            name,
+            status,
+            companies!client_company_id (
+              name
+            )
+          )
+        `)
+        .gte("cost_date", startOfMonth.toISOString().split("T")[0])
+        .lte("cost_date", endOfMonth.toISOString().split("T")[0])
+        .not("projects.status", "eq", "archived");
+
+      if (allCostsError) throw allCostsError;
+
+      // Calculate total subcontractor costs for the month (actual cash flow)
+      const actualSubcontractorCosts = (allCostsData || []).reduce((sum, cost) => sum + cost.cost_amount, 0);
+
       // Calculate revenue for each item using date-based distribution (same logic as pipeline)
       const breakdown: ProjectFinancials[] = [];
       let totalRev = 0;
@@ -384,6 +414,8 @@ function FinancialsContent() {
       setStaffSuspenseCost(suspense);
       
       setProjectFinancials(breakdown);
+      setAllSubcontractorCosts(allCostsData || []);
+      setActualSubcontractorTotal(actualSubcontractorCosts);
     } catch (err) {
       console.error("Failed to load financials data", err);
       setError("Failed to load financial data. Please try again.");
@@ -692,8 +724,12 @@ function FinancialsContent() {
                     <span className="font-semibold text-orange-600">{formatCurrency(staffSuspenseCost)}</span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b">
-                    <span className="text-sm text-slate-600">Subcontractor Cost</span>
+                    <span className="text-sm text-slate-600">Subcontractor Cost (Allocated)</span>
                     <span className="font-semibold">{formatCurrency(totalSubcontractorCost)}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b">
+                    <span className="text-sm text-slate-600">Subcontractor Cost (Actual Incurred)</span>
+                    <span className="font-semibold text-blue-600">{formatCurrency(actualSubcontractorTotal)}</span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b">
                     <span className="text-sm text-slate-600">Overhead</span>
@@ -981,6 +1017,126 @@ function FinancialsContent() {
                 )}
               </CardContent>
             </Card>
+
+            {/* NEW: Actual Subcontractor Costs Incurred This Month */}
+            {allSubcontractorCosts.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base sm:text-lg">
+                    Subcontractor Costs Incurred This Month
+                  </CardTitle>
+                  <CardDescription>
+                    All subcontractor costs with dates in this month (regardless of project timing)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {/* Mobile: Card View */}
+                  <div className="block lg:hidden space-y-3">
+                    {allSubcontractorCosts.map((cost, idx) => (
+                      <Card key={idx} className="cursor-pointer hover:shadow-md transition-shadow">
+                        <CardContent className="p-4">
+                          <div className="space-y-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="font-mono text-xs text-slate-500 mb-1">
+                                  {cost.projects?.code || "—"}
+                                </div>
+                                <div className="font-semibold text-sm text-slate-900 truncate">
+                                  {cost.projects?.name || "Unknown Project"}
+                                </div>
+                                <div className="text-xs text-slate-600 truncate">
+                                  {cost.projects?.companies?.name || "—"}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t">
+                              <div>
+                                <span className="text-slate-500">Supplier:</span>
+                                <div className="font-semibold text-slate-900 truncate">
+                                  {cost.supplier_name}
+                                </div>
+                              </div>
+                              <div>
+                                <span className="text-slate-500">Date:</span>
+                                <div className="font-semibold text-slate-900">
+                                  {new Date(cost.cost_date).toLocaleDateString("en-GB")}
+                                </div>
+                              </div>
+                              <div className="col-span-2">
+                                <span className="text-slate-500">Amount:</span>
+                                <div className="font-bold text-lg text-blue-600">
+                                  {formatCurrency(cost.cost_amount)}
+                                </div>
+                              </div>
+                              {cost.description && (
+                                <div className="col-span-2">
+                                  <span className="text-slate-500">Description:</span>
+                                  <div className="text-slate-700 text-xs">
+                                    {cost.description}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+
+                  {/* Desktop: Table View */}
+                  <div className="hidden lg:block overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-left">Project Code</TableHead>
+                          <TableHead className="text-left">Project Name</TableHead>
+                          <TableHead className="text-left">Client</TableHead>
+                          <TableHead className="text-left">Supplier</TableHead>
+                          <TableHead className="text-left">Date</TableHead>
+                          <TableHead className="text-left">Description</TableHead>
+                          <TableHead className="text-right">Amount</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {allSubcontractorCosts.map((cost, idx) => (
+                          <TableRow key={idx} className="border-b hover:bg-slate-50">
+                            <TableCell className="font-mono text-slate-600">
+                              {cost.projects?.code || "—"}
+                            </TableCell>
+                            <TableCell className="font-medium text-slate-900">
+                              {cost.projects?.name || "Unknown Project"}
+                            </TableCell>
+                            <TableCell className="text-slate-600">
+                              {cost.projects?.companies?.name || "—"}
+                            </TableCell>
+                            <TableCell className="font-medium text-slate-700">
+                              {cost.supplier_name}
+                            </TableCell>
+                            <TableCell className="text-slate-600">
+                              {new Date(cost.cost_date).toLocaleDateString("en-GB")}
+                            </TableCell>
+                            <TableCell className="text-slate-600 max-w-xs truncate">
+                              {cost.description || "—"}
+                            </TableCell>
+                            <TableCell className="text-right font-semibold text-blue-600">
+                              {formatCurrency(cost.cost_amount)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        <TableRow className="bg-blue-50 font-semibold">
+                          <TableCell colSpan={6} className="text-right">
+                            TOTAL ACTUAL COSTS INCURRED
+                          </TableCell>
+                          <TableCell className="text-right text-blue-600">
+                            {formatCurrency(actualSubcontractorTotal)}
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </>
         )}
       </div>
