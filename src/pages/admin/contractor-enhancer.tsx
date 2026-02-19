@@ -130,7 +130,7 @@ export default function ContractorEnhancerPage() {
       try {
         // Call the enhancement Edge Function
         const { data, error } = await supabase.functions.invoke("enhance-contractor", {
-          body: { contractor_id: contractorId }
+          body: { contractorId }
         });
 
         if (error) throw error;

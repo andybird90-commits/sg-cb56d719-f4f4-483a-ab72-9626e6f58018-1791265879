@@ -11,14 +11,18 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { contractorId } = await req.json();
-    console.log("Enhancing contractor:", contractorId);
-
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
+    const { contractorId } = await req.json();
+
+    if (!contractorId) {
+      throw new Error("contractorId is required");
+    }
+
+    // 1. Fetch current contractor data
     const { data: contractor, error: fetchError } = await supabaseClient
       .from("me_contractors")
       .select("*")
@@ -26,173 +30,130 @@ Deno.serve(async (req) => {
       .single();
 
     if (fetchError || !contractor) {
-      console.error("Error fetching contractor:", fetchError);
       throw new Error("Contractor not found");
     }
 
-    console.log("Contractor data:", contractor);
+    const companyName = contractor.name;
+    const companyNumber = contractor.company_number;
 
+    // 2. Fetch Companies House Data
     let companiesHouseData = null;
-    let braveSearchData = null;
-    let aiAnalysis = null;
-
-    if (contractor.company_number) {
+    if (companyNumber) {
       try {
-        const companiesHouseKey = Deno.env.get("COMPANIES_HOUSE_API_KEY");
-        if (companiesHouseKey) {
-          console.log("Fetching from Companies House...");
+        const chApiKey = Deno.env.get("COMPANIES_HOUSE_API_KEY");
+        if (chApiKey) {
           const chResponse = await fetch(
-            `https://api.company-information.service.gov.uk/company/${contractor.company_number}`,
+            `https://api.company-information.service.gov.uk/company/${companyNumber}`,
             {
-              headers: {
-                Authorization: `Basic ${btoa(companiesHouseKey + ":")}`,
-              },
+              headers: { Authorization: `Basic ${btoa(chApiKey + ":")}` },
             }
           );
-
+          
           if (chResponse.ok) {
             companiesHouseData = await chResponse.json();
-            console.log("Companies House data fetched successfully");
-          } else {
-            console.log("Companies House API error:", chResponse.status);
           }
         }
-      } catch (error) {
-        console.error("Companies House API error:", error);
+      } catch (e) {
+        console.error("Companies House fetch failed:", e);
       }
     }
 
+    // 3. Search Data
+    let searchResults = [];
     try {
-      const braveApiKey = Deno.env.get("BRAVE_SEARCH_API_KEY");
-      if (braveApiKey && contractor.name) {
-        console.log("Searching with Brave...");
-        const searchQuery = encodeURIComponent(contractor.name + " UK company");
-        const braveResponse = await fetch(
-          `https://api.search.brave.com/res/v1/web/search?q=${searchQuery}`,
+      const braveKey = Deno.env.get("BRAVE_SEARCH_API_KEY");
+      if (braveKey) {
+        const searchResponse = await fetch(
+          `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(companyName + " construction uk")}&count=3`,
           {
             headers: {
-              "X-Subscription-Token": braveApiKey,
-              Accept: "application/json",
-            },
+              "Accept": "application/json",
+              "X-Subscription-Token": braveKey
+            }
           }
         );
-
-        if (braveResponse.ok) {
-          braveSearchData = await braveResponse.json();
-          console.log("Brave search data fetched successfully");
-        } else {
-          console.log("Brave API error:", braveResponse.status);
+        
+        if (searchResponse.ok) {
+          const searchData = await searchResponse.json();
+          searchResults = searchData.web?.results || [];
         }
       }
-    } catch (error) {
-      console.error("Brave Search API error:", error);
+    } catch (e) {
+      console.error("Search failed:", e);
     }
 
-    try {
-      const openaiKey = Deno.env.get("OPENAI_API_KEY");
-      if (openaiKey) {
-        console.log("Analyzing with OpenAI...");
-        
-        const currentData = {
-          name: contractor.name,
-          region: contractor.region,
-          postcode: contractor.postcode,
-          address: contractor.address,
-          sic_code: contractor.sic_code,
-          employees: contractor.employees,
-          turnover_gbp: contractor.turnover_gbp,
-          status: contractor.status,
-          notes: contractor.notes,
-        };
-        
-        const promptParts = [];
-        promptParts.push("Analyze this contractor data and suggest improvements for missing fields only.");
-        promptParts.push("");
-        promptParts.push("CURRENT DATA:");
-        promptParts.push(JSON.stringify(currentData, null, 2));
-
-        if (companiesHouseData) {
-          promptParts.push("");
-          promptParts.push("COMPANIES HOUSE DATA:");
-          promptParts.push(JSON.stringify(companiesHouseData, null, 2));
-        }
-        
-        if (braveSearchData && braveSearchData.web && braveSearchData.web.results) {
-          promptParts.push("");
-          promptParts.push("WEB SEARCH RESULTS:");
-          promptParts.push(JSON.stringify(braveSearchData.web.results.slice(0, 3), null, 2));
-        }
-        
-        promptParts.push("");
-        promptParts.push("Return JSON with suggested values for null/empty fields only. Include confidence score 0-100.");
-        promptParts.push("Use this exact structure: {region, postcode, address, sic_code, employees, turnover_gbp, notes, confidence}");
-
-        const promptText = promptParts.join("
-");
-
-        const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${openaiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "gpt-4o-mini",
-            messages: [
-              { role: "system", content: "You are a data enrichment specialist. Return only valid JSON." },
-              { role: "user", content: promptText },
-            ],
-            temperature: 0.3,
-          }),
-        });
-
-        if (openaiResponse.ok) {
-          const openaiData = await openaiResponse.json();
-          const content = openaiData.choices[0].message.content;
-          console.log("OpenAI response:", content);
-          
-          try {
-            aiAnalysis = JSON.parse(content);
-            console.log("AI analysis parsed successfully");
-          } catch (parseError) {
-            console.error("Failed to parse AI response:", parseError);
-            aiAnalysis = { confidence: 50, notes: "AI analysis completed but response format was invalid" };
-          }
-        } else {
-          console.log("OpenAI API error:", openaiResponse.status);
-        }
-      }
-    } catch (error) {
-      console.error("OpenAI API error:", error);
+    // 4. AI Analysis
+    const openAiKey = Deno.env.get("OPENAI_API_KEY");
+    if (!openAiKey) {
+      throw new Error("OpenAI API Key not configured");
     }
 
+    const systemPrompt = "You are an expert UK construction industry data analyst.";
+    
+    // Construct prompt safely
+    const userPrompt = `Analyze this contractor: ${companyName}.
+Region: ${contractor.region || "Unknown"}
+SIC: ${contractor.sic_code || "Unknown"}
+CH Data: ${JSON.stringify(companiesHouseData || {})}
+Web: ${JSON.stringify(searchResults)}
+
+Return JSON with these fields ONLY:
+- region: (string) Best estimated UK region
+- postcode: (string) Registered postcode
+- address: (string) Full registered address
+- sic_code: (string) Primary SIC code
+- employees: (number) Estimated employee count
+- turnover_gbp: (number) Estimated annual turnover
+- notes: (string) A brief 2-sentence summary
+- confidence: (number) 0-100 score of data quality`;
+
+    const aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${openAiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        response_format: { type: "json_object" }
+      }),
+    });
+
+    if (!aiResponse.ok) {
+      throw new Error("OpenAI error");
+    }
+
+    const aiData = await aiResponse.json();
+    const result = JSON.parse(aiData.choices[0].message.content);
+
+    // 5. Update Database - STRICTLY EXISTING COLUMNS ONLY
+    // We explicitly define the interface of what we are updating to match the schema
     const updates: Record<string, any> = {
       last_enhanced_at: new Date().toISOString(),
-      enhancement_confidence: aiAnalysis?.confidence || 50,
+      enhancement_confidence: result.confidence || 50,
+      companies_house_raw: companiesHouseData || contractor.companies_house_raw || {}
     };
 
-    if (aiAnalysis) {
-      if (!contractor.region && aiAnalysis.region) updates.region = aiAnalysis.region;
-      if (!contractor.postcode && aiAnalysis.postcode) updates.postcode = aiAnalysis.postcode;
-      if (!contractor.address && aiAnalysis.address) updates.address = aiAnalysis.address;
-      if (!contractor.sic_code && aiAnalysis.sic_code) updates.sic_code = aiAnalysis.sic_code;
-      if (!contractor.employees && aiAnalysis.employees) updates.employees = aiAnalysis.employees;
-      if (!contractor.turnover_gbp && aiAnalysis.turnover_gbp) updates.turnover_gbp = aiAnalysis.turnover_gbp;
-      if (aiAnalysis.notes) {
-        const aiNotesPrefix = "AI Enhancement: ";
-        const existingNotes = contractor.notes || "";
-        const newNotes = existingNotes ? existingNotes + "
+    if (result.region) updates.region = result.region;
+    if (result.postcode) updates.postcode = result.postcode;
+    if (result.address) updates.address = result.address;
+    if (result.sic_code) updates.sic_code = result.sic_code;
+    if (result.employees) updates.employees = result.employees;
+    if (result.turnover_gbp) updates.turnover_gbp = result.turnover_gbp;
+    
+    if (result.notes) {
+      const newNote = `[AI Enhanced]: ${result.notes}`;
+      updates.notes = contractor.notes ? `${contractor.notes}
 
-" + aiNotesPrefix + aiAnalysis.notes : aiNotesPrefix + aiAnalysis.notes;
-        updates.notes = newNotes;
-      }
+${newNote}` : newNote;
     }
 
-    if (companiesHouseData) {
-      updates.companies_house_raw = companiesHouseData;
-    }
-
-    console.log("Applying updates:", updates);
+    // DEBUG: Log updates to ensure no invalid columns
+    console.log("Updating contractor with:", JSON.stringify(updates));
 
     const { error: updateError } = await supabaseClient
       .from("me_contractors")
@@ -200,42 +161,22 @@ Deno.serve(async (req) => {
       .eq("id", contractorId);
 
     if (updateError) {
-      console.error("Error updating contractor:", updateError);
-      throw updateError;
+      console.error("Update error:", updateError);
+      throw new Error(`Update failed: ${updateError.message}`);
     }
 
-    try {
-      console.log("Triggering radar score recalculation...");
-      const recalcResult = await supabaseClient.functions.invoke(
-        "recalculate-contractor-radar-score",
-        {
-          body: { contractorId },
-        }
-      );
-      if (recalcResult.error) {
-        console.error("Error recalculating radar score:", recalcResult.error);
-      } else {
-        console.log("Radar score recalculated successfully");
-      }
-    } catch (error) {
-      console.error("Error invoking radar score function:", error);
-    }
+    // 6. Trigger Radar Score
+    await supabaseClient.functions.invoke('recalculate-contractor-radar-score', {
+        body: { contractorId }
+    });
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        message: "Contractor enhanced successfully",
-        updates,
-        sources: {
-          companiesHouse: !!companiesHouseData,
-          braveSearch: !!braveSearchData,
-          aiAnalysis: !!aiAnalysis,
-        },
-      }),
+      JSON.stringify({ success: true, data: result }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
+
   } catch (error) {
-    console.error("Enhancement error:", error);
+    console.error("Function error:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
