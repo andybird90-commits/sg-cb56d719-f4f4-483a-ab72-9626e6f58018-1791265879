@@ -1,23 +1,14 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
-import { corsHeaders } from '../_shared/cors.ts'
 
-interface RadarScoreRequest {
-  contractor_id: string
-}
-
-interface ScoreComponents {
-  fit_geo: number
-  fit_size: number
-  fit_specialism: number
-  relationship_heat: number
-  performance: number
-  data_completeness: number
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 Deno.serve(async (req) => {
-  // Handle CORS preflight requests
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders })
   }
 
   try {
@@ -31,7 +22,7 @@ Deno.serve(async (req) => {
       }
     )
 
-    const { contractor_id }: RadarScoreRequest = await req.json()
+    const { contractor_id } = await req.json()
 
     if (!contractor_id) {
       return new Response(
@@ -40,51 +31,47 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Fetch contractor data
+    // Fetch contractor
     const { data: contractor, error: contractorError } = await supabaseClient
       .from('me_contractors')
       .select('*')
       .eq('id', contractor_id)
       .single()
 
-    if (contractorError || !contractor) {
-      return new Response(
-        JSON.stringify({ error: 'Contractor not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Fetch capabilities
-    const { data: capabilities } = await supabaseClient
-      .from('me_contractor_capabilities')
-      .select('capability')
-      .eq('contractor_id', contractor_id)
+    if (contractorError) throw contractorError
 
     // Fetch relationships
-    const { data: relationships } = await supabaseClient
+    const { data: relationships, error: relError } = await supabaseClient
       .from('me_contractor_relationships')
       .select('*')
       .eq('contractor_id', contractor_id)
-      .order('interaction_date', { ascending: false })
 
-    // Calculate score components
-    const scores: ScoreComponents = {
-      fit_geo: calculateGeoFit(contractor.region),
-      fit_size: calculateSizeFit(contractor.employees, contractor.turnover_gbp),
-      fit_specialism: calculateSpecialismFit(capabilities || []),
-      relationship_heat: calculateRelationshipHeat(relationships || []),
-      performance: calculatePerformance(relationships || []),
-      data_completeness: calculateDataCompleteness(contractor, capabilities || [])
-    }
+    if (relError) throw relError
 
-    // Calculate weighted radar score
-    const radar_score = Math.round(
-      scores.fit_geo * 0.25 +
-      scores.fit_size * 0.15 +
-      scores.fit_specialism * 0.25 +
-      scores.relationship_heat * 0.15 +
-      scores.performance * 0.15 +
-      scores.data_completeness * 0.05
+    // Fetch capabilities
+    const { data: capabilities, error: capError } = await supabaseClient
+      .from('me_contractor_capabilities')
+      .select('*')
+      .eq('contractor_id', contractor_id)
+
+    if (capError) throw capError
+
+    // Calculate scores
+    const fitGeo = calculateFitGeo(contractor.region)
+    const fitSize = calculateFitSize(contractor.employees, contractor.turnover_gbp)
+    const fitSpecialism = calculateFitSpecialism(capabilities || [])
+    const relationshipHeat = calculateRelationshipHeat(relationships || [])
+    const performance = calculatePerformance(relationships || [])
+    const dataCompleteness = calculateDataCompleteness(contractor, capabilities || [], relationships || [])
+
+    // Weighted radar score
+    const radarScore = Math.round(
+      fitGeo * 0.25 +
+      fitSize * 0.15 +
+      fitSpecialism * 0.25 +
+      relationshipHeat * 0.15 +
+      performance * 0.15 +
+      dataCompleteness * 0.05
     )
 
     // Upsert radar score
@@ -92,25 +79,33 @@ Deno.serve(async (req) => {
       .from('me_contractor_radar_scores')
       .upsert({
         contractor_id,
-        radar_score,
-        ...scores,
+        radar_score: radarScore,
+        fit_geo: fitGeo,
+        fit_size: fitSize,
+        fit_specialism: fitSpecialism,
+        relationship_heat: relationshipHeat,
+        performance: performance,
+        data_completeness: dataCompleteness,
         calculated_at: new Date().toISOString()
-      })
+      }, { onConflict: 'contractor_id' })
 
-    if (upsertError) {
-      throw upsertError
-    }
+    if (upsertError) throw upsertError
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        contractor_id,
-        radar_score,
-        components: scores
+        radar_score: radarScore,
+        breakdown: {
+          fit_geo: fitGeo,
+          fit_size: fitSize,
+          fit_specialism: fitSpecialism,
+          relationship_heat: relationshipHeat,
+          performance: performance,
+          data_completeness: dataCompleteness
+        }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
-
   } catch (error) {
     return new Response(
       JSON.stringify({ error: error.message }),
@@ -119,87 +114,60 @@ Deno.serve(async (req) => {
   }
 })
 
-// Scoring functions
-function calculateGeoFit(region: string | null): number {
-  // Priority regions for RD Group
+function calculateFitGeo(region: string | null): number {
   const priorityRegions = ['London', 'South East', 'East of England', 'South West']
-  if (!region) return 30
-  if (priorityRegions.includes(region)) return 100
-  if (['East Midlands', 'West Midlands', 'North West'].includes(region)) return 70
-  return 50
+  if (!region) return 50
+  return priorityRegions.includes(region) ? 100 : 70
 }
 
-function calculateSizeFit(employees: number | null, turnover: number | null): number {
-  // Sweet spot: 10-100 employees, £2M-£20M turnover
+function calculateFitSize(employees: number | null, turnover: number | null): number {
   let score = 50
-  
-  if (employees) {
-    if (employees >= 10 && employees <= 100) score += 25
-    else if (employees > 100 && employees <= 250) score += 15
-    else if (employees < 10) score += 10
-  }
-  
-  if (turnover) {
-    if (turnover >= 2000000 && turnover <= 20000000) score += 25
-    else if (turnover > 20000000 && turnover <= 50000000) score += 15
-    else if (turnover < 2000000) score += 10
-  }
-  
+  if (employees && employees >= 10 && employees <= 100) score += 25
+  if (turnover && turnover >= 1000000 && turnover <= 10000000) score += 25
   return Math.min(score, 100)
 }
 
-function calculateSpecialismFit(capabilities: any[]): number {
-  // High-value capabilities
-  const highValueCaps = [
-    'HVAC', 'Electrical', 'BMS', 'Fire Safety', 'Data Centre',
-    'Critical Systems', 'Renewable Energy', 'EV Charging'
-  ]
+function calculateFitSpecialism(capabilities: any[]): number {
+  const priorityTrades = ['Electrical', 'Mechanical', 'HVAC', 'Fire & Security', 'Plumbing']
+  if (!capabilities || capabilities.length === 0) return 30
   
-  const capNames = capabilities.map(c => c.capability)
-  const highValueCount = capNames.filter(c => highValueCaps.includes(c)).length
+  const matches = capabilities.filter(c => 
+    priorityTrades.some(pt => c.capability_name?.includes(pt))
+  ).length
   
-  if (highValueCount >= 3) return 100
-  if (highValueCount === 2) return 80
-  if (highValueCount === 1) return 60
-  if (capNames.length > 0) return 40
-  return 20
+  return Math.min(30 + (matches * 20), 100)
 }
 
 function calculateRelationshipHeat(relationships: any[]): number {
-  if (relationships.length === 0) return 20
+  if (!relationships || relationships.length === 0) return 0
   
+  const now = new Date()
   const recentInteractions = relationships.filter(r => {
-    const daysSince = (Date.now() - new Date(r.interaction_date).getTime()) / (1000 * 60 * 60 * 24)
+    const interactionDate = new Date(r.interaction_date)
+    const daysSince = (now.getTime() - interactionDate.getTime()) / (1000 * 60 * 60 * 24)
     return daysSince <= 90
   })
   
-  const positiveInteractions = relationships.filter(r => 
-    ['positive', 'very_positive'].includes(r.sentiment)
-  ).length
+  const baseScore = Math.min((recentInteractions.length / relationships.length) * 100, 80)
+  const hasQualityNotes = relationships.some(r => r.notes && r.notes.length > 50)
   
-  let score = 20
-  score += Math.min(recentInteractions.length * 15, 50)
-  score += Math.min(positiveInteractions * 10, 30)
-  
-  return Math.min(score, 100)
+  return Math.min(baseScore + (hasQualityNotes ? 20 : 0), 100)
 }
 
 function calculatePerformance(relationships: any[]): number {
-  if (relationships.length === 0) return 50
+  if (!relationships || relationships.length === 0) return 50
   
-  const performanceRatings = relationships
-    .filter(r => r.performance_rating !== null)
-    .map(r => r.performance_rating)
+  const positiveTypes = ['meeting', 'project_discussion', 'tender_invite']
+  const positiveInteractions = relationships.filter(r => 
+    positiveTypes.includes(r.interaction_type)
+  ).length
   
-  if (performanceRatings.length === 0) return 50
-  
-  const avgRating = performanceRatings.reduce((a, b) => a + b, 0) / performanceRatings.length
-  return avgRating * 20 // Convert 1-5 scale to 20-100
+  return Math.min((positiveInteractions / relationships.length) * 100, 100)
 }
 
-function calculateDataCompleteness(contractor: any, capabilities: any[]): number {
+function calculateDataCompleteness(contractor: any, capabilities: any[], relationships: any[]): number {
   let completedFields = 0
-  let totalFields = 10
+  const totalFields = 10
   
   if (contractor.name) completedFields++
   if (contractor.region) completedFields++
@@ -207,10 +175,10 @@ function calculateDataCompleteness(contractor: any, capabilities: any[]): number
   if (contractor.sic_code) completedFields++
   if (contractor.employees) completedFields++
   if (contractor.turnover_gbp) completedFields++
-  if (contractor.website) completedFields++
-  if (contractor.companies_house_number) completedFields++
-  if (capabilities.length > 0) completedFields++
   if (contractor.notes) completedFields++
+  if (capabilities && capabilities.length > 0) completedFields++
+  if (relationships && relationships.length > 0) completedFields++
+  if (contractor.status) completedFields++
   
   return (completedFields / totalFields) * 100
 }
