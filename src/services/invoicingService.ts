@@ -219,14 +219,45 @@ export const invoicingService = {
         (item) => !item.excluded_this_month && item.invoice_value !== null
       );
 
-      const tableData = includedItems.map((item) => [
-        item.project_code,
-        item.project_name,
-        item.client_name,
-        item.po_number || "—",
-        `£${(item.invoice_value || 0).toFixed(2)}`,
-        item.description || "—",
-      ]);
+      // Table headers
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      const headers = ["Project", "Client", "Value", "Description"];
+      const colWidths = [50, 50, 30, 60];
+      let yPos = 40;
+      let xPos = 20;
+      
+      headers.forEach((header, i) => {
+        doc.text(header, xPos, yPos);
+        xPos += colWidths[i];
+      });
+      
+      yPos += 5;
+      doc.setFont("helvetica", "normal");
+      
+      // Table rows
+      includedItems.forEach((item) => {
+        if (yPos > 270) {
+          doc.addPage();
+          yPos = 20;
+        }
+        
+        xPos = 20;
+        const rowData = [
+          item.project_name,
+          item.client_name,
+          `£${item.invoice_value?.toFixed(2) || "0.00"}`,
+          item.description || ""
+        ];
+        
+        rowData.forEach((data, i) => {
+          const lines = doc.splitTextToSize(data, colWidths[i] - 2);
+          doc.text(lines, xPos, yPos);
+          xPos += colWidths[i];
+        });
+        
+        yPos += 8;
+      });
 
       const totalValue = includedItems.reduce(
         (sum, item) => sum + (item.invoice_value || 0),
@@ -236,7 +267,7 @@ export const invoicingService = {
       (doc as any).autoTable({
         startY: 40,
         head: [["Code", "Project", "Client", "PO", "Value", "Description"]],
-        body: tableData,
+        body: [],
         foot: [["", "", "", "TOTAL", `£${totalValue.toFixed(2)}`, ""]],
         theme: "grid",
         styles: { fontSize: 9 },

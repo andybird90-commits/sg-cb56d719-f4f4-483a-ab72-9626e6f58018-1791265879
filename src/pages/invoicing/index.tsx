@@ -662,16 +662,16 @@ export default function InvoicingPage() {
           end_date,
           agreed_fee_value,
           added_by_user_id,
-          companies!projects_client_company_id_fkey (
+          companies!projects_client_company_id_fkey(
             name,
             address,
             accounts_email,
             payment_terms
           ),
-          opportunities!projects_opportunity_id_fkey (
+          opportunities!projects_opportunity_id_fkey(
             enquiry_number
           ),
-          profiles!projects_added_by_user_id_fkey (
+          profiles!projects_added_by_user_id_fkey(
             full_name,
             email
           )
@@ -981,9 +981,6 @@ export default function InvoicingPage() {
                                 Address
                               </th>
                               <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                                Estimate Number
-                              </th>
-                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
                                 Project Number
                               </th>
                               <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
@@ -1041,9 +1038,6 @@ export default function InvoicingPage() {
                                 </td>
                                 <td className="px-4 py-3 text-sm max-w-xs truncate" title={item.client_address || ""}>
                                   {item.client_address || "—"}
-                                </td>
-                                <td className="px-4 py-3 text-sm font-mono">
-                                  {item.enquiry_number || "—"}
                                 </td>
                                 <td className="px-4 py-3 text-sm font-mono">
                                   {item.project_reference || "—"}

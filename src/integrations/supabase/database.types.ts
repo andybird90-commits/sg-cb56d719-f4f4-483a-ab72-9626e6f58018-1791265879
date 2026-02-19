@@ -484,51 +484,69 @@ export type Database = {
       }
       invoice_items: {
         Row: {
+          accounts_email: string | null
+          client_address: string | null
           client_name: string
           created_at: string | null
           created_by: string | null
           description: string | null
+          enquiry_number: string | null
           excluded_this_month: boolean | null
           id: string
           invoice_month_id: string
           invoice_reference: string | null
           invoice_value: number | null
+          payment_terms: number | null
           po_number: string | null
           project_code: string | null
           project_id: string
           project_name: string
+          project_owner_name: string | null
+          project_reference: string | null
           updated_at: string | null
         }
         Insert: {
+          accounts_email?: string | null
+          client_address?: string | null
           client_name: string
           created_at?: string | null
           created_by?: string | null
           description?: string | null
+          enquiry_number?: string | null
           excluded_this_month?: boolean | null
           id?: string
           invoice_month_id: string
           invoice_reference?: string | null
           invoice_value?: number | null
+          payment_terms?: number | null
           po_number?: string | null
           project_code?: string | null
           project_id: string
           project_name: string
+          project_owner_name?: string | null
+          project_reference?: string | null
           updated_at?: string | null
         }
         Update: {
+          accounts_email?: string | null
+          client_address?: string | null
           client_name?: string
           created_at?: string | null
           created_by?: string | null
           description?: string | null
+          enquiry_number?: string | null
           excluded_this_month?: boolean | null
           id?: string
           invoice_month_id?: string
           invoice_reference?: string | null
           invoice_value?: number | null
+          payment_terms?: number | null
           po_number?: string | null
           project_code?: string | null
           project_id?: string
           project_name?: string
+          project_owner_name?: string | null
+          project_reference?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -1135,6 +1153,7 @@ export type Database = {
       }
       projects: {
         Row: {
+          added_by_user_id: string | null
           agreed_fee_value: number | null
           archived: boolean | null
           archived_at: string | null
@@ -1156,6 +1175,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          added_by_user_id?: string | null
           agreed_fee_value?: number | null
           archived?: boolean | null
           archived_at?: string | null
@@ -1177,6 +1197,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          added_by_user_id?: string | null
           agreed_fee_value?: number | null
           archived?: boolean | null
           archived_at?: string | null
@@ -1198,6 +1219,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "projects_added_by_user_id_fkey"
+            columns: ["added_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "projects_archived_by_user_id_fkey"
             columns: ["archived_by_user_id"]
