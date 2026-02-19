@@ -74,7 +74,6 @@ export const invoicingService = {
       return start <= endOfMonth && end >= startOfMonth;
     });
 
-    // Get phasing data for this specific month
     const { data: phasingData, error: phasingError } = await supabase
       .from("project_monthly_phasing")
       .select("project_id, revenue_amount")
@@ -83,7 +82,6 @@ export const invoicingService = {
 
     if (phasingError) throw phasingError;
 
-    // Get all projects that have ANY manual phasing entries
     const { data: projectsWithPhasing, error: projectsWithPhasingError } = await supabase
       .from("project_monthly_phasing")
       .select("project_id")
@@ -103,12 +101,9 @@ export const invoicingService = {
     const itemsToInsert = activeProjects.map((project) => {
       let invoiceValue = 0;
 
-      // Check if this project has ANY manual phasing entries
       if (projectsWithAnyPhasing.has(project.id)) {
-        // Project has manual phasing - use the value for this month OR 0 if not set
         invoiceValue = phasingMap.get(project.id) || 0;
       } else {
-        // Project has NO manual phasing - calculate fallback
         if (project.agreed_fee_value && project.start_date && project.end_date) {
           const start = new Date(project.start_date);
           const end = new Date(project.end_date);
@@ -204,7 +199,7 @@ export const invoicingService = {
     const { jsPDF } = await import("jspdf");
     await import("jspdf-autotable");
 
-    const doc = new jsPDF("l", "mm", "a4");
+    const doc = new jsPDF("landscape", "mm", "a4");
     const months = [
       "January", "February", "March", "April", "May", "June",
       "July", "August", "September", "October", "November", "December"
@@ -212,69 +207,73 @@ export const invoicingService = {
     const monthName = months[invoiceMonth.month - 1];
 
     doc.setFontSize(18);
-    doc.text(`Invoice Summary - ${monthName} ${invoiceMonth.year}`, 14, 20);
+    doc.text(`Invoicing Summary`, 14, 20);
 
-    doc.setFontSize(11);
-    doc.text(`Generated: ${new Date().toLocaleDateString("en-GB")}`, 14, 30);
+    doc.setFontSize(12);
+    doc.text(`${monthName} ${invoiceMonth.year}`, 14, 28);
+    
+    doc.setFontSize(10);
+    doc.text(`Generated: ${new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })}, ${new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`, 14, 35);
 
     const includedItems = items.filter(
       (item) => !item.excluded_this_month && item.invoice_value !== null
     );
-
-    // Table headers
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    const headers = ["Project", "Client", "Value", "Description"];
-    const colWidths = [50, 50, 30, 60];
-    let yPos = 40;
-    let xPos = 20;
-    
-    headers.forEach((header, i) => {
-      doc.text(header, xPos, yPos);
-      xPos += colWidths[i];
-    });
-    
-    yPos += 5;
-    doc.setFont("helvetica", "normal");
-    
-    // Table rows
-    includedItems.forEach((item) => {
-      if (yPos > 270) {
-        doc.addPage();
-        yPos = 20;
-      }
-      
-      xPos = 20;
-      const rowData = [
-        item.project_name,
-        item.client_name,
-        `£${item.invoice_value?.toFixed(2) || "0.00"}`,
-        item.description || ""
-      ];
-      
-      rowData.forEach((data, i) => {
-        const lines = doc.splitTextToSize(data, colWidths[i] - 2);
-        doc.text(lines, xPos, yPos);
-        xPos += colWidths[i];
-      });
-      
-      yPos += 8;
-    });
 
     const totalValue = includedItems.reduce(
       (sum, item) => sum + (item.invoice_value || 0),
       0
     );
 
+    const tableData = includedItems.map(item => [
+      item.project_code || "—",
+      item.project_name || "—",
+      item.client_name || "—",
+      item.po_number || "—",
+      item.accounts_email || "—",
+      item.client_address || "—",
+      item.project_reference || "—",
+      item.project_owner_name || "—",
+      item.payment_terms ? `${item.payment_terms} days` : "—",
+      `£${item.invoice_value?.toFixed(2) || "0.00"}`,
+      item.description || "—"
+    ]);
+
     (doc as any).autoTable({
-      startY: 40,
-      head: [["Code", "Project", "Client", "PO", "Email Contact", "Address", "Project Number", "Project Owner", "Payment Terms", "Value", "Description"]],
-      body: [],
+      startY: 45,
+      head: [["Code", "Project", "Client", "PO Number", "Email Contact", "Address", "Project Number", "Project Owner", "Payment Terms", "Value", "Description"]],
+      body: tableData,
       foot: [["", "", "", "", "", "", "", "", "TOTAL", `£${totalValue.toFixed(2)}`, ""]],
       theme: "grid",
-      styles: { fontSize: 9 },
-      headStyles: { fillColor: [71, 85, 105] },
-      footStyles: { fillColor: [241, 245, 249], textColor: [0, 0, 0], fontStyle: "bold" },
+      styles: { 
+        fontSize: 8,
+        cellPadding: 2,
+        overflow: "linebreak",
+        cellWidth: "wrap"
+      },
+      headStyles: { 
+        fillColor: [71, 85, 105],
+        fontStyle: "bold",
+        fontSize: 8
+      },
+      footStyles: { 
+        fillColor: [241, 245, 249], 
+        textColor: [0, 0, 0], 
+        fontStyle: "bold",
+        fontSize: 9
+      },
+      columnStyles: {
+        0: { cellWidth: 20 },
+        1: { cellWidth: 30 },
+        2: { cellWidth: 25 },
+        3: { cellWidth: 20 },
+        4: { cellWidth: 30 },
+        5: { cellWidth: 30 },
+        6: { cellWidth: 20 },
+        7: { cellWidth: 25 },
+        8: { cellWidth: 20 },
+        9: { cellWidth: 20 },
+        10: { cellWidth: 35 }
+      }
     });
 
     const pdfBlob = doc.output("blob");
