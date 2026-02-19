@@ -51,9 +51,9 @@ export function PaymentAlerts({ userRole }: PaymentAlertsProps) {
       const allAlerts: PaymentAlert[] = [];
 
       // Fetch manual invoices from invoice_history
-      const { data: manualInvoices, error: manualError } = await supabase
-        .from("invoice_history")
-        .select(`
+      const { data: manualInvoices, error: manualError } = await supabase.
+      from("invoice_history").
+      select(`
           id,
           invoice_number,
           client_name,
@@ -70,9 +70,9 @@ export function PaymentAlerts({ userRole }: PaymentAlertsProps) {
               full_name
             )
           )
-        `)
-        .in("status", ["unpaid", "part_paid"])
-        .order("due_date", { ascending: true });
+        `).
+      in("status", ["unpaid", "part_paid"]).
+      order("due_date", { ascending: true });
 
       if (manualError) throw manualError;
 
@@ -80,7 +80,7 @@ export function PaymentAlerts({ userRole }: PaymentAlertsProps) {
       (manualInvoices || []).forEach((invoice: any) => {
         const dueDate = parseISO(invoice.due_date);
         const daysUntilDue = differenceInDays(dueDate, today);
-        
+
         // Only include if due within 7 days or overdue
         if (daysUntilDue <= 7) {
           allAlerts.push({
@@ -101,9 +101,9 @@ export function PaymentAlerts({ userRole }: PaymentAlertsProps) {
       });
 
       // Fetch system-generated invoices
-      const { data: systemInvoices, error: systemError } = await supabase
-        .from("invoice_months")
-        .select(`
+      const { data: systemInvoices, error: systemError } = await supabase.
+      from("invoice_months").
+      select(`
           id,
           year,
           month,
@@ -125,25 +125,25 @@ export function PaymentAlerts({ userRole }: PaymentAlertsProps) {
               )
             )
           )
-        `)
-        .eq("status", "locked")
-        .order("created_at", { ascending: false });
+        `).
+      eq("status", "locked").
+      order("created_at", { ascending: false });
 
       if (systemError) throw systemError;
 
       // Process system invoices
       (systemInvoices || []).forEach((month: any) => {
         const issueDate = parseISO(month.created_at);
-        
+
         (month.invoice_items || []).forEach((item: any) => {
           if (!item.invoice_value || item.excluded_this_month) return;
-          
+
           const paymentTerms = item.payment_terms || 30;
           const dueDate = new Date(issueDate);
           dueDate.setDate(dueDate.getDate() + paymentTerms);
-          
+
           const daysUntilDue = differenceInDays(dueDate, today);
-          
+
           // Only include if due within 7 days or overdue
           if (daysUntilDue <= 7) {
             allAlerts.push({
@@ -177,7 +177,7 @@ export function PaymentAlerts({ userRole }: PaymentAlertsProps) {
       toast({
         title: "Error",
         description: "Failed to load payment alerts",
-        variant: "destructive",
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
@@ -200,8 +200,8 @@ export function PaymentAlerts({ userRole }: PaymentAlertsProps) {
         <CardContent>
           <p className="text-sm text-muted-foreground">Loading payment alerts...</p>
         </CardContent>
-      </Card>
-    );
+      </Card>);
+
   }
 
   if (alerts.length === 0) {
@@ -231,12 +231,12 @@ export function PaymentAlerts({ userRole }: PaymentAlertsProps) {
             </p>
           </div>
         </CardContent>
-      </Card>
-    );
+      </Card>);
+
   }
 
-  const overdueAlerts = alerts.filter(a => a.isOverdue);
-  const upcomingAlerts = alerts.filter(a => !a.isOverdue);
+  const overdueAlerts = alerts.filter((a) => a.isOverdue);
+  const upcomingAlerts = alerts.filter((a) => !a.isOverdue);
 
   return (
     <Card className="mb-6">
@@ -247,26 +247,26 @@ export function PaymentAlerts({ userRole }: PaymentAlertsProps) {
             Payment Alerts
           </CardTitle>
           <Link href="/invoicing/cashflow">
-            <Button variant="outline" size="sm">
-              <ExternalLink className="h-4 w-4 mr-2" />
-              View Cash Flow
-            </Button>
+            
+
+
+            
           </Link>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
         {/* Overdue Payments */}
-        {overdueAlerts.length > 0 && (
-          <div className="space-y-2">
+        {overdueAlerts.length > 0 &&
+        <div className="space-y-2">
             <h3 className="text-sm font-semibold text-red-600 flex items-center gap-2">
               <AlertTriangle className="h-4 w-4" />
               Overdue Payments ({overdueAlerts.length})
             </h3>
-            {overdueAlerts.map((alert) => (
-              <div
-                key={alert.id}
-                className="bg-red-50 border border-red-200 rounded-lg p-4"
-              >
+            {overdueAlerts.map((alert) =>
+          <div
+            key={alert.id}
+            className="bg-red-50 border border-red-200 rounded-lg p-4">
+            
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
@@ -276,11 +276,11 @@ export function PaymentAlerts({ userRole }: PaymentAlertsProps) {
                       <Badge variant="destructive" className="text-xs">
                         {Math.abs(alert.daysUntilDue)} days overdue
                       </Badge>
-                      {alert.source === "manual" && (
-                        <Badge variant="outline" className="text-xs">
+                      {alert.source === "manual" &&
+                  <Badge variant="outline" className="text-xs">
                           Manual
                         </Badge>
-                      )}
+                  }
                     </div>
                     <p className="text-sm text-red-800">
                       <span className="font-medium">{alert.clientName}</span> - {alert.projectName}
@@ -301,22 +301,22 @@ export function PaymentAlerts({ userRole }: PaymentAlertsProps) {
                   </div>
                 </div>
               </div>
-            ))}
+          )}
           </div>
-        )}
+        }
 
         {/* Upcoming Payments */}
-        {upcomingAlerts.length > 0 && (
-          <div className="space-y-2">
+        {upcomingAlerts.length > 0 &&
+        <div className="space-y-2">
             <h3 className="text-sm font-semibold text-orange-600 flex items-center gap-2">
               <Clock className="h-4 w-4" />
               Due Within 7 Days ({upcomingAlerts.length})
             </h3>
-            {upcomingAlerts.map((alert) => (
-              <div
-                key={alert.id}
-                className="bg-orange-50 border border-orange-200 rounded-lg p-4"
-              >
+            {upcomingAlerts.map((alert) =>
+          <div
+            key={alert.id}
+            className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+            
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
@@ -326,11 +326,11 @@ export function PaymentAlerts({ userRole }: PaymentAlertsProps) {
                       <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800">
                         {alert.daysUntilDue} {alert.daysUntilDue === 1 ? "day" : "days"} until due
                       </Badge>
-                      {alert.source === "manual" && (
-                        <Badge variant="outline" className="text-xs">
+                      {alert.source === "manual" &&
+                  <Badge variant="outline" className="text-xs">
                           Manual
                         </Badge>
-                      )}
+                  }
                     </div>
                     <p className="text-sm text-orange-800">
                       <span className="font-medium">{alert.clientName}</span> - {alert.projectName}
@@ -351,10 +351,10 @@ export function PaymentAlerts({ userRole }: PaymentAlertsProps) {
                   </div>
                 </div>
               </div>
-            ))}
+          )}
           </div>
-        )}
+        }
       </CardContent>
-    </Card>
-  );
+    </Card>);
+
 }
