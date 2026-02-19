@@ -828,6 +828,8 @@ export type Database = {
       me_contractors: {
         Row: {
           address: string | null
+          companies_house_raw: Json | null
+          company_number: string | null
           created_at: string | null
           employees: number | null
           id: string
@@ -842,6 +844,8 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          companies_house_raw?: Json | null
+          company_number?: string | null
           created_at?: string | null
           employees?: number | null
           id?: string
@@ -856,6 +860,8 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          companies_house_raw?: Json | null
+          company_number?: string | null
           created_at?: string | null
           employees?: number | null
           id?: string

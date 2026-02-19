@@ -33,7 +33,6 @@ export interface ContractorListItem {
   email: string | null;
   phone: string | null;
   status: string | null;
-  company_number: string | null;
 }
 
 export async function getContractorRadarList(
@@ -98,7 +97,7 @@ export async function getContractorRadarList(
     }
 
     return {
-      data: (data || []) as ContractorListItem[],
+      data: (data || []) as unknown as ContractorListItem[],
       error: null,
       count: count || 0,
     };
@@ -215,7 +214,7 @@ export async function correctCompanyNames(
       const oldName = contractor.name;
 
       // Merge companies_house_raw
-      const rawData = contractor.companies_house_raw || {};
+      const rawData = (contractor.companies_house_raw as Record<string, unknown>) || {};
       const oldNames = Array.isArray(rawData.old_names) ? rawData.old_names : [];
       oldNames.push(oldName);
 
