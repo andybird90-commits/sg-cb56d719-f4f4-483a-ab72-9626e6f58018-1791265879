@@ -5,6 +5,169 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+interface CompaniesHouseData {
+  company_name?: string
+  company_number?: string
+  company_status?: string
+  registered_office_address?: {
+    address_line_1?: string
+    locality?: string
+    postal_code?: string
+    country?: string
+  }
+  sic_codes?: string[]
+  date_of_creation?: string
+}
+
+interface BraveSearchResult {
+  web?: {
+    results?: Array<{
+      title: string
+      url: string
+      description: string
+    }>
+  }
+}
+
+async function fetchCompaniesHouseData(companyNumber: string): Promise<CompaniesHouseData | null> {
+  const apiKey = Deno.env.get('COMPANIES_HOUSE_API_KEY')
+  if (!apiKey) {
+    console.error('COMPANIES_HOUSE_API_KEY not set')
+    return null
+  }
+
+  try {
+    const auth = btoa(`${apiKey}:`)
+    const response = await fetch(
+      `https://api.company-information.service.gov.uk/company/${companyNumber}`,
+      {
+        headers: {
+          'Authorization': `Basic ${auth}`,
+        },
+      }
+    )
+
+    if (!response.ok) {
+      console.error('Companies House API error:', response.status)
+      return null
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error('Error fetching Companies House data:', error)
+    return null
+  }
+}
+
+async function searchBrave(query: string): Promise<BraveSearchResult | null> {
+  const apiKey = Deno.env.get('BRAVE_SEARCH_API_KEY')
+  if (!apiKey) {
+    console.error('BRAVE_SEARCH_API_KEY not set')
+    return null
+  }
+
+  try {
+    const response = await fetch(
+      `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}`,
+      {
+        headers: {
+          'Accept': 'application/json',
+          'X-Subscription-Token': apiKey,
+        },
+      }
+    )
+
+    if (!response.ok) {
+      console.error('Brave Search API error:', response.status)
+      return null
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error('Error searching Brave:', error)
+    return null
+  }
+}
+
+async function enhanceWithOpenAI(contractorData: any, companiesHouseData: CompaniesHouseData | null, braveData: BraveSearchResult | null): Promise<any> {
+  const apiKey = Deno.env.get('OPENAI_API_KEY')
+  if (!apiKey) {
+    console.error('OPENAI_API_KEY not set')
+    return null
+  }
+
+  const prompt = `Analyze this contractor data and provide enrichment suggestions:
+
+Contractor Information:
+- Name: ${contractorData.company_name || 'N/A'}
+- Email: ${contractorData.email || 'N/A'}
+- Phone: ${contractorData.phone || 'N/A'}
+- Website: ${contractorData.website_clean || 'N/A'}
+- Region: ${contractorData.region || 'N/A'}
+- Postcode: ${contractorData.postcode || 'N/A'}
+
+${companiesHouseData ? `Companies House Data:
+- Company Number: ${companiesHouseData.company_number}
+- Status: ${companiesHouseData.company_status}
+- Address: ${JSON.stringify(companiesHouseData.registered_office_address)}
+- SIC Codes: ${companiesHouseData.sic_codes?.join(', ')}
+` : ''}
+
+${braveData?.web?.results?.[0] ? `Web Search Results:
+- ${braveData.web.results.slice(0, 3).map(r => `${r.title}: ${r.description}`).join('\n- ')}
+` : ''}
+
+Provide a JSON response with:
+{
+  "confidence": <number 0-100>,
+  "suggested_updates": {
+    "email": "<email if found>",
+    "phone": "<phone if found>",
+    "website_clean": "<website if found>",
+    "region": "<region if found>",
+    "postcode": "<postcode if found>"
+  },
+  "notes": "<brief summary of findings>"
+}`
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a data enrichment assistant. Analyze contractor information and suggest improvements.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.3,
+      }),
+    })
+
+    if (!response.ok) {
+      console.error('OpenAI API error:', response.status, await response.text())
+      return null
+    }
+
+    const result = await response.json()
+    const content = result.choices[0].message.content
+    return JSON.parse(content)
+  } catch (error) {
+    console.error('Error calling OpenAI:', error)
+    return null
+  }
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -31,6 +194,8 @@ Deno.serve(async (req) => {
       )
     }
 
+    console.log('Enhancing contractor:', contractor_id)
+
     // Fetch contractor data
     const { data: contractor, error: contractorError } = await supabaseClient
       .from('me_contractors')
@@ -38,32 +203,71 @@ Deno.serve(async (req) => {
       .eq('id', contractor_id)
       .single()
 
-    if (contractorError) throw contractorError
+    if (contractorError) {
+      console.error('Error fetching contractor:', contractorError)
+      throw contractorError
+    }
 
-    // TODO: Add actual AI enrichment logic here
-    // For now, just update the enhancement metadata
-    
-    // Calculate a basic confidence score based on data completeness
-    let confidence = 50
-    if (contractor.email) confidence += 10
-    if (contractor.phone) confidence += 10
-    if (contractor.website_clean) confidence += 10
-    if (contractor.region) confidence += 10
-    if (contractor.postcode) confidence += 10
+    console.log('Contractor data:', contractor.company_name)
 
-    // Update the contractor with enhancement metadata
+    // Gather external data
+    let companiesHouseData: CompaniesHouseData | null = null
+    let braveData: BraveSearchResult | null = null
+
+    // Try Companies House if we have a company number
+    if (contractor.company_number) {
+      console.log('Fetching Companies House data for:', contractor.company_number)
+      companiesHouseData = await fetchCompaniesHouseData(contractor.company_number)
+    }
+
+    // Search for the company online
+    if (contractor.company_name) {
+      console.log('Searching Brave for:', contractor.company_name)
+      braveData = await searchBrave(`${contractor.company_name} contractor UK`)
+    }
+
+    // Use OpenAI to analyze and suggest enhancements
+    console.log('Calling OpenAI for analysis...')
+    const aiResult = await enhanceWithOpenAI(contractor, companiesHouseData, braveData)
+
+    if (!aiResult) {
+      throw new Error('Failed to get AI enhancement results')
+    }
+
+    console.log('AI Result:', aiResult)
+
+    // Prepare updates
+    const updates: any = {
+      last_enhanced_at: new Date().toISOString(),
+      enhancement_confidence: aiResult.confidence || 50,
+      updated_at: new Date().toISOString()
+    }
+
+    // Apply suggested updates if they exist and are not empty
+    if (aiResult.suggested_updates) {
+      const suggested = aiResult.suggested_updates
+      if (suggested.email && !contractor.email) updates.email = suggested.email
+      if (suggested.phone && !contractor.phone) updates.phone = suggested.phone
+      if (suggested.website_clean && !contractor.website_clean) updates.website_clean = suggested.website_clean
+      if (suggested.region && !contractor.region) updates.region = suggested.region
+      if (suggested.postcode && !contractor.postcode) updates.postcode = suggested.postcode
+    }
+
+    console.log('Applying updates:', updates)
+
+    // Update the contractor
     const { error: updateError } = await supabaseClient
       .from('me_contractors')
-      .update({
-        last_enhanced_at: new Date().toISOString(),
-        enhancement_confidence: confidence,
-        updated_at: new Date().toISOString()
-      })
+      .update(updates)
       .eq('id', contractor_id)
 
-    if (updateError) throw updateError
+    if (updateError) {
+      console.error('Error updating contractor:', updateError)
+      throw updateError
+    }
 
     // Recalculate radar score after enhancement
+    console.log('Recalculating radar score...')
     const { error: recalcError } = await supabaseClient.functions.invoke(
       'recalculate-contractor-radar-score',
       {
@@ -80,7 +284,9 @@ Deno.serve(async (req) => {
       JSON.stringify({ 
         success: true,
         contractor_id,
-        confidence,
+        confidence: aiResult.confidence,
+        updates_applied: Object.keys(updates).length - 3, // Exclude metadata fields
+        notes: aiResult.notes,
         message: 'Contractor enhanced successfully'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

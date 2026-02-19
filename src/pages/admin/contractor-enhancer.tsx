@@ -310,115 +310,63 @@ export default function ContractorEnhancerPage() {
             ) : (
               <div className="space-y-4">
                 {contractors.map((contractor) => (
-                  <Card
+                  <div
                     key={contractor.id}
-                    className={`cursor-pointer transition-all hover:shadow-md ${
+                    className={`p-4 border rounded-lg cursor-pointer transition-colors ${
                       isSelected(contractor.id)
                         ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
-                        : ""
+                        : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
                     }`}
                     onClick={() => toggle(contractor.id)}
                   >
-                    <CardContent className="pt-6">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-4 flex-1">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
                           <Checkbox
                             checked={isSelected(contractor.id)}
                             onCheckedChange={() => toggle(contractor.id)}
                             onClick={(e) => e.stopPropagation()}
                           />
-                          <div className="flex-1 space-y-3">
-                            <div>
-                              <h3 className="text-lg font-semibold flex items-center gap-2">
-                                <Building2 className="h-5 w-5" />
-                                {contractor.name}
-                              </h3>
-                              <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                                {contractor.region && (
-                                  <span className="flex items-center gap-1">
-                                    <MapPin className="h-4 w-4" />
-                                    {contractor.region}
-                                  </span>
-                                )}
-                                {contractor.postcode && (
-                                  <span>{contractor.postcode}</span>
-                                )}
-                                {contractor.sic_code && (
-                                  <Badge variant="outline">
-                                    SIC: {contractor.sic_code}
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                              {contractor.email && (
-                                <div className="flex items-center gap-2 text-sm">
-                                  <Mail className="h-4 w-4 text-muted-foreground" />
-                                  <span className="truncate">{contractor.email}</span>
-                                </div>
-                              )}
-                              {contractor.phone && (
-                                <div className="flex items-center gap-2 text-sm">
-                                  <Phone className="h-4 w-4 text-muted-foreground" />
-                                  <span>{contractor.phone}</span>
-                                </div>
-                              )}
-                              {contractor.website_clean && (
-                                <div className="flex items-center gap-2 text-sm">
-                                  <Globe className="h-4 w-4 text-muted-foreground" />
-                                  <span className="truncate">{contractor.website_clean}</span>
-                                </div>
-                              )}
-                              {contractor.employees_band && (
-                                <div className="flex items-center gap-2 text-sm">
-                                  <Users className="h-4 w-4 text-muted-foreground" />
-                                  <span>{contractor.employees_band}</span>
-                                </div>
-                              )}
-                            </div>
-
-                            {contractor.capabilities && contractor.capabilities.length > 0 && (
-                              <div className="flex flex-wrap gap-2">
-                                {contractor.capabilities.slice(0, 5).map((cap, idx) => (
-                                  <Badge key={idx} variant="secondary">
-                                    {cap}
-                                  </Badge>
-                                ))}
-                                {contractor.capabilities.length > 5 && (
-                                  <Badge variant="outline">
-                                    +{contractor.capabilities.length - 5} more
-                                  </Badge>
-                                )}
-                              </div>
-                            )}
-                          </div>
+                          <h3 className="font-semibold">{contractor.name}</h3>
                         </div>
-
-                        <div className="text-right space-y-2">
-                          <div>
-                            <div className="text-sm text-muted-foreground">Radar Score</div>
-                            <div className="text-2xl font-bold flex items-center gap-1">
-                              <TrendingUp className="h-5 w-5" />
-                              {contractor.radar_score?.toFixed(1) ?? '0.0'}
+                        <div className="mt-2 text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                          <div>Region: {contractor.region || "N/A"}</div>
+                          <div>Postcode: {contractor.postcode || "N/A"}</div>
+                          <div>SIC: {contractor.sic_code || "N/A"}</div>
+                          <div>Email: {contractor.email || "N/A"}</div>
+                          <div>Phone: {contractor.phone || "N/A"}</div>
+                          <div>Website: {contractor.website_clean || "N/A"}</div>
+                          <div>Employees: {contractor.employees_band || "N/A"}</div>
+                          <div>Turnover: {contractor.turnover_band || "N/A"}</div>
+                          {contractor.capabilities && contractor.capabilities.length > 0 && (
+                            <div>
+                              Capabilities: {contractor.capabilities.join(", ")}
                             </div>
-                          </div>
-                          {contractor.enhancement_confidence !== null && (
-                            <Badge variant="outline">
-                              Confidence: {contractor.enhancement_confidence.toFixed(0)}%
-                            </Badge>
-                          )}
-                          {contractor.last_enhanced_at ? (
-                            <div className="text-xs text-muted-foreground">
-                              Enhanced: {new Date(contractor.last_enhanced_at).toLocaleDateString()}
-                            </div>
-                          ) : (
-                            <Badge variant="secondary">Not Enhanced</Badge>
                           )}
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
+
+                      <div className="text-right space-y-2">
+                        <Badge variant="outline" className="text-lg font-bold">
+                          Score: {contractor.radar_score !== null && contractor.radar_score !== undefined ? contractor.radar_score.toFixed(1) : "N/A"}
+                        </Badge>
+                        {contractor.enhancement_confidence !== null && contractor.enhancement_confidence !== undefined && (
+                          <Badge variant="secondary">
+                            Confidence: {contractor.enhancement_confidence.toFixed(0)}%
+                          </Badge>
+                        )}
+                        {contractor.last_enhanced_at ? (
+                          <Badge variant="default" className="block">
+                            Enhanced: {new Date(contractor.last_enhanced_at).toLocaleDateString()}
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive" className="block">
+                            Not Enhanced
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 ))}
               </div>
             )}

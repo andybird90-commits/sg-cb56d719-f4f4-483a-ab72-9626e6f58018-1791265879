@@ -832,7 +832,9 @@ export type Database = {
           company_number: string | null
           created_at: string | null
           employees: number | null
+          enhancement_confidence: number | null
           id: string
+          last_enhanced_at: string | null
           name: string
           notes: string | null
           postcode: string | null
@@ -848,7 +850,9 @@ export type Database = {
           company_number?: string | null
           created_at?: string | null
           employees?: number | null
+          enhancement_confidence?: number | null
           id?: string
+          last_enhanced_at?: string | null
           name: string
           notes?: string | null
           postcode?: string | null
@@ -864,7 +868,9 @@ export type Database = {
           company_number?: string | null
           created_at?: string | null
           employees?: number | null
+          enhancement_confidence?: number | null
           id?: string
+          last_enhanced_at?: string | null
           name?: string
           notes?: string | null
           postcode?: string | null
