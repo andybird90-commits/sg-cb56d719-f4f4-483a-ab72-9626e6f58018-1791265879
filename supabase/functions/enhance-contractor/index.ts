@@ -115,10 +115,10 @@ Deno.serve(async (req) => {
           promptParts.push(JSON.stringify(companiesHouseData, null, 2));
         }
         
-        if (braveSearchData) {
+        if (braveSearchData && braveSearchData.web && braveSearchData.web.results) {
           promptParts.push("");
           promptParts.push("WEB SEARCH RESULTS:");
-          promptParts.push(JSON.stringify(braveSearchData.web?.results?.slice(0, 3) || [], null, 2));
+          promptParts.push(JSON.stringify(braveSearchData.web.results.slice(0, 3), null, 2));
         }
         
         promptParts.push("");
@@ -178,9 +178,10 @@ Deno.serve(async (req) => {
       if (aiAnalysis.notes) {
         const aiNotesPrefix = "AI Enhancement: ";
         const existingNotes = contractor.notes || "";
-        updates.notes = existingNotes ? `${existingNotes}
+        const newNotes = existingNotes ? existingNotes + "
 
-${aiNotesPrefix}${aiAnalysis.notes}` : `${aiNotesPrefix}${aiAnalysis.notes}`;
+" + aiNotesPrefix + aiAnalysis.notes : aiNotesPrefix + aiAnalysis.notes;
+        updates.notes = newNotes;
       }
     }
 
