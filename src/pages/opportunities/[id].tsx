@@ -44,12 +44,17 @@ interface Opportunity {
   created_by_user_id: string;
   added_by_user_id?: string;
   linked_project_id: string | null;
+  enquiry_number?: string | null;
+  contact_id?: string | null;
   companies?: {
     id: string;
     name: string;
   };
   contacts?: {
+    id: string;
     name: string;
+    email?: string;
+    phone?: string;
   };
   added_by_profile?: {
     full_name: string | null;
@@ -78,6 +83,7 @@ function OpportunityDetailContent() {
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [users, setUsers] = useState<User[]>([]);
+  const [contacts, setContacts] = useState<Array<{ id: string; name: string; email?: string; phone?: string }>>([]);
   const [editFormData, setEditFormData] = useState({
     name: "",
     stage: "",
@@ -92,6 +98,8 @@ function OpportunityDetailContent() {
     description: "",
     probability_percent: "",
     added_by_user_id: "",
+    enquiry_number: "",
+    contact_id: "",
   });
 
   // Everyone can edit, only directors/admins can delete
@@ -119,14 +127,29 @@ function OpportunityDetailContent() {
     }
   };
 
+  const fetchContacts = async (companyId: string) => {
+    try {
+      const { data, error: contactsError } = await supabase
+        .from("contacts")
+        .select("id, name, email, phone")
+        .eq("company_id", companyId)
+        .order("name");
+
+      if (contactsError) throw contactsError;
+      setContacts(data || []);
+    } catch (err) {
+      console.error("Failed to load contacts", err);
+    }
+  };
+
   const fetchOpportunity = async (oppId: string) => {
     try {
       const { data, error } = await supabase
         .from("opportunities")
         .select(`
           *,
-          companies(name),
-          contacts(name),
+          companies(id, name),
+          contacts(id, name, email, phone),
           added_by_profile:profiles!opportunities_added_by_user_id_fkey(
             full_name,
             email
@@ -145,6 +168,12 @@ function OpportunityDetailContent() {
 
       const opportunityData = data as any;
       setOpportunity(opportunityData);
+      
+      // Fetch contacts for the company
+      if (opportunityData.company_id) {
+        fetchContacts(opportunityData.company_id);
+      }
+      
       setEditFormData({
         name: opportunityData.name,
         stage: opportunityData.stage,
@@ -159,6 +188,8 @@ function OpportunityDetailContent() {
         description: opportunityData.description || "",
         probability_percent: opportunityData.probability_percent?.toString() || "",
         added_by_user_id: opportunityData.added_by_user_id || opportunityData.created_by_user_id || "",
+        enquiry_number: opportunityData.enquiry_number || "",
+        contact_id: opportunityData.contact_id || "",
       });
     } catch (err) {
       console.error("Error fetching opportunity:", err);
@@ -215,6 +246,8 @@ function OpportunityDetailContent() {
         project_reference: editFormData.project_reference || null,
         description: editFormData.description || null,
         added_by_user_id: editFormData.added_by_user_id || null,
+        enquiry_number: editFormData.enquiry_number || null,
+        contact_id: editFormData.contact_id || null,
       };
 
       // Add archive fields if archiving
@@ -381,6 +414,38 @@ function OpportunityDetailContent() {
                     />
                   </div>
 
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="enquiry_number" className="text-sm sm:text-base">Enquiry Number</Label>
+                      <Input
+                        id="enquiry_number"
+                        value={editFormData.enquiry_number}
+                        onChange={(e) => setEditFormData({ ...editFormData, enquiry_number: e.target.value })}
+                        placeholder="e.g. ENQ-2024-001"
+                        className="h-10 sm:h-11"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="contact_id" className="text-sm sm:text-base">Assign Contact</Label>
+                      <Select
+                        value={editFormData.contact_id}
+                        onValueChange={(value) => setEditFormData({ ...editFormData, contact_id: value })}
+                      >
+                        <SelectTrigger id="contact_id" className="h-10 sm:h-11">
+                          <SelectValue placeholder="Select contact (optional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {contacts.map((contact) => (
+                            <SelectItem key={contact.id} value={contact.id}>
+                              {contact.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="description" className="text-sm sm:text-base">Description</Label>
                     <Textarea
@@ -535,10 +600,25 @@ function OpportunityDetailContent() {
                     </div>
                   </div>
 
+                  {opportunity.enquiry_number && (
+                    <div>
+                      <div className="text-sm font-medium text-slate-500 mb-1">Enquiry Number</div>
+                      <div className="font-mono text-blue-600 text-sm sm:text-base">{opportunity.enquiry_number}</div>
+                    </div>
+                  )}
+
                   {opportunity.contacts && (
                     <div>
                       <div className="text-sm font-medium text-slate-500 mb-1">Contact</div>
-                      <div className="text-slate-900 text-sm sm:text-base">{opportunity.contacts.name}</div>
+                      <div className="text-slate-900 text-sm sm:text-base space-y-1">
+                        <div className="font-medium">{opportunity.contacts.name}</div>
+                        {opportunity.contacts.email && (
+                          <div className="text-sm text-slate-600">{opportunity.contacts.email}</div>
+                        )}
+                        {opportunity.contacts.phone && (
+                          <div className="text-sm text-slate-600">{opportunity.contacts.phone}</div>
+                        )}
+                      </div>
                     </div>
                   )}
 
