@@ -673,7 +673,10 @@ function FinancialsContent() {
                   <div className="space-y-2">
                     <div className="text-xs sm:text-sm text-slate-600">Subcontractor Cost</div>
                     <div className="text-xl sm:text-2xl font-bold text-slate-900">
-                      {formatCurrency(totalSubcontractorCost)}
+                      {formatCurrency(actualSubcontractorTotal)}
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      Costs incurred this month
                     </div>
                   </div>
                 </CardContent>
