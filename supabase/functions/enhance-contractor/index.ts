@@ -5,259 +5,179 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface CompaniesHouseData {
-  company_name?: string;
-  company_number?: string;
-  company_status?: string;
-  registered_office_address?: {
-    address_line_1?: string;
-    locality?: string;
-    postal_code?: string;
-    country?: string;
-  };
-  sic_codes?: string[];
-  date_of_creation?: string;
-}
-
-interface BraveSearchResult {
-  web?: {
-    results?: Array<{
-      title: string;
-      url: string;
-      description: string;
-    }>;
-  };
-}
-
-async function fetchCompaniesHouseData(companyNumber: string): Promise<CompaniesHouseData | null> {
-  const apiKey = Deno.env.get("COMPANIES_HOUSE_API_KEY");
-  if (!apiKey) {
-    console.error("COMPANIES_HOUSE_API_KEY not set");
-    return null;
-  }
-
-  try {
-    const auth = btoa(`${apiKey}:`);
-    const response = await fetch(
-      `https://api.company-information.service.gov.uk/company/${companyNumber}`,
-      {
-        headers: {
-          Authorization: `Basic ${auth}`,
-        },
-      }
-    );
-
-    if (!response.ok) {
-      console.error("Companies House API error:", response.status);
-      return null;
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Error fetching Companies House data:", error);
-    return null;
-  }
-}
-
-async function searchBrave(query: string): Promise<BraveSearchResult | null> {
-  const apiKey = Deno.env.get("BRAVE_SEARCH_API_KEY");
-  if (!apiKey) {
-    console.error("BRAVE_SEARCH_API_KEY not set");
-    return null;
-  }
-
-  try {
-    const response = await fetch(
-      `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}`,
-      {
-        headers: {
-          Accept: "application/json",
-          "X-Subscription-Token": apiKey,
-        },
-      }
-    );
-
-    if (!response.ok) {
-      console.error("Brave Search API error:", response.status);
-      return null;
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Error searching Brave:", error);
-    return null;
-  }
-}
-
-async function enhanceWithOpenAI(
-  contractorData: Record<string, unknown>,
-  companiesHouseData: CompaniesHouseData | null,
-  braveData: BraveSearchResult | null
-): Promise<Record<string, unknown> | null> {
-  const apiKey = Deno.env.get("OPENAI_API_KEY");
-  if (!apiKey) {
-    console.error("OPENAI_API_KEY not set");
-    return null;
-  }
-
-  const prompt = `Analyze this contractor data and provide enrichment suggestions:
-
-Contractor Information:
-- Name: ${contractorData.company_name || "N/A"}
-- Email: ${contractorData.email || "N/A"}
-- Phone: ${contractorData.phone || "N/A"}
-- Website: ${contractorData.website_clean || "N/A"}
-- Region: ${contractorData.region || "N/A"}
-- Postcode: ${contractorData.postcode || "N/A"}
-
-${companiesHouseData ? `Companies House Data:
-- Company Number: ${companiesHouseData.company_number}
-- Status: ${companiesHouseData.company_status}
-- Address: ${JSON.stringify(companiesHouseData.registered_office_address)}
-- SIC Codes: ${companiesHouseData.sic_codes?.join(", ")}
-` : ""}
-
-${braveData?.web?.results?.[0] ? `Web Search Results:
-- ${braveData.web.results.slice(0, 3).map((r) => `${r.title}: ${r.description}`).join("\n- ")}
-` : ""}
-
-Provide a JSON response with:
-{
-  "confidence": <number 0-100>,
-  "suggested_updates": {
-    "email": "<email if found>",
-    "phone": "<phone if found>",
-    "website_clean": "<website if found>",
-    "region": "<region if found>",
-    "postcode": "<postcode if found>"
-  },
-  "notes": "<brief summary of findings>"
-}`;
-
-  try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: "You are a data enrichment assistant. Analyze contractor information and suggest improvements.",
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        response_format: { type: "json_object" },
-        temperature: 0.3,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("OpenAI API error:", response.status, errorText);
-      return null;
-    }
-
-    const result = await response.json();
-    const content = result.choices[0].message.content;
-    return JSON.parse(content);
-  } catch (error) {
-    console.error("Error calling OpenAI:", error);
-    return null;
-  }
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
+    const { contractorId } = await req.json();
+    console.log("Enhancing contractor:", contractorId);
+
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      {
-        global: {
-          headers: { Authorization: req.headers.get("Authorization")! },
-        },
-      }
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const { contractor_id } = await req.json();
-
-    if (!contractor_id) {
-      return new Response(
-        JSON.stringify({ error: "contractor_id is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    console.log("Enhancing contractor:", contractor_id);
-
-    const { data: contractor, error: contractorError } = await supabaseClient
+    const { data: contractor, error: fetchError } = await supabaseClient
       .from("me_contractors")
       .select("*")
-      .eq("id", contractor_id)
+      .eq("id", contractorId)
       .single();
 
-    if (contractorError) {
-      console.error("Error fetching contractor:", contractorError);
-      throw contractorError;
+    if (fetchError || !contractor) {
+      console.error("Error fetching contractor:", fetchError);
+      throw new Error("Contractor not found");
     }
 
-    console.log("Contractor data:", contractor.company_name);
+    console.log("Contractor data:", contractor);
 
-    let companiesHouseData: CompaniesHouseData | null = null;
-    let braveData: BraveSearchResult | null = null;
+    let companiesHouseData = null;
+    let braveSearchData = null;
+    let aiAnalysis = null;
 
     if (contractor.company_number) {
-      console.log("Fetching Companies House data for:", contractor.company_number);
-      companiesHouseData = await fetchCompaniesHouseData(contractor.company_number);
+      try {
+        const companiesHouseKey = Deno.env.get("COMPANIES_HOUSE_API_KEY");
+        if (companiesHouseKey) {
+          console.log("Fetching from Companies House...");
+          const chResponse = await fetch(
+            `https://api.company-information.service.gov.uk/company/${contractor.company_number}`,
+            {
+              headers: {
+                Authorization: `Basic ${btoa(companiesHouseKey + ":")}`,
+              },
+            }
+          );
+
+          if (chResponse.ok) {
+            companiesHouseData = await chResponse.json();
+            console.log("Companies House data fetched successfully");
+          } else {
+            console.log("Companies House API error:", chResponse.status);
+          }
+        }
+      } catch (error) {
+        console.error("Companies House API error:", error);
+      }
     }
 
-    if (contractor.company_name) {
-      console.log("Searching Brave for:", contractor.company_name);
-      braveData = await searchBrave(`${contractor.company_name} contractor UK`);
+    try {
+      const braveApiKey = Deno.env.get("BRAVE_SEARCH_API_KEY");
+      if (braveApiKey && contractor.name) {
+        console.log("Searching with Brave...");
+        const searchQuery = encodeURIComponent(contractor.name + " UK company");
+        const braveResponse = await fetch(
+          `https://api.search.brave.com/res/v1/web/search?q=${searchQuery}`,
+          {
+            headers: {
+              "X-Subscription-Token": braveApiKey,
+              Accept: "application/json",
+            },
+          }
+        );
+
+        if (braveResponse.ok) {
+          braveSearchData = await braveResponse.json();
+          console.log("Brave search data fetched successfully");
+        } else {
+          console.log("Brave API error:", braveResponse.status);
+        }
+      }
+    } catch (error) {
+      console.error("Brave Search API error:", error);
     }
 
-    console.log("Calling OpenAI for analysis...");
-    const aiResult = await enhanceWithOpenAI(contractor, companiesHouseData, braveData);
+    try {
+      const openaiKey = Deno.env.get("OPENAI_API_KEY");
+      if (openaiKey) {
+        console.log("Analyzing with OpenAI...");
+        
+        const systemPrompt = "You are a data enrichment specialist. Return only valid JSON with this exact structure: {region, postcode, address, sic_code, employees, turnover_gbp, notes, confidence}";
+        
+        const userPrompt = `Analyze this contractor data and suggest improvements for missing fields only.
 
-    if (!aiResult) {
-      throw new Error("Failed to get AI enhancement results");
+CURRENT DATA:
+${JSON.stringify({
+  name: contractor.name,
+  region: contractor.region,
+  postcode: contractor.postcode,
+  address: contractor.address,
+  sic_code: contractor.sic_code,
+  employees: contractor.employees,
+  turnover_gbp: contractor.turnover_gbp,
+  status: contractor.status,
+  notes: contractor.notes,
+}, null, 2)}
+
+${companiesHouseData ? `COMPANIES HOUSE DATA:
+${JSON.stringify(companiesHouseData, null, 2)}
+` : ""}
+${braveSearchData ? `WEB SEARCH RESULTS:
+${JSON.stringify(braveSearchData.web?.results?.slice(0, 3) || [], null, 2)}
+` : ""}
+
+Return JSON with suggested values for null/empty fields only. Include confidence score 0-100.`;
+
+        const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${openaiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt },
+            ],
+            temperature: 0.3,
+          }),
+        });
+
+        if (openaiResponse.ok) {
+          const openaiData = await openaiResponse.json();
+          const content = openaiData.choices[0].message.content;
+          console.log("OpenAI response:", content);
+          
+          try {
+            aiAnalysis = JSON.parse(content);
+            console.log("AI analysis parsed successfully");
+          } catch (parseError) {
+            console.error("Failed to parse AI response:", parseError);
+            aiAnalysis = { confidence: 50, notes: "AI analysis completed but response format was invalid" };
+          }
+        } else {
+          console.log("OpenAI API error:", openaiResponse.status);
+        }
+      }
+    } catch (error) {
+      console.error("OpenAI API error:", error);
     }
 
-    console.log("AI Result:", aiResult);
-
-    const updates: Record<string, unknown> = {
+    const updates: Record<string, any> = {
       last_enhanced_at: new Date().toISOString(),
-      enhancement_confidence: (aiResult.confidence as number) || 50,
-      updated_at: new Date().toISOString(),
+      enhancement_confidence: aiAnalysis?.confidence || 50,
     };
 
-    if (aiResult.suggested_updates && typeof aiResult.suggested_updates === "object") {
-      const suggested = aiResult.suggested_updates as Record<string, unknown>;
-      if (suggested.email && !contractor.email) {
-        updates.email = suggested.email;
+    if (aiAnalysis) {
+      if (!contractor.region && aiAnalysis.region) updates.region = aiAnalysis.region;
+      if (!contractor.postcode && aiAnalysis.postcode) updates.postcode = aiAnalysis.postcode;
+      if (!contractor.address && aiAnalysis.address) updates.address = aiAnalysis.address;
+      if (!contractor.sic_code && aiAnalysis.sic_code) updates.sic_code = aiAnalysis.sic_code;
+      if (!contractor.employees && aiAnalysis.employees) updates.employees = aiAnalysis.employees;
+      if (!contractor.turnover_gbp && aiAnalysis.turnover_gbp) updates.turnover_gbp = aiAnalysis.turnover_gbp;
+      if (aiAnalysis.notes) {
+        updates.notes = contractor.notes 
+          ? contractor.notes + "
+
+AI Enhancement: " + aiAnalysis.notes
+          : "AI Enhancement: " + aiAnalysis.notes;
       }
-      if (suggested.phone && !contractor.phone) {
-        updates.phone = suggested.phone;
-      }
-      if (suggested.website_clean && !contractor.website_clean) {
-        updates.website_clean = suggested.website_clean;
-      }
-      if (suggested.region && !contractor.region) {
-        updates.region = suggested.region;
-      }
-      if (suggested.postcode && !contractor.postcode) {
-        updates.postcode = suggested.postcode;
-      }
+    }
+
+    if (companiesHouseData) {
+      updates.companies_house_raw = companiesHouseData;
     }
 
     console.log("Applying updates:", updates);
@@ -265,40 +185,47 @@ Deno.serve(async (req) => {
     const { error: updateError } = await supabaseClient
       .from("me_contractors")
       .update(updates)
-      .eq("id", contractor_id);
+      .eq("id", contractorId);
 
     if (updateError) {
       console.error("Error updating contractor:", updateError);
       throw updateError;
     }
 
-    console.log("Recalculating radar score...");
-    const { error: recalcError } = await supabaseClient.functions.invoke(
-      "recalculate-contractor-radar-score",
-      {
-        body: { contractor_id },
+    try {
+      console.log("Triggering radar score recalculation...");
+      const { error: recalcError } = await supabaseClient.functions.invoke(
+        "recalculate-contractor-radar-score",
+        {
+          body: { contractorId },
+        }
+      );
+      if (recalcError) {
+        console.error("Error recalculating radar score:", recalcError);
+      } else {
+        console.log("Radar score recalculated successfully");
       }
-    );
-
-    if (recalcError) {
-      console.error("Failed to recalculate radar score:", recalcError);
+    } catch (error) {
+      console.error("Error invoking radar score function:", error);
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        contractor_id,
-        confidence: aiResult.confidence,
-        updates_applied: Object.keys(updates).length - 3,
-        notes: aiResult.notes,
         message: "Contractor enhanced successfully",
+        updates,
+        sources: {
+          companiesHouse: !!companiesHouseData,
+          braveSearch: !!braveSearchData,
+          aiAnalysis: !!aiAnalysis,
+        },
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
     console.error("Enhancement error:", error);
     return new Response(
-      JSON.stringify({ error: (error as Error).message }),
+      JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
