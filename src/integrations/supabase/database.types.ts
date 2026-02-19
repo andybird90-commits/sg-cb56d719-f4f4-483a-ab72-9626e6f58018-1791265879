@@ -870,6 +870,69 @@ export type Database = {
         }
         Relationships: []
       }
+      me_contractors_import_raw: {
+        Row: {
+          address_line_1: string | null
+          address_line_2: string | null
+          company_name: string | null
+          company_number: string | null
+          created_at: string | null
+          email: string | null
+          employees: number | null
+          id: string
+          imported_at: string | null
+          phone: string | null
+          postcode: string | null
+          processed: boolean | null
+          region: string | null
+          sic_code: string | null
+          status: string | null
+          town_city: string | null
+          turnover_gbp: number | null
+          website: string | null
+        }
+        Insert: {
+          address_line_1?: string | null
+          address_line_2?: string | null
+          company_name?: string | null
+          company_number?: string | null
+          created_at?: string | null
+          email?: string | null
+          employees?: number | null
+          id?: string
+          imported_at?: string | null
+          phone?: string | null
+          postcode?: string | null
+          processed?: boolean | null
+          region?: string | null
+          sic_code?: string | null
+          status?: string | null
+          town_city?: string | null
+          turnover_gbp?: number | null
+          website?: string | null
+        }
+        Update: {
+          address_line_1?: string | null
+          address_line_2?: string | null
+          company_name?: string | null
+          company_number?: string | null
+          created_at?: string | null
+          email?: string | null
+          employees?: number | null
+          id?: string
+          imported_at?: string | null
+          phone?: string | null
+          postcode?: string | null
+          processed?: boolean | null
+          region?: string | null
+          sic_code?: string | null
+          status?: string | null
+          town_city?: string | null
+          turnover_gbp?: number | null
+          website?: string | null
+        }
+        Relationships: []
+      }
       monthly_budgets: {
         Row: {
           budget_cost: number | null
