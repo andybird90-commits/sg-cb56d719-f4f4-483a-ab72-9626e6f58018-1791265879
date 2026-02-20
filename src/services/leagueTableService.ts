@@ -27,6 +27,7 @@ export interface LeagueTableEntry {
 }
 
 export async function getLeagueTable(): Promise<LeagueTableEntry[]> {
+  // First, get all league table entries
   const { data: leagueEntries, error: leagueError } = await supabase
     .from("me_contractor_league_table")
     .select(`
@@ -43,8 +44,9 @@ export async function getLeagueTable(): Promise<LeagueTableEntry[]> {
     throw leagueError;
   }
 
+  // Then, get all contractors from the radar view
   const { data: contractors, error: contractorsError } = await supabase
-    .from("me_contractors_radar_view")
+    .from("me_contractor_radar_view")
     .select(`
       id,
       name,
@@ -69,6 +71,7 @@ export async function getLeagueTable(): Promise<LeagueTableEntry[]> {
     throw contractorsError;
   }
 
+  // Combine the data
   const contractorMap = new Map<string, any>();
   contractors.forEach((c) => {
     contractorMap.set(c.id, c);
