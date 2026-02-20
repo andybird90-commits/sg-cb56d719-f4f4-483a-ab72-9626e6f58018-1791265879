@@ -18,7 +18,6 @@ export interface LeagueTableEntry {
     enhancement_confidence: number | null;
     last_enhanced_at: string | null;
     radar_score?: number | null;
-    company_number?: string | null;
     website_clean?: string | null;
     email?: string | null;
     phone?: string | null;
@@ -58,7 +57,6 @@ export async function getLeagueTable(): Promise<LeagueTableEntry[]> {
       enhancement_confidence,
       last_enhanced_at,
       radar_score,
-      company_number,
       website_clean,
       email,
       phone
