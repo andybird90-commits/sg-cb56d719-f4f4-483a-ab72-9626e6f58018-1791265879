@@ -28,6 +28,9 @@ import {
 import { useContractorSelection } from "@/stores/contractorSelectionStore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog } from "@/components/ui/dialog";
+import { DialogContent } from "@/components/ui/dialog";
+import { DialogHeader } from "@/components/ui/dialog";
+import { DialogTitle } from "@/components/ui/dialog";
 
 export default function ContractorRadarPage() {
   const router = useRouter();
@@ -361,6 +364,125 @@ export default function ContractorRadarPage() {
           </div>
         )}
       </div>
+
+      {/* Contractor Detail Dialog */}
+      <Dialog open={!!selectedContractor} onOpenChange={(open) => !open && setSelectedContractor(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          {selectedContractor && (
+            <div className="space-y-6">
+              <DialogHeader>
+                <DialogTitle className="text-2xl flex items-center gap-2">
+                  <Building2 className="h-6 w-6" />
+                  {selectedContractor.name}
+                </DialogTitle>
+              </DialogHeader>
+
+              <div className="grid grid-cols-2 gap-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">Radar Score</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold">
+                      {selectedContractor.radar_score?.toFixed(1) ?? '0.0'}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {selectedContractor.enhancement_confidence !== null && typeof selectedContractor.enhancement_confidence === "number" && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm">Enhancement Confidence</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-3xl font-bold">
+                        {selectedContractor.enhancement_confidence.toFixed(0)}%
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Company Information</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {selectedContractor.region && (
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">Region:</span>
+                      <span>{selectedContractor.region}</span>
+                    </div>
+                  )}
+                  {selectedContractor.postcode && (
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">Postcode:</span>
+                      <span>{selectedContractor.postcode}</span>
+                    </div>
+                  )}
+                  {selectedContractor.sic_code && (
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">SIC Code:</span>
+                      <Badge variant="outline">{selectedContractor.sic_code}</Badge>
+                    </div>
+                  )}
+                  {selectedContractor.employees && (
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">Employees:</span>
+                      <span>{selectedContractor.employees}</span>
+                    </div>
+                  )}
+                  {selectedContractor.turnover_gbp && (
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">Turnover:</span>
+                      <span>£{selectedContractor.turnover_gbp.toLocaleString()}</span>
+                    </div>
+                  )}
+                  {selectedContractor.last_enhanced_at && (
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">Last Enhanced:</span>
+                      <span>{new Date(selectedContractor.last_enhanced_at).toLocaleString()}</span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {selectedContractor.notes && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>AI Summary</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                      <p className="whitespace-pre-wrap">{selectedContractor.notes}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setSelectedContractor(null)}>
+                  Close
+                </Button>
+                <Button onClick={() => {
+                  router.push(`/admin/contractor-enhancer`);
+                  // Pre-select this contractor
+                  toggle(selectedContractor.id);
+                }}>
+                  Enhance This Contractor
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
