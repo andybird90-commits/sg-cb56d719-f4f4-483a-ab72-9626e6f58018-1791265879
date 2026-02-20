@@ -275,17 +275,17 @@ export default function ContractorRadarPage() {
     // Pre-populate form with contractor data
     setCompanyFormData({
       name: contractor.contractor?.name || "",
-      company_number: "",
-      address: "",
-      website: contractor.contractor?.website_clean || "",
-      accounts_email: contractor.contractor?.email || "",
-      notes: contractor.contractor?.notes || "",
       short_name: "",
       sector: "",
       status: "prospect",
       payment_terms: 30,
+      company_number: "",
+      address: "",
       vat_number: "",
+      website: "",
       linkedin_url: "",
+      accounts_email: "",
+      notes: contractor.contractor?.notes || "",
     });
   };
 

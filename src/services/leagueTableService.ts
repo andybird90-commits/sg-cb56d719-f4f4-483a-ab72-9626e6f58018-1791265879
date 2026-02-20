@@ -14,13 +14,11 @@ export interface LeagueTableEntry {
     sic_code: string;
     employees: number;
     turnover_gbp: number;
+    status: string;
     notes: string;
     enhancement_confidence: number | null;
     last_enhanced_at: string | null;
     radar_score?: number | null;
-    website_clean?: string | null;
-    email?: string | null;
-    phone?: string | null;
   };
 }
 
@@ -53,13 +51,11 @@ export async function getLeagueTable(): Promise<LeagueTableEntry[]> {
       sic_code,
       employees,
       turnover_gbp,
+      status,
       notes,
       enhancement_confidence,
       last_enhanced_at,
-      radar_score,
-      website_clean,
-      email,
-      phone
+      radar_score
     `);
 
   if (contractorsError) {
