@@ -26,6 +26,14 @@ import {
   type ContractorListItem,
   type ContractorFilters,
 } from "@/services/contractorDataService";
+import {
+  getLeagueTable,
+  addToLeagueTable,
+  removeFromLeagueTable,
+  moveContractorUp,
+  moveContractorDown,
+  type LeagueTableEntry,
+} from "@/services/leagueTableService";
 import { useContractorSelection } from "@/stores/contractorSelectionStore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog } from "@/components/ui/dialog";
@@ -50,10 +58,16 @@ export default function ContractorRadarPage() {
   });
   const [totalCount, setTotalCount] = useState(0);
   const [selectedContractor, setSelectedContractor] = useState<ContractorListItem | null>(null);
+  const [leagueTable, setLeagueTable] = useState<LeagueTableEntry[]>([]);
+  const [isLoadingLeague, setIsLoadingLeague] = useState(false);
 
   useEffect(() => {
     loadContractors();
   }, [filters]);
+
+  useEffect(() => {
+    loadLeagueTable();
+  }, []);
 
   const loadContractors = async () => {
     setIsLoading(true);
@@ -78,6 +92,22 @@ export default function ContractorRadarPage() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadLeagueTable = async () => {
+    setIsLoadingLeague(true);
+    try {
+      const data = await getLeagueTable();
+      setLeagueTable(data);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load league table",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingLeague(false);
     }
   };
 
@@ -149,6 +179,75 @@ export default function ContractorRadarPage() {
       limit: 50,
       offset: 0,
     });
+  };
+
+  const handleAddToLeagueTable = async () => {
+    if (selectedIds.length === 0) return;
+
+    try {
+      // For now, add first selected contractor with a placeholder fit reason
+      // Later we can add a dialog to get the fit reason from the user
+      for (const contractorId of selectedIds) {
+        await addToLeagueTable(contractorId, "Selected as a potential fit for current projects");
+      }
+
+      toast({
+        title: "Success",
+        description: `Added ${selectedIds.length} contractor(s) to league table`,
+      });
+
+      clearSelection();
+      await loadLeagueTable();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add contractors to league table",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleMoveUp = async (entryId: string) => {
+    try {
+      await moveContractorUp(entryId);
+      await loadLeagueTable();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to move contractor up",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleMoveDown = async (entryId: string) => {
+    try {
+      await moveContractorDown(entryId);
+      await loadLeagueTable();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to move contractor down",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRemoveFromLeague = async (entryId: string) => {
+    try {
+      await removeFromLeagueTable(entryId);
+      toast({
+        title: "Success",
+        description: "Contractor removed from league table",
+      });
+      await loadLeagueTable();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to remove contractor from league table",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
