@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Layout } from "@/components/Layout";
 import { RequireAuth } from "@/components/RequireAuth";
@@ -141,6 +141,11 @@ export default function InvoicingPage() {
     collected: 0,
     totalValue: 0
   });
+
+  const [invoiceMonths, setInvoiceMonths] = useState<InvoiceMonth[]>([]);
+
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const bottomScrollRef = useRef<HTMLDivElement>(null);
 
   const canEdit = profile?.role === "admin" || profile?.role === "director";
   const isLocked = invoiceMonth?.status === "locked";
@@ -948,124 +953,142 @@ export default function InvoicingPage() {
                   {/* Invoice Items Table */}
                   <div className="bg-white rounded-lg shadow overflow-hidden">
                     {invoiceItems.length === 0 ? (
-                      <div className="p-8 text-center">
-                        <p className="text-lg text-muted-foreground mb-2">
-                          No active projects found for this billing period.
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          Invoice items are automatically created from active projects. 
-                          Make sure you have projects with status "active" and they will appear here.
-                        </p>
+                      <div className="p-8 text-center text-gray-500">
+                        No invoices for this period
                       </div>
                     ) : (
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="w-[50px]">Include</TableHead>
-                              <TableHead className="min-w-[150px]">Project</TableHead>
-                              <TableHead className="min-w-[120px]">Client</TableHead>
-                              <TableHead className="min-w-[120px]">PO Number</TableHead>
-                              <TableHead className="min-w-[150px]">Email Contact</TableHead>
-                              <TableHead className="min-w-[200px]">Address</TableHead>
-                              <TableHead className="min-w-[100px]">Project Number</TableHead>
-                              <TableHead className="min-w-[120px]">Project Owner</TableHead>
-                              <TableHead className="min-w-[100px]">Payment Terms</TableHead>
-                              <TableHead className="min-w-[150px]">Invoice Value (from Monthly Phasing)</TableHead>
-                              <TableHead className="min-w-[200px]">Description</TableHead>
-                              <TableHead className="min-w-[100px]">Last Updated</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {invoiceItems.map((item) => (
-                              <TableRow key={item.id} className={item.excluded_this_month ? "opacity-50" : ""}>
-                                <TableCell className="px-4 py-3">
-                                  <Checkbox
-                                    checked={!item.excluded_this_month}
-                                    disabled={!canEdit || isLocked}
-                                    onCheckedChange={(checked) =>
-                                      handleUpdateItem(item.id, "excluded_this_month", !checked)
-                                    }
-                                  />
-                                </TableCell>
-                                <TableCell className="px-4 py-3">
-                                  <Link
-                                    href={`/projects/${item.project_id}`}
-                                    className="text-blue-600 hover:underline"
-                                  >
-                                    {item.project_code} - {item.project_name}
-                                  </Link>
-                                </TableCell>
-                                <TableCell className="px-4 py-3 text-sm">{item.client_name}</TableCell>
-                                <TableCell className="px-4 py-3 text-sm">
-                                  {item.po_number || "—"}
-                                </TableCell>
-                                <TableCell className="px-4 py-3 text-sm">
-                                  {item.accounts_email ? (
-                                    <a
-                                      href={`mailto:${item.accounts_email}`}
+                      <>
+                        {/* Top Scrollbar */}
+                        <div
+                          ref={topScrollRef}
+                          className="overflow-x-auto overflow-y-hidden mb-2"
+                          onScroll={(e) => {
+                            if (bottomScrollRef.current) {
+                              bottomScrollRef.current.scrollLeft = e.currentTarget.scrollLeft;
+                            }
+                          }}
+                        >
+                          <div style={{ width: '1600px', height: '1px' }}></div>
+                        </div>
+                        
+                        {/* Main Table */}
+                        <div
+                          ref={bottomScrollRef}
+                          className="overflow-x-auto"
+                          onScroll={(e) => {
+                            if (topScrollRef.current) {
+                              topScrollRef.current.scrollLeft = e.currentTarget.scrollLeft;
+                            }
+                          }}
+                        >
+                          <Table className="min-w-[1600px]">
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-[50px]">Include</TableHead>
+                                <TableHead className="min-w-[150px]">Project</TableHead>
+                                <TableHead className="min-w-[120px]">Client</TableHead>
+                                <TableHead className="min-w-[120px]">PO Number</TableHead>
+                                <TableHead className="min-w-[150px]">Email Contact</TableHead>
+                                <TableHead className="min-w-[200px]">Address</TableHead>
+                                <TableHead className="min-w-[100px]">Project Number</TableHead>
+                                <TableHead className="min-w-[120px]">Project Owner</TableHead>
+                                <TableHead className="min-w-[100px]">Payment Terms</TableHead>
+                                <TableHead className="min-w-[150px]">Invoice Value (from Monthly Phasing)</TableHead>
+                                <TableHead className="min-w-[200px]">Description</TableHead>
+                                <TableHead className="min-w-[100px]">Last Updated</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {invoiceItems.map((item) => (
+                                <TableRow key={item.id} className={item.excluded_this_month ? "opacity-50" : ""}>
+                                  <TableCell className="px-4 py-3">
+                                    <Checkbox
+                                      checked={!item.excluded_this_month}
+                                      disabled={!canEdit || isLocked}
+                                      onCheckedChange={(checked) =>
+                                        handleUpdateItem(item.id, "excluded_this_month", !checked)
+                                      }
+                                    />
+                                  </TableCell>
+                                  <TableCell className="px-4 py-3">
+                                    <Link
+                                      href={`/projects/${item.project_id}`}
                                       className="text-blue-600 hover:underline"
                                     >
-                                      {item.accounts_email}
-                                    </a>
-                                  ) : (
-                                    "—"
-                                  )}
-                                </TableCell>
-                                <TableCell className="px-4 py-3 text-sm max-w-xs truncate" title={item.client_address || ""}>
-                                  {item.client_address || "—"}
-                                </TableCell>
-                                <TableCell className="px-4 py-3 text-sm font-mono">
-                                  {item.project_reference || "—"}
-                                </TableCell>
-                                <TableCell className="px-4 py-3 text-sm">
-                                  {item.project_owner_name || "—"}
-                                </TableCell>
-                                <TableCell className="px-4 py-3 text-sm">
-                                  {item.payment_terms ? `${item.payment_terms} days` : "—"}
-                                </TableCell>
-                                <TableCell className="px-4 py-3">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm font-medium">
-                                      {item.invoice_value
-                                        ? `£${item.invoice_value.toFixed(2)}`
-                                        : "—"}
-                                    </span>
-                                    <span className="text-xs text-muted-foreground italic">
-                                      (from phasing)
-                                    </span>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="px-4 py-3">
-                                  {canEdit && !isLocked && !item.excluded_this_month ? (
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => handleOpenEditDialog(item)}
-                                      className="w-full justify-start text-left min-h-[60px] whitespace-normal"
-                                    >
-                                      {item.description ? (
-                                        <span className="text-sm">{item.description}</span>
-                                      ) : (
-                                        <span className="text-sm text-muted-foreground italic">
-                                          Click to add description...
-                                        </span>
-                                      )}
-                                    </Button>
-                                  ) : (
-                                    <span className="text-sm whitespace-pre-wrap">
-                                      {item.description || "—"}
-                                    </span>
-                                  )}
-                                </TableCell>
-                                <TableCell className="px-4 py-3 text-sm text-gray-500">
-                                  {new Date(item.updated_at).toLocaleDateString()}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
+                                      {item.project_code} - {item.project_name}
+                                    </Link>
+                                  </TableCell>
+                                  <TableCell className="px-4 py-3 text-sm">{item.client_name}</TableCell>
+                                  <TableCell className="px-4 py-3 text-sm">
+                                    {item.po_number || "—"}
+                                  </TableCell>
+                                  <TableCell className="px-4 py-3 text-sm">
+                                    {item.accounts_email ? (
+                                      <a
+                                        href={`mailto:${item.accounts_email}`}
+                                        className="text-blue-600 hover:underline"
+                                      >
+                                        {item.accounts_email}
+                                      </a>
+                                    ) : (
+                                      "—"
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="px-4 py-3 text-sm max-w-xs truncate" title={item.client_address || ""}>
+                                    {item.client_address || "—"}
+                                  </TableCell>
+                                  <TableCell className="px-4 py-3 text-sm font-mono">
+                                    {item.project_reference || "—"}
+                                  </TableCell>
+                                  <TableCell className="px-4 py-3 text-sm">
+                                    {item.project_owner_name || "—"}
+                                  </TableCell>
+                                  <TableCell className="px-4 py-3 text-sm">
+                                    {item.payment_terms ? `${item.payment_terms} days` : "—"}
+                                  </TableCell>
+                                  <TableCell className="px-4 py-3">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm font-medium">
+                                        {item.invoice_value
+                                          ? `£${item.invoice_value.toFixed(2)}`
+                                          : "—"}
+                                      </span>
+                                      <span className="text-xs text-muted-foreground italic">
+                                        (from phasing)
+                                      </span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="px-4 py-3">
+                                    {canEdit && !isLocked && !item.excluded_this_month ? (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleOpenEditDialog(item)}
+                                        className="w-full justify-start text-left min-h-[60px] whitespace-normal"
+                                      >
+                                        {item.description ? (
+                                          <span className="text-sm">{item.description}</span>
+                                        ) : (
+                                          <span className="text-sm text-muted-foreground italic">
+                                            Click to add description...
+                                          </span>
+                                        )}
+                                      </Button>
+                                    ) : (
+                                      <span className="text-sm whitespace-pre-wrap">
+                                        {item.description || "—"}
+                                      </span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="px-4 py-3 text-sm text-gray-500">
+                                    {new Date(item.updated_at).toLocaleDateString()}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </>
                     )}
                   </div>
 
