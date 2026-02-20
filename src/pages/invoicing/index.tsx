@@ -43,6 +43,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar, CheckCircle2, AlertTriangle, Clock } from "lucide-react";
 import { format, addDays, startOfWeek, endOfWeek, addWeeks, isBefore, isAfter, isWithinInterval } from "date-fns";
 import { TableCell } from "@/components/ui/table";
+import { Table } from "@/components/ui/table";
 
 type InvoiceMonth = {
   id: string;
@@ -959,47 +960,23 @@ export default function InvoicingPage() {
                       </div>
                     ) : (
                       <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead className="bg-gray-50 border-b">
-                            <tr>
-                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                                Include
-                              </th>
-                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                                Project
-                              </th>
-                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                                Client
-                              </th>
-                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                                PO Number
-                              </th>
-                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                                Email Contact
-                              </th>
-                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                                Address
-                              </th>
-                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                                Project Number
-                              </th>
-                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                                Project Owner
-                              </th>
-                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                                Payment Terms
-                              </th>
-                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                                Invoice Value (from Monthly Phasing)
-                              </th>
-                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                                Description
-                              </th>
-                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">
-                                Last Updated
-                              </th>
-                            </tr>
-                          </thead>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-[50px]">Include</TableHead>
+                              <TableHead className="min-w-[150px]">Project</TableHead>
+                              <TableHead className="min-w-[120px]">Client</TableHead>
+                              <TableHead className="min-w-[120px]">PO Number</TableHead>
+                              <TableHead className="min-w-[150px]">Email Contact</TableHead>
+                              <TableHead className="min-w-[200px]">Address</TableHead>
+                              <TableHead className="min-w-[100px]">Project Number</TableHead>
+                              <TableHead className="min-w-[120px]">Project Owner</TableHead>
+                              <TableHead className="min-w-[100px]">Payment Terms</TableHead>
+                              <TableHead className="min-w-[150px]">Invoice Value (from Monthly Phasing)</TableHead>
+                              <TableHead className="min-w-[200px]">Description</TableHead>
+                              <TableHead className="min-w-[100px]">Last Updated</TableHead>
+                            </TableRow>
+                          </TableHeader>
                           <tbody className="divide-y">
                             {invoiceItems.map((item) => (
                               <tr key={item.id} className={item.excluded_this_month ? "opacity-50" : ""}>
@@ -1088,7 +1065,7 @@ export default function InvoicingPage() {
                               </tr>
                             ))}
                           </tbody>
-                        </table>
+                        </Table>
                       </div>
                     )}
                   </div>
