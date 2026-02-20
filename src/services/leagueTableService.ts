@@ -12,7 +12,6 @@ export interface LeagueTableEntry {
     region: string;
     postcode: string;
     sic_code: string;
-    address: string;
     employees: number;
     turnover_gbp: number;
     notes: string;
@@ -53,7 +52,6 @@ export async function getLeagueTable(): Promise<LeagueTableEntry[]> {
       region,
       postcode,
       sic_code,
-      address,
       employees,
       turnover_gbp,
       notes,
