@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Building2,
   Mail,
@@ -40,6 +41,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { DialogContent } from "@/components/ui/dialog";
 import { DialogHeader } from "@/components/ui/dialog";
 import { DialogTitle } from "@/components/ui/dialog";
+import type React from "react";
 
 export default function ContractorRadarPage() {
   const router = useRouter();
@@ -60,6 +62,23 @@ export default function ContractorRadarPage() {
   const [selectedContractor, setSelectedContractor] = useState<ContractorListItem | null>(null);
   const [leagueTable, setLeagueTable] = useState<LeagueTableEntry[]>([]);
   const [isLoadingLeague, setIsLoadingLeague] = useState(false);
+  const [addToCompanyDialogOpen, setAddToCompanyDialogOpen] = useState(false);
+  const [selectedLeagueContractor, setSelectedLeagueContractor] = useState<LeagueTableEntry | null>(null);
+  const [savingCompany, setSavingCompany] = useState(false);
+  const [companyFormData, setCompanyFormData] = useState({
+    name: "",
+    short_name: "",
+    sector: "",
+    status: "prospect" as "active" | "prospect" | "inactive",
+    payment_terms: 30,
+    company_number: "",
+    address: "",
+    vat_number: "",
+    website: "",
+    linkedin_url: "",
+    accounts_email: "",
+    notes: "",
+  });
 
   useEffect(() => {
     loadContractors();
@@ -250,6 +269,74 @@ export default function ContractorRadarPage() {
     }
   };
 
+  const handleAddToCompanies = (contractor: LeagueTableEntry) => {
+    setAddToCompanyDialogOpen(true);
+    setSelectedLeagueContractor(contractor);
+    // Pre-populate form with contractor data
+    setCompanyFormData({
+      name: contractor.contractor?.name || "",
+      company_number: contractor.contractor?.company_number || "",
+      address: contractor.contractor?.address || "",
+      website: contractor.contractor?.website_clean || "",
+      accounts_email: contractor.contractor?.email || "",
+      notes: contractor.contractor?.notes || "",
+      short_name: "",
+      sector: "",
+      status: "prospect",
+      payment_terms: 30,
+      vat_number: "",
+      linkedin_url: "",
+    });
+  };
+
+  const handleCompanyFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingCompany(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const { data, error } = await supabase
+        .from("companies")
+        .insert({
+          ...companyFormData,
+          added_by_user_id: userData.user?.id,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `${companyFormData.name} added to companies`,
+      });
+
+      setAddToCompanyDialogOpen(false);
+      setSelectedLeagueContractor(null);
+      setCompanyFormData({
+        name: "",
+        short_name: "",
+        sector: "",
+        status: "prospect",
+        payment_terms: 30,
+        company_number: "",
+        address: "",
+        vat_number: "",
+        website: "",
+        linkedin_url: "",
+        accounts_email: "",
+        notes: "",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create company",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingCompany(false);
+    }
+  };
+
   return (
     <Layout>
       <div className="container mx-auto py-8 space-y-6">
@@ -353,6 +440,14 @@ export default function ContractorRadarPage() {
 
                       {/* Controls */}
                       <div className="flex flex-col gap-2">
+                        <Button
+                          size="sm"
+                          variant="default"
+                          onClick={() => handleAddToCompanies(entry)}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          + Company
+                        </Button>
                         <Button
                           size="sm"
                           variant="outline"
@@ -695,6 +790,142 @@ export default function ContractorRadarPage() {
                 </div>
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Add to Companies Dialog */}
+        <Dialog open={addToCompanyDialogOpen} onOpenChange={setAddToCompanyDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Add to Companies</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleCompanyFormSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="text-sm font-medium">Company Name *</label>
+                  <Input
+                    value={companyFormData.name}
+                    onChange={(e) => setCompanyFormData({ ...companyFormData, name: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Short Name</label>
+                  <Input
+                    value={companyFormData.short_name}
+                    onChange={(e) => setCompanyFormData({ ...companyFormData, short_name: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Sector</label>
+                  <Input
+                    value={companyFormData.sector}
+                    onChange={(e) => setCompanyFormData({ ...companyFormData, sector: e.target.value })}
+                    placeholder="e.g., Construction, M&E"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Status *</label>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={companyFormData.status}
+                    onChange={(e) => setCompanyFormData({ ...companyFormData, status: e.target.value as "active" | "prospect" | "inactive" })}
+                    required
+                  >
+                    <option value="prospect">Prospect</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Payment Terms (days) *</label>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={companyFormData.payment_terms}
+                    onChange={(e) => setCompanyFormData({ ...companyFormData, payment_terms: parseInt(e.target.value) })}
+                    required
+                  >
+                    <option value={14}>14 days</option>
+                    <option value={30}>30 days</option>
+                    <option value={45}>45 days</option>
+                    <option value={60}>60 days</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Company Number</label>
+                  <Input
+                    value={companyFormData.company_number}
+                    onChange={(e) => setCompanyFormData({ ...companyFormData, company_number: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">VAT Number</label>
+                  <Input
+                    value={companyFormData.vat_number}
+                    onChange={(e) => setCompanyFormData({ ...companyFormData, vat_number: e.target.value })}
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <label className="text-sm font-medium">Address</label>
+                  <Input
+                    value={companyFormData.address}
+                    onChange={(e) => setCompanyFormData({ ...companyFormData, address: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">Website</label>
+                  <Input
+                    value={companyFormData.website}
+                    onChange={(e) => setCompanyFormData({ ...companyFormData, website: e.target.value })}
+                    placeholder="https://..."
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium">LinkedIn URL</label>
+                  <Input
+                    value={companyFormData.linkedin_url}
+                    onChange={(e) => setCompanyFormData({ ...companyFormData, linkedin_url: e.target.value })}
+                    placeholder="https://linkedin.com/company/..."
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <label className="text-sm font-medium">Accounts Email</label>
+                  <Input
+                    type="email"
+                    value={companyFormData.accounts_email}
+                    onChange={(e) => setCompanyFormData({ ...companyFormData, accounts_email: e.target.value })}
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <label className="text-sm font-medium">Notes</label>
+                  <textarea
+                    className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={companyFormData.notes}
+                    onChange={(e) => setCompanyFormData({ ...companyFormData, notes: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setAddToCompanyDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={savingCompany}>
+                  {savingCompany ? "Adding..." : "Add to Companies"}
+                </Button>
+              </div>
+            </form>
           </DialogContent>
         </Dialog>
       </div>

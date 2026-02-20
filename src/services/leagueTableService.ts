@@ -4,22 +4,25 @@ export interface LeagueTableEntry {
   id: string;
   contractor_id: string;
   rank_position: number;
-  fit_reason: string | null;
-  added_by: string | null;
-  created_at: string;
-  updated_at: string;
-  contractor?: {
+  fit_reason: string;
+  added_at: string;
+  contractor: {
     id: string;
     name: string;
-    region: string | null;
-    postcode: string | null;
-    sic_code: string | null;
-    address: string | null;
-    employees: number | null;
-    turnover_gbp: number | null;
-    notes: string | null;
+    region: string;
+    postcode: string;
+    sic_code: string;
+    address: string;
+    employees: number;
+    turnover_gbp: number;
+    notes: string;
     enhancement_confidence: number | null;
     last_enhanced_at: string | null;
+    radar_score?: number | null;
+    company_number?: string | null;
+    website_clean?: string | null;
+    email?: string | null;
+    phone?: string | null;
   };
 }
 
@@ -27,8 +30,12 @@ export async function getLeagueTable(): Promise<LeagueTableEntry[]> {
   const { data, error } = await supabase
     .from("me_contractor_league_table")
     .select(`
-      *,
-      contractor:me_contractors(
+      id,
+      contractor_id,
+      rank_position,
+      fit_reason,
+      added_at,
+      contractor:me_contractors_radar_view!contractor_id (
         id,
         name,
         region,
@@ -39,7 +46,12 @@ export async function getLeagueTable(): Promise<LeagueTableEntry[]> {
         turnover_gbp,
         notes,
         enhancement_confidence,
-        last_enhanced_at
+        last_enhanced_at,
+        radar_score,
+        company_number,
+        website_clean,
+        email,
+        phone
       )
     `)
     .order("rank_position", { ascending: true });
