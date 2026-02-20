@@ -358,11 +358,6 @@ export default function ContractorEnhancerPage() {
                           <div>Website: {contractor.website_clean || "N/A"}</div>
                           <div>Employees: {contractor.employees || "N/A"}</div>
                           <div>Turnover: {contractor.turnover_gbp ? `£${contractor.turnover_gbp.toLocaleString()}` : "N/A"}</div>
-                          {contractor.capabilities && contractor.capabilities.length > 0 && (
-                            <div>
-                              Capabilities: {contractor.capabilities.join(", ")}
-                            </div>
-                          )}
                         </div>
                       </div>
 

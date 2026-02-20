@@ -41,10 +41,7 @@ export async function getContractorRadarList(
   try {
     let query = supabase
       .from("me_contractor_radar_view")
-      .select(
-        "id, name, region, postcode, sic_code, radar_score, enhancement_confidence, last_enhanced_at, website_clean, markets, capabilities, email, phone, status, employees, turnover_gbp",
-        { count: "exact" }
-      );
+      .select("*", { count: "exact" });
 
     // Apply filters
     if (filters.regions && filters.regions.length > 0) {
