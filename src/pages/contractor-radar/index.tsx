@@ -146,7 +146,6 @@ export default function ContractorRadarPage() {
       searchTerm: "",
       minScore: undefined,
       maxScore: undefined,
-      region: undefined,
       limit: 50,
       offset: 0,
     });
