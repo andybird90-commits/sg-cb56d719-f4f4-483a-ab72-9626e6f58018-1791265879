@@ -5,7 +5,7 @@ export interface LeagueTableEntry {
   contractor_id: string;
   rank_position: number;
   fit_reason: string;
-  added_at: string;
+  created_at: string;
   contractor: {
     id: string;
     name: string;
@@ -34,7 +34,7 @@ export async function getLeagueTable(): Promise<LeagueTableEntry[]> {
       contractor_id,
       rank_position,
       fit_reason,
-      added_at,
+      created_at,
       contractor:me_contractors_radar_view!contractor_id (
         id,
         name,
