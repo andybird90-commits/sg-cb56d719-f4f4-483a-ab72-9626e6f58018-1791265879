@@ -160,6 +160,131 @@ export default function ContractorRadarPage() {
             <p className="text-muted-foreground">Browse and manage M&E contractors</p>
           </div>
 
+          {/* League Table Section */}
+          <Card className="bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-950 dark:to-amber-950 border-2 border-yellow-400 dark:border-yellow-600">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="bg-yellow-500 text-white rounded-full p-2">
+                    <TrendingUp className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-2xl">League Table</CardTitle>
+                    <p className="text-sm text-muted-foreground">Your curated top contractors</p>
+                  </div>
+                </div>
+                {selectedIds.length > 0 && (
+                  <Button onClick={handleAddToLeagueTable} variant="default">
+                    Add {selectedIds.length} to League Table
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {isLoadingLeague ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-24 w-full" />
+                  ))}
+                </div>
+              ) : leagueTable.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <TrendingUp className="mx-auto h-12 w-12 mb-4 opacity-50" />
+                  <p className="font-medium">No contractors in your league table yet</p>
+                  <p className="text-sm mt-2">Select contractors below and click "Add to League Table"</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {leagueTable.map((entry, index) => (
+                    <div
+                      key={entry.id}
+                      className="flex items-center gap-4 p-4 rounded-lg border-2 bg-white dark:bg-gray-900 hover:shadow-md transition-shadow"
+                    >
+                      {/* Rank Badge */}
+                      <div className="flex-shrink-0">
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg ${
+                          index === 0 ? 'bg-yellow-500 text-white' :
+                          index === 1 ? 'bg-gray-400 text-white' :
+                          index === 2 ? 'bg-orange-600 text-white' :
+                          'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                        }`}>
+                          {entry.rank_position}
+                        </div>
+                      </div>
+
+                      {/* Contractor Details */}
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-center gap-3">
+                          <h3 className="text-lg font-semibold">{entry.contractor?.name}</h3>
+                          <Badge variant="outline">Score: {entry.contractor?.radar_score?.toFixed(1) ?? 'N/A'}</Badge>
+                          {entry.contractor?.enhancement_confidence !== null && (
+                            <Badge variant="secondary">
+                              Confidence: {entry.contractor?.enhancement_confidence?.toFixed(0)}%
+                            </Badge>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-start gap-2 text-sm">
+                          <span className="font-medium text-muted-foreground min-w-[80px]">Why a fit:</span>
+                          <p className="flex-1 text-gray-700 dark:text-gray-300">
+                            {entry.fit_reason || "No reason provided yet"}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          {entry.contractor?.region && (
+                            <span className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              {entry.contractor.region}
+                            </span>
+                          )}
+                          {entry.contractor?.sic_code && (
+                            <Badge variant="outline" className="text-xs">
+                              SIC: {entry.contractor.sic_code}
+                            </Badge>
+                          )}
+                          {entry.contractor?.employees && (
+                            <span className="flex items-center gap-1">
+                              <Users className="h-3 w-3" />
+                              {entry.contractor.employees} employees
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Controls */}
+                      <div className="flex flex-col gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleMoveUp(entry.id)}
+                          disabled={index === 0}
+                        >
+                          ↑
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleMoveDown(entry.id)}
+                          disabled={index === leagueTable.length - 1}
+                        >
+                          ↓
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => handleRemoveFromLeague(entry.id)}
+                        >
+                          ✕
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {selectedIds.length > 0 && (
             <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
               <CardContent className="pt-6">
