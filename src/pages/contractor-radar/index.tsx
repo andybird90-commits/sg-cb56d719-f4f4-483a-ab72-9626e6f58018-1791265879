@@ -275,7 +275,7 @@ export default function ContractorRadarPage() {
     // Pre-populate form with contractor data
     setCompanyFormData({
       name: contractor.contractor?.name || "",
-      company_number: contractor.contractor?.company_number || "",
+      company_number: "",
       address: "",
       website: contractor.contractor?.website_clean || "",
       accounts_email: contractor.contractor?.email || "",
