@@ -976,10 +976,10 @@ export default function InvoicingPage() {
                               <TableHead className="min-w-[100px]">Last Updated</TableHead>
                             </TableRow>
                           </TableHeader>
-                          <tbody className="divide-y">
+                          <TableBody>
                             {invoiceItems.map((item) => (
-                              <tr key={item.id} className={item.excluded_this_month ? "opacity-50" : ""}>
-                                <td className="px-4 py-3">
+                              <TableRow key={item.id} className={item.excluded_this_month ? "opacity-50" : ""}>
+                                <TableCell className="px-4 py-3">
                                   <Checkbox
                                     checked={!item.excluded_this_month}
                                     disabled={!canEdit || isLocked}
@@ -987,20 +987,20 @@ export default function InvoicingPage() {
                                       handleUpdateItem(item.id, "excluded_this_month", !checked)
                                     }
                                   />
-                                </td>
-                                <td className="px-4 py-3">
+                                </TableCell>
+                                <TableCell className="px-4 py-3">
                                   <Link
                                     href={`/projects/${item.project_id}`}
                                     className="text-blue-600 hover:underline"
                                   >
                                     {item.project_code} - {item.project_name}
                                   </Link>
-                                </td>
-                                <td className="px-4 py-3 text-sm">{item.client_name}</td>
-                                <td className="px-4 py-3 text-sm">
+                                </TableCell>
+                                <TableCell className="px-4 py-3 text-sm">{item.client_name}</TableCell>
+                                <TableCell className="px-4 py-3 text-sm">
                                   {item.po_number || "—"}
-                                </td>
-                                <td className="px-4 py-3 text-sm">
+                                </TableCell>
+                                <TableCell className="px-4 py-3 text-sm">
                                   {item.accounts_email ? (
                                     <a
                                       href={`mailto:${item.accounts_email}`}
@@ -1011,20 +1011,20 @@ export default function InvoicingPage() {
                                   ) : (
                                     "—"
                                   )}
-                                </td>
-                                <td className="px-4 py-3 text-sm max-w-xs truncate" title={item.client_address || ""}>
+                                </TableCell>
+                                <TableCell className="px-4 py-3 text-sm max-w-xs truncate" title={item.client_address || ""}>
                                   {item.client_address || "—"}
-                                </td>
-                                <td className="px-4 py-3 text-sm font-mono">
+                                </TableCell>
+                                <TableCell className="px-4 py-3 text-sm font-mono">
                                   {item.project_reference || "—"}
-                                </td>
-                                <td className="px-4 py-3 text-sm">
+                                </TableCell>
+                                <TableCell className="px-4 py-3 text-sm">
                                   {item.project_owner_name || "—"}
-                                </td>
-                                <td className="px-4 py-3 text-sm">
+                                </TableCell>
+                                <TableCell className="px-4 py-3 text-sm">
                                   {item.payment_terms ? `${item.payment_terms} days` : "—"}
-                                </td>
-                                <td className="px-4 py-3">
+                                </TableCell>
+                                <TableCell className="px-4 py-3">
                                   <div className="flex items-center gap-2">
                                     <span className="text-sm font-medium">
                                       {item.invoice_value
@@ -1035,8 +1035,8 @@ export default function InvoicingPage() {
                                       (from phasing)
                                     </span>
                                   </div>
-                                </td>
-                                <td className="px-4 py-3">
+                                </TableCell>
+                                <TableCell className="px-4 py-3">
                                   {canEdit && !isLocked && !item.excluded_this_month ? (
                                     <Button
                                       variant="outline"
@@ -1057,13 +1057,13 @@ export default function InvoicingPage() {
                                       {item.description || "—"}
                                     </span>
                                   )}
-                                </td>
-                                <td className="px-4 py-3 text-sm text-gray-500">
+                                </TableCell>
+                                <TableCell className="px-4 py-3 text-sm text-gray-500">
                                   {new Date(item.updated_at).toLocaleDateString()}
-                                </td>
-                              </tr>
+                                </TableCell>
+                              </TableRow>
                             ))}
-                          </tbody>
+                          </TableBody>
                         </Table>
                       </div>
                     )}
