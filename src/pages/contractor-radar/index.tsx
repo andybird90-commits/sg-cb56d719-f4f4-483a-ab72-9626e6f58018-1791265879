@@ -276,7 +276,7 @@ export default function ContractorRadarPage() {
     setCompanyFormData({
       name: contractor.contractor?.name || "",
       company_number: contractor.contractor?.company_number || "",
-      address: contractor.contractor?.address || "",
+      address: "",
       website: contractor.contractor?.website_clean || "",
       accounts_email: contractor.contractor?.email || "",
       notes: contractor.contractor?.notes || "",
