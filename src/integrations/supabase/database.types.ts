@@ -1754,15 +1754,15 @@ export type Database = {
     Views: {
       me_contractor_radar_view: {
         Row: {
-          capabilities: string[] | null
           created_at: string | null
           data_completeness: number | null
           employees: number | null
+          enhancement_confidence: number | null
           fit_geo: number | null
           fit_size: number | null
           fit_specialism: number | null
           id: string | null
-          last_contact_at: string | null
+          last_enhanced_at: string | null
           name: string | null
           notes: string | null
           performance: number | null
