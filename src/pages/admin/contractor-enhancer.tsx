@@ -169,8 +169,12 @@ export default function ContractorEnhancerPage() {
       description: `Successfully enhanced ${successCount} of ${selectedIds.length} contractors`,
     });
 
-    // Refresh the contractor list to show updated data
-    loadContractors();
+    // Wait a moment for database to fully update, then refresh
+    setTimeout(() => {
+      loadContractors();
+    }, 500);
+
+    clearSelection();
   };
 
   const handleEnhanceAllNeedingUpdate = async () => {
