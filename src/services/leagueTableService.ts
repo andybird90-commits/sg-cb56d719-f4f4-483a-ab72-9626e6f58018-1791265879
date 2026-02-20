@@ -27,41 +27,62 @@ export interface LeagueTableEntry {
 }
 
 export async function getLeagueTable(): Promise<LeagueTableEntry[]> {
-  const { data, error } = await supabase
+  const { data: leagueEntries, error: leagueError } = await supabase
     .from("me_contractor_league_table")
     .select(`
       id,
       contractor_id,
       rank_position,
       fit_reason,
-      created_at,
-      contractor:me_contractors_radar_view!contractor_id (
-        id,
-        name,
-        region,
-        postcode,
-        sic_code,
-        address,
-        employees,
-        turnover_gbp,
-        notes,
-        enhancement_confidence,
-        last_enhanced_at,
-        radar_score,
-        company_number,
-        website_clean,
-        email,
-        phone
-      )
+      created_at
     `)
     .order("rank_position", { ascending: true });
 
-  if (error) {
-    console.error("Error fetching league table:", error);
-    throw error;
+  if (leagueError) {
+    console.error("Error fetching league table entries:", leagueError);
+    throw leagueError;
   }
 
-  return data || [];
+  const { data: contractors, error: contractorsError } = await supabase
+    .from("me_contractors_radar_view")
+    .select(`
+      id,
+      name,
+      region,
+      postcode,
+      sic_code,
+      address,
+      employees,
+      turnover_gbp,
+      notes,
+      enhancement_confidence,
+      last_enhanced_at,
+      radar_score,
+      company_number,
+      website_clean,
+      email,
+      phone
+    `);
+
+  if (contractorsError) {
+    console.error("Error fetching contractors:", contractorsError);
+    throw contractorsError;
+  }
+
+  const contractorMap = new Map<string, any>();
+  contractors.forEach((c) => {
+    contractorMap.set(c.id, c);
+  });
+
+  const combinedData = leagueEntries.map((entry) => {
+    const contractor = contractorMap.get(entry.contractor_id);
+    return {
+      ...entry,
+      contractor,
+    };
+  });
+
+  return combinedData || [];
 }
 
 export async function addToLeagueTable(
