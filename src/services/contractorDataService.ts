@@ -33,6 +33,7 @@ export interface ContractorListItem {
   status: string | null;
   employees?: number;
   turnover_gbp?: number;
+  notes?: string;
 }
 
 export async function getContractorRadarList(

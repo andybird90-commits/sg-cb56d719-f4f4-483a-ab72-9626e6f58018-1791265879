@@ -713,6 +713,51 @@ export type Database = {
           },
         ]
       }
+      me_contractor_league_table: {
+        Row: {
+          added_by: string | null
+          contractor_id: string
+          created_at: string | null
+          fit_reason: string | null
+          id: string
+          rank_position: number
+          updated_at: string | null
+        }
+        Insert: {
+          added_by?: string | null
+          contractor_id: string
+          created_at?: string | null
+          fit_reason?: string | null
+          id?: string
+          rank_position: number
+          updated_at?: string | null
+        }
+        Update: {
+          added_by?: string | null
+          contractor_id?: string
+          created_at?: string | null
+          fit_reason?: string | null
+          id?: string
+          rank_position?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "me_contractor_league_table_contractor_id_fkey"
+            columns: ["contractor_id"]
+            isOneToOne: true
+            referencedRelation: "me_contractor_radar_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "me_contractor_league_table_contractor_id_fkey"
+            columns: ["contractor_id"]
+            isOneToOne: true
+            referencedRelation: "me_contractors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       me_contractor_radar_scores: {
         Row: {
           contractor_id: string
