@@ -298,12 +298,6 @@ export default function ContractorRadarPage() {
                                   <span className="truncate">{contractor.website_clean}</span>
                                 </div>
                               )}
-                              {contractor.employees_band && (
-                                <div className="flex items-center gap-2 text-sm">
-                                  <Users className="h-4 w-4 text-muted-foreground" />
-                                  <span>{contractor.employees_band}</span>
-                                </div>
-                              )}
                             </div>
 
                             {contractor.capabilities && contractor.capabilities.length > 0 && (
@@ -325,17 +319,17 @@ export default function ContractorRadarPage() {
 
                         <div className="text-right space-y-2">
                           <div>
-                            <div className="text-sm text-muted-foreground">Radar Score</div>
-                            <div className="text-2xl font-bold flex items-center gap-1">
-                              <TrendingUp className="h-5 w-5" />
-                              {contractor.radar_score?.toFixed(1) ?? '0.0'}
-                            </div>
-                          </div>
-                          {contractor.enhancement_confidence !== null && (
-                            <Badge variant="outline">
-                              Confidence: {contractor.enhancement_confidence.toFixed(0)}%
+                            <Badge variant="outline" className="text-lg font-bold">
+                              Score: {contractor.radar_score?.toFixed(1) ?? '0.0'}
                             </Badge>
-                          )}
+                          </div>
+                          <div>
+                            {contractor.enhancement_confidence !== null && typeof contractor.enhancement_confidence === "number" && (
+                              <Badge variant="secondary">
+                                Confidence: {contractor.enhancement_confidence.toFixed(0)}%
+                              </Badge>
+                            )}
+                          </div>
                           {contractor.last_enhanced_at ? (
                             <div className="text-xs text-muted-foreground">
                               Enhanced: {new Date(contractor.last_enhanced_at).toLocaleDateString()}
