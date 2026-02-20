@@ -136,6 +136,12 @@ export default function ContractorEnhancerPage() {
         });
 
         console.log(`[Enhance] Response for ${contractorId}:`, { data, error });
+        
+        // Log the detailed response data
+        if (data) {
+          console.log(`[Enhance] Full Response Data:`, JSON.stringify(data, null, 2));
+          console.log(`[Enhance] Updated Fields:`, data);
+        }
 
         if (error) {
           console.error(`[Enhance] Error for ${contractorId}:`, error);
@@ -160,8 +166,11 @@ export default function ContractorEnhancerPage() {
 
     toast({
       title: "Enhancement Complete",
-      description: `${successCount} contractors enhanced, ${failCount} failed`,
+      description: `Successfully enhanced ${successCount} of ${selectedIds.length} contractors`,
     });
+
+    // Refresh the contractor list to show updated data
+    loadContractors();
   };
 
   const handleEnhanceAllNeedingUpdate = async () => {
@@ -343,8 +352,8 @@ export default function ContractorEnhancerPage() {
                           <div>Email: {contractor.email || "N/A"}</div>
                           <div>Phone: {contractor.phone || "N/A"}</div>
                           <div>Website: {contractor.website_clean || "N/A"}</div>
-                          <div>Employees: {contractor.employees_band || "N/A"}</div>
-                          <div>Turnover: {contractor.turnover_band || "N/A"}</div>
+                          <div>Employees: {contractor.employees || "N/A"}</div>
+                          <div>Turnover: {contractor.turnover_gbp || "N/A"}</div>
                           {contractor.capabilities && contractor.capabilities.length > 0 && (
                             <div>
                               Capabilities: {contractor.capabilities.join(", ")}

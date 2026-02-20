@@ -26,8 +26,6 @@ export interface ContractorListItem {
   enhancement_confidence: number | null;
   last_enhanced_at: string | null;
   website_clean: string | null;
-  employees_band: string | null;
-  turnover_band: string | null;
   markets: string[] | null;
   capabilities: string[] | null;
   email: string | null;
