@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import type { UIEvent } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Layout } from "@/components/Layout";
 import { RequireAuth } from "@/components/RequireAuth";
@@ -180,28 +181,17 @@ export default function InvoicingPage() {
     }
   }, []);
 
-  useEffect(() => {
-    const topScroll = topScrollRef.current;
-    const bottomScroll = bottomScrollRef.current;
+  const handleTopScroll = (event: UIEvent<HTMLDivElement>) => {
+    if (bottomScrollRef.current) {
+      bottomScrollRef.current.scrollLeft = event.currentTarget.scrollLeft;
+    }
+  };
 
-    if (!topScroll || !bottomScroll) return;
-
-    const handleTopScroll = () => {
-      bottomScroll.scrollLeft = topScroll.scrollLeft;
-    };
-
-    const handleBottomScroll = () => {
-      topScroll.scrollLeft = bottomScroll.scrollLeft;
-    };
-
-    topScroll.addEventListener('scroll', handleTopScroll);
-    bottomScroll.addEventListener('scroll', handleBottomScroll);
-
-    return () => {
-      topScroll.removeEventListener('scroll', handleTopScroll);
-      bottomScroll.removeEventListener('scroll', handleBottomScroll);
-    };
-  }, [invoiceItems]);
+  const handleBottomScroll = (event: UIEvent<HTMLDivElement>) => {
+    if (topScrollRef.current) {
+      topScrollRef.current.scrollLeft = event.currentTarget.scrollLeft;
+    }
+  };
 
   async function loadInvoiceData() {
     try {
@@ -985,6 +975,7 @@ export default function InvoicingPage() {
                       <div
                         ref={topScrollRef}
                         className="overflow-x-auto border-b"
+                        onScroll={handleTopScroll}
                       >
                         <div className="h-4 min-w-[1600px]"></div>
                       </div>
@@ -993,6 +984,7 @@ export default function InvoicingPage() {
                       <div
                         ref={bottomScrollRef}
                         className="overflow-x-auto"
+                        onScroll={handleBottomScroll}
                       >
                         <Table className="min-w-[1600px]">
                           <TableHeader>
