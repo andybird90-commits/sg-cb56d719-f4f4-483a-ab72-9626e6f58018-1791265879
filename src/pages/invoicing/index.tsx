@@ -158,7 +158,10 @@ export default function InvoicingPage() {
   const isSyncingFromBottomRef = useRef(false);
 
   const handleTopScroll = (event: UIEvent<HTMLDivElement>) => {
-    if (!bottomScrollRef.current) return;
+    if (!bottomScrollRef.current) {
+      console.log("🧪 Top scroll: bottomScrollRef is null");
+      return;
+    }
 
     if (isSyncingFromBottomRef.current) {
       isSyncingFromBottomRef.current = false;
@@ -166,12 +169,22 @@ export default function InvoicingPage() {
     }
 
     const newScrollLeft = event.currentTarget.scrollLeft;
+    console.log("🧪 Top scroll event", {
+      newScrollLeft,
+      bottomScrollLeftBefore: bottomScrollRef.current.scrollLeft,
+    });
     isSyncingFromTopRef.current = true;
     bottomScrollRef.current.scrollLeft = newScrollLeft;
+    console.log("🧪 Top scroll applied", {
+      bottomScrollLeftAfter: bottomScrollRef.current.scrollLeft,
+    });
   };
 
   const handleBottomScroll = (event: UIEvent<HTMLDivElement>) => {
-    if (!topScrollRef.current) return;
+    if (!topScrollRef.current) {
+      console.log("🧪 Bottom scroll: topScrollRef is null");
+      return;
+    }
 
     if (isSyncingFromTopRef.current) {
       isSyncingFromTopRef.current = false;
@@ -179,8 +192,15 @@ export default function InvoicingPage() {
     }
 
     const newScrollLeft = event.currentTarget.scrollLeft;
+    console.log("🧪 Bottom scroll event", {
+      newScrollLeft,
+      topScrollLeftBefore: topScrollRef.current.scrollLeft,
+    });
     isSyncingFromBottomRef.current = true;
     topScrollRef.current.scrollLeft = newScrollLeft;
+    console.log("🧪 Bottom scroll applied", {
+      topScrollLeftAfter: topScrollRef.current.scrollLeft,
+    });
   };
 
   const loadInvoiceData = useCallback(async () => {
@@ -964,128 +984,128 @@ export default function InvoicingPage() {
                       </div>
                     ) : (
                       <>
-                      {/* Top Scrollbar */}
-                      <div
-                        ref={topScrollRef}
-                        className="overflow-x-auto border-b"
-                        onScroll={handleTopScroll}
-                      >
-                        <div className="h-4 min-w-[1600px]" />
-                      </div>
+                        {/* Top Scrollbar */}
+                        <div
+                          ref={topScrollRef}
+                          className="overflow-x-auto border-b"
+                          onScroll={handleTopScroll}
+                        >
+                          <div className="h-4 min-w-[1600px]" />
+                        </div>
 
-                      {/* Bottom Scrollable Table */}
-                      <div
-                        ref={bottomScrollRef}
-                        className="overflow-x-auto"
-                        onScroll={handleBottomScroll}
-                      >
-                        <Table className="min-w-[1600px]">
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="w-[50px]">Include</TableHead>
-                              <TableHead className="min-w-[150px]">Project</TableHead>
-                              <TableHead className="min-w-[120px]">Client</TableHead>
-                              <TableHead className="min-w-[120px]">PO Number</TableHead>
-                              <TableHead className="min-w-[150px]">Email Contact</TableHead>
-                              <TableHead className="min-w-[200px]">Address</TableHead>
-                              <TableHead className="min-w-[100px]">Project Number</TableHead>
-                              <TableHead className="min-w-[120px]">Project Owner</TableHead>
-                              <TableHead className="min-w-[100px]">Payment Terms</TableHead>
-                              <TableHead className="min-w-[150px]">Invoice Value (from Monthly Phasing)</TableHead>
-                              <TableHead className="min-w-[200px]">Description</TableHead>
-                              <TableHead className="min-w-[100px]">Last Updated</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {invoiceItems.map((item) => (
-                              <TableRow key={item.id} className={item.excluded_this_month ? "opacity-50" : ""}>
-                                <TableCell className="px-4 py-3">
-                                  <Checkbox
-                                    checked={!item.excluded_this_month}
-                                    disabled={!canEdit || isLocked}
-                                    onCheckedChange={(checked) =>
-                                      handleUpdateItem(item.id, "excluded_this_month", !checked)
-                                    }
-                                  />
-                                </TableCell>
-                                <TableCell className="px-4 py-3">
-                                  <Link
-                                    href={`/projects/${item.project_id}`}
-                                    className="text-blue-600 hover:underline"
-                                  >
-                                    {item.project_code} - {item.project_name}
-                                  </Link>
-                                </TableCell>
-                                <TableCell className="px-4 py-3 text-sm">{item.client_name}</TableCell>
-                                <TableCell className="px-4 py-3 text-sm">
-                                  {item.po_number || "—"}
-                                </TableCell>
-                                <TableCell className="px-4 py-3 text-sm">
-                                  {item.accounts_email ? (
-                                    <a
-                                      href={`mailto:${item.accounts_email}`}
+                        {/* Bottom Scrollable Table */}
+                        <div
+                          ref={bottomScrollRef}
+                          className="overflow-x-auto"
+                          onScroll={handleBottomScroll}
+                        >
+                          <Table className="min-w-[1600px]">
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-[50px]">Include</TableHead>
+                                <TableHead className="min-w-[150px]">Project</TableHead>
+                                <TableHead className="min-w-[120px]">Client</TableHead>
+                                <TableHead className="min-w-[120px]">PO Number</TableHead>
+                                <TableHead className="min-w-[150px]">Email Contact</TableHead>
+                                <TableHead className="min-w-[200px]">Address</TableHead>
+                                <TableHead className="min-w-[100px]">Project Number</TableHead>
+                                <TableHead className="min-w-[120px]">Project Owner</TableHead>
+                                <TableHead className="min-w-[100px]">Payment Terms</TableHead>
+                                <TableHead className="min-w-[150px]">Invoice Value (from Monthly Phasing)</TableHead>
+                                <TableHead className="min-w-[200px]">Description</TableHead>
+                                <TableHead className="min-w-[100px]">Last Updated</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {invoiceItems.map((item) => (
+                                <TableRow key={item.id} className={item.excluded_this_month ? "opacity-50" : ""}>
+                                  <TableCell className="px-4 py-3">
+                                    <Checkbox
+                                      checked={!item.excluded_this_month}
+                                      disabled={!canEdit || isLocked}
+                                      onCheckedChange={(checked) =>
+                                        handleUpdateItem(item.id, "excluded_this_month", !checked)
+                                      }
+                                    />
+                                  </TableCell>
+                                  <TableCell className="px-4 py-3">
+                                    <Link
+                                      href={`/projects/${item.project_id}`}
                                       className="text-blue-600 hover:underline"
                                     >
-                                      {item.accounts_email}
-                                    </a>
-                                  ) : (
-                                    "—"
-                                  )}
-                                </TableCell>
-                                <TableCell className="px-4 py-3 text-sm max-w-xs truncate" title={item.client_address || ""}>
-                                  {item.client_address || "—"}
-                                </TableCell>
-                                <TableCell className="px-4 py-3 text-sm font-mono">
-                                  {item.project_reference || "—"}
-                                </TableCell>
-                                <TableCell className="px-4 py-3 text-sm">
-                                  {item.project_owner_name || "—"}
-                                </TableCell>
-                                <TableCell className="px-4 py-3 text-sm">
-                                  {item.payment_terms ? `${item.payment_terms} days` : "—"}
-                                </TableCell>
-                                <TableCell className="px-4 py-3">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm font-medium">
-                                      {item.invoice_value
-                                        ? `£${item.invoice_value.toFixed(2)}`
-                                        : "—"}
-                                    </span>
-                                    <span className="text-xs text-muted-foreground italic">
-                                      (from phasing)
-                                    </span>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="px-4 py-3">
-                                  {canEdit && !isLocked && !item.excluded_this_month ? (
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => handleOpenEditDialog(item)}
-                                      className="w-full justify-start text-left min-h-[60px] whitespace-normal"
-                                    >
-                                      {item.description ? (
-                                        <span className="text-sm">{item.description}</span>
-                                      ) : (
-                                        <span className="text-sm text-muted-foreground italic">
-                                          Click to add description...
-                                        </span>
-                                      )}
-                                    </Button>
-                                  ) : (
-                                    <span className="text-sm whitespace-pre-wrap">
-                                      {item.description || "—"}
-                                    </span>
-                                  )}
-                                </TableCell>
-                                <TableCell className="px-4 py-3 text-sm text-gray-500">
-                                  {new Date(item.updated_at).toLocaleDateString()}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
+                                      {item.project_code} - {item.project_name}
+                                    </Link>
+                                  </TableCell>
+                                  <TableCell className="px-4 py-3 text-sm">{item.client_name}</TableCell>
+                                  <TableCell className="px-4 py-3 text-sm">
+                                    {item.po_number || "—"}
+                                  </TableCell>
+                                  <TableCell className="px-4 py-3 text-sm">
+                                    {item.accounts_email ? (
+                                      <a
+                                        href={`mailto:${item.accounts_email}`}
+                                        className="text-blue-600 hover:underline"
+                                      >
+                                        {item.accounts_email}
+                                      </a>
+                                    ) : (
+                                      "—"
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="px-4 py-3 text-sm max-w-xs truncate" title={item.client_address || ""}>
+                                    {item.client_address || "—"}
+                                  </TableCell>
+                                  <TableCell className="px-4 py-3 text-sm font-mono">
+                                    {item.project_reference || "—"}
+                                  </TableCell>
+                                  <TableCell className="px-4 py-3 text-sm">
+                                    {item.project_owner_name || "—"}
+                                  </TableCell>
+                                  <TableCell className="px-4 py-3 text-sm">
+                                    {item.payment_terms ? `${item.payment_terms} days` : "—"}
+                                  </TableCell>
+                                  <TableCell className="px-4 py-3">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm font-medium">
+                                        {item.invoice_value
+                                          ? `£${item.invoice_value.toFixed(2)}`
+                                          : "—"}
+                                      </span>
+                                      <span className="text-xs text-muted-foreground italic">
+                                        (from phasing)
+                                      </span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="px-4 py-3">
+                                    {canEdit && !isLocked && !item.excluded_this_month ? (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleOpenEditDialog(item)}
+                                        className="w-full justify-start text-left min-h-[60px] whitespace-normal"
+                                      >
+                                        {item.description ? (
+                                          <span className="text-sm">{item.description}</span>
+                                        ) : (
+                                          <span className="text-sm text-muted-foreground italic">
+                                            Click to add description...
+                                          </span>
+                                        )}
+                                      </Button>
+                                    ) : (
+                                      <span className="text-sm whitespace-pre-wrap">
+                                        {item.description || "—"}
+                                      </span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="px-4 py-3 text-sm text-gray-500">
+                                    {new Date(item.updated_at).toLocaleDateString()}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
                       </>
                     )}
                   </div>
