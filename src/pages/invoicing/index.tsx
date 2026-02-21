@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import type { UIEvent } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Layout } from "@/components/Layout";
@@ -123,10 +123,16 @@ export default function InvoicingPage() {
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [editingDescription, setEditingDescription] = useState<string | null>(null);
   const [newDescription, setNewDescription] = useState("");
-  const [profileLoading, setProfileLoading] = useState(true);
+  // Removed separate profileLoading flag; AuthContext and RequireAuth already handle auth/profile loading.
   const [showLockDialog, setShowLockDialog] = useState(false);
   const [editingItems, setEditingItems] = useState<Set<string>>(new Set());
   
+  // Permissions and locking helpers
+  const isLocked = invoiceMonth?.status === "locked";
+  const canEdit =
+    !!profile &&
+    ["admin", "director", "finance_admin", "finance"].includes(profile.role);
+
   // Dialog state for editing description
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -154,7 +160,6 @@ export default function InvoicingPage() {
   const handleTopScroll = (event: UIEvent<HTMLDivElement>) => {
     if (!bottomScrollRef.current) return;
 
-    // If this scroll was triggered programmatically from the bottom handler, skip it
     if (isSyncingFromBottomRef.current) {
       isSyncingFromBottomRef.current = false;
       return;
@@ -168,7 +173,6 @@ export default function InvoicingPage() {
   const handleBottomScroll = (event: UIEvent<HTMLDivElement>) => {
     if (!topScrollRef.current) return;
 
-    // If this scroll was triggered programmatically from the top handler, skip it
     if (isSyncingFromTopRef.current) {
       isSyncingFromTopRef.current = false;
       return;
@@ -179,13 +183,12 @@ export default function InvoicingPage() {
     topScrollRef.current.scrollLeft = newScrollLeft;
   };
 
-  async function loadInvoiceData() {
+  const loadInvoiceData = useCallback(async () => {
     try {
       setLoading(true);
       console.log("Loading invoice data for:", selectedYear, selectedMonth);
       const month = await invoicingService.getOrCreateInvoiceMonth(selectedYear, selectedMonth);
       console.log("Invoice month result:", month);
-      // Ensure status is typed correctly when setting state
       if (month) {
         setInvoiceMonth(month as InvoiceMonth);
         const items = await invoicingService.getInvoiceItems(month.id);
@@ -204,7 +207,7 @@ export default function InvoicingPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [selectedYear, selectedMonth, toast]);
 
   const fetchCashFlowData = async () => {
     try {
@@ -826,9 +829,13 @@ export default function InvoicingPage() {
     (item) => item.invoice_value && item.invoice_value > 0 && item.description?.trim()
   );
 
+  useEffect(() => {
+    loadInvoiceData();
+  }, [loadInvoiceData]);
+
   const years = Array.from({ length: 10 }, (_, i) => currentDate.getFullYear() - 2 + i);
 
-  if (loading || profileLoading) {
+  if (loading) {
     return (
       <RequireAuth>
         <Layout>
