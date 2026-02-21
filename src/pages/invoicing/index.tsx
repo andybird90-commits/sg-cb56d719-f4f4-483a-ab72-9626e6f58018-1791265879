@@ -148,49 +148,35 @@ export default function InvoicingPage() {
   const topScrollRef = useRef<HTMLDivElement>(null);
   const bottomScrollRef = useRef<HTMLDivElement>(null);
 
-  const canEdit = profile?.role === "admin" || profile?.role === "director";
-  const isLocked = invoiceMonth?.status === "locked";
-
-  useEffect(() => {
-    console.log("Auth state:", { user: !!user, profile, canEdit });
-    if (user !== null) {
-      // User state is determined (either logged in or not)
-      if (profile !== undefined) {
-        // Profile has loaded (could be null or an object)
-        setProfileLoading(false);
-      }
-    }
-  }, [user, profile, canEdit]);
-
-  useEffect(() => {
-    if (!profileLoading) {
-      loadInvoiceData();
-    }
-  }, [selectedYear, selectedMonth, profileLoading]);
-
-  useEffect(() => {
-    loadInvoiceData();
-  }, [selectedMonth]);
-
-  // Fetch cash flow data when needed
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const activeTab = urlParams.get('tab');
-    if (activeTab === 'cashflow') {
-      fetchCashFlowData();
-    }
-  }, []);
+  const isSyncingFromTopRef = useRef(false);
+  const isSyncingFromBottomRef = useRef(false);
 
   const handleTopScroll = (event: UIEvent<HTMLDivElement>) => {
-    if (bottomScrollRef.current) {
-      bottomScrollRef.current.scrollLeft = event.currentTarget.scrollLeft;
+    if (!bottomScrollRef.current) return;
+
+    // If this scroll was triggered programmatically from the bottom handler, skip it
+    if (isSyncingFromBottomRef.current) {
+      isSyncingFromBottomRef.current = false;
+      return;
     }
+
+    const newScrollLeft = event.currentTarget.scrollLeft;
+    isSyncingFromTopRef.current = true;
+    bottomScrollRef.current.scrollLeft = newScrollLeft;
   };
 
   const handleBottomScroll = (event: UIEvent<HTMLDivElement>) => {
-    if (topScrollRef.current) {
-      topScrollRef.current.scrollLeft = event.currentTarget.scrollLeft;
+    if (!topScrollRef.current) return;
+
+    // If this scroll was triggered programmatically from the top handler, skip it
+    if (isSyncingFromTopRef.current) {
+      isSyncingFromTopRef.current = false;
+      return;
     }
+
+    const newScrollLeft = event.currentTarget.scrollLeft;
+    isSyncingFromBottomRef.current = true;
+    topScrollRef.current.scrollLeft = newScrollLeft;
   };
 
   async function loadInvoiceData() {
@@ -977,7 +963,7 @@ export default function InvoicingPage() {
                         className="overflow-x-auto border-b"
                         onScroll={handleTopScroll}
                       >
-                        <div className="h-4 min-w-[1600px]"></div>
+                        <div className="h-4 min-w-[1600px]" />
                       </div>
 
                       {/* Bottom Scrollable Table */}
