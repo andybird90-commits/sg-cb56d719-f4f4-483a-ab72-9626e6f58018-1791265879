@@ -165,6 +165,8 @@ function AdminDashboardContent() {
       let totalYearRevenue = 0;
       const chartData: MonthlyData[] = [];
       const waterfallData: CashWaterfallEntry[] = [];
+
+      // Opening cash is at the start of February, not January
       let openingCash = 100000;
       let quarterRevenueAccumulator = 0;
 
@@ -181,14 +183,21 @@ function AdminDashboardContent() {
           margin,
         });
 
+        // VAT accumulator always includes all months, including January
         quarterRevenueAccumulator += revenue;
 
         const isQuarterEnd = ["Mar", "Jun", "Sep", "Dec"].includes(monthName);
         let vatPayment = 0;
 
         if (isQuarterEnd) {
+          // VAT is 20% of the full quarter turnover (including Jan in Q1)
           vatPayment = quarterRevenueAccumulator * 0.2;
           quarterRevenueAccumulator = 0;
+        }
+
+        // Cash waterfall should start from February; skip January for cash rows
+        if (monthName === "Jan") {
+          return;
         }
 
         const closingCash = openingCash + revenue - monthlyOutgoings - vatPayment;
