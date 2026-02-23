@@ -14,6 +14,13 @@ import type React from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Company {
   id: string;
@@ -27,6 +34,7 @@ interface Company {
   accounts_email?: string | null;
   notes?: string | null;
   created_at: string;
+  status: "active" | "prospect" | "inactive";
 }
 
 interface Contact {
@@ -62,6 +70,7 @@ function CompanyDetailContent() {
     linkedin_url: "",
     accounts_email: "",
     notes: "",
+    status: "prospect" as "active" | "prospect" | "inactive",
   });
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
@@ -112,6 +121,7 @@ function CompanyDetailContent() {
         linkedin_url: companyData.linkedin_url || "",
         accounts_email: companyData.accounts_email || "",
         notes: companyData.notes || "",
+        status: companyData.status,
       });
     } catch (err) {
       console.error("Failed to load company data", err);
@@ -138,6 +148,7 @@ function CompanyDetailContent() {
           linkedin_url: formData.linkedin_url || null,
           accounts_email: formData.accounts_email || null,
           notes: formData.notes || null,
+          status: formData.status,
         })
         .eq("id", id);
 
@@ -250,6 +261,22 @@ function CompanyDetailContent() {
               <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
                 <CardTitle className="text-xl sm:text-2xl">{company.name}</CardTitle>
                 <div className="flex items-center gap-2">
+                  <Badge
+                    variant="outline"
+                    className={
+                      company.status === "active"
+                        ? "border-green-200 bg-green-50 text-green-800"
+                        : company.status === "prospect"
+                        ? "border-amber-200 bg-amber-50 text-amber-800"
+                        : "border-slate-200 bg-slate-50 text-slate-700"
+                    }
+                  >
+                    {company.status === "active"
+                      ? "Active"
+                      : company.status === "prospect"
+                      ? "Prospect"
+                      : "Inactive"}
+                  </Badge>
                   {canEdit && !isEditing && (
                     <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="gap-2">
                       <Edit className="w-4 h-4" />
@@ -285,6 +312,28 @@ function CompanyDetailContent() {
                           value={formData.short_name}
                           onChange={(e) => setFormData({ ...formData, short_name: e.target.value })}
                         />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="status">Status</Label>
+                        <Select
+                          value={formData.status}
+                          onValueChange={(value) =>
+                            setFormData({
+                              ...formData,
+                              status: value as "active" | "prospect" | "inactive",
+                            })
+                          }
+                        >
+                          <SelectTrigger id="status">
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="prospect">Prospect</SelectItem>
+                            <SelectItem value="active">Active</SelectItem>
+                            <SelectItem value="inactive">Inactive</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
 
                       <div className="space-y-2">
