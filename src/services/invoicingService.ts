@@ -192,6 +192,80 @@ export const invoicingService = {
     if (error) throw error;
   },
 
+  async getProjectPhasingTotal(year: number, month: number): Promise<number> {
+    const monthStart = new Date(year, month - 1, 1);
+    const monthEnd = new Date(year, month, 0);
+
+    const { data: projects, error: projectsError } = await supabase
+      .from("projects" as any)
+      .select(`
+        id,
+        agreed_fee_value,
+        start_date,
+        end_date
+      `)
+      .eq("archived", false)
+      .not("agreed_fee_value", "is", null)
+      .gte("end_date", monthStart.toISOString());
+
+    if (projectsError) throw projectsError;
+
+    const { data: phasingRows, error: phasingError } = await supabase
+      .from("project_monthly_phasing")
+      .select("project_id, year, month, revenue_amount")
+      .eq("year", year)
+      .eq("month", month);
+
+    if (phasingError) throw phasingError;
+
+    const { data: projectsWithAnyPhasing, error: projectsWithAnyPhasingError } = await supabase
+      .from("project_monthly_phasing")
+      .select("project_id")
+      .not("revenue_amount", "is", null);
+
+    if (projectsWithAnyPhasingError) throw projectsWithAnyPhasingError;
+
+    const phasingMap = new Map<string, number>();
+    phasingRows?.forEach((row) => {
+      phasingMap.set(row.project_id, row.revenue_amount || 0);
+    });
+
+    const projectsWithAnyPhasingSet = new Set<string>(
+      projectsWithAnyPhasing?.map((p) => p.project_id) || []
+    );
+
+    let total = 0;
+
+    (projects || []).forEach((project) => {
+      if (!project.start_date || !project.end_date) return;
+
+      const start = new Date(project.start_date);
+      const end = new Date(project.end_date);
+
+      if (start > monthEnd || end < monthStart) return;
+
+      const hasManualPhasing = projectsWithAnyPhasingSet.has(project.id);
+      let monthlyRevenue = 0;
+
+      if (hasManualPhasing) {
+        monthlyRevenue = phasingMap.get(project.id) || 0;
+      } else {
+        const durationMonths = Math.max(
+          1,
+          (end.getFullYear() - start.getFullYear()) * 12 +
+            (end.getMonth() - start.getMonth()) +
+            1
+        );
+        monthlyRevenue =
+          (Number(project.agreed_fee_value) || 0) / durationMonths;
+      }
+
+      total += monthlyRevenue;
+    });
+
+    return total;
+  },
+
   async generateAndUploadPdf(
     invoiceMonth: InvoiceMonth,
     items: InvoiceItem[]

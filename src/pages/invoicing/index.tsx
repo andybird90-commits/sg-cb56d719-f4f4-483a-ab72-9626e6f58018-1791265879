@@ -126,6 +126,7 @@ export default function InvoicingPage() {
   // Removed separate profileLoading flag; AuthContext and RequireAuth already handle auth/profile loading.
   const [showLockDialog, setShowLockDialog] = useState(false);
   const [editingItems, setEditingItems] = useState<Set<string>>(new Set());
+  const [phasingTotal, setPhasingTotal] = useState<number | null>(null);
   
   // Permissions and locking helpers
   const isLocked = invoiceMonth?.status === "locked";
@@ -218,6 +219,12 @@ export default function InvoicingPage() {
         setInvoiceMonth(null);
         setInvoiceItems([]);
       }
+
+      const phasingValue = await invoicingService.getProjectPhasingTotal(
+        selectedYear,
+        selectedMonth
+      );
+      setPhasingTotal(phasingValue);
     } catch (error) {
       console.error("Error loading invoice data:", error);
       toast({
@@ -225,6 +232,7 @@ export default function InvoicingPage() {
         description: "Failed to load invoice data",
         variant: "destructive",
       });
+      setPhasingTotal(null);
     } finally {
       setLoading(false);
     }
@@ -836,6 +844,7 @@ export default function InvoicingPage() {
     (sum, item) => sum + (item.invoice_value || 0),
     0
   );
+  const displayTotal = phasingTotal !== null ? phasingTotal : totalValue;
 
   // Debug logging
   console.log("📊 Invoice Items Debug:", {
@@ -843,7 +852,8 @@ export default function InvoicingPage() {
     includedItems: includedItems.length,
     excludedItems: invoiceItems.filter(i => i.excluded_this_month).length,
     nullValueItems: invoiceItems.filter(i => i.invoice_value === null).length,
-    calculatedTotal: totalValue,
+    calculatedTotalFromItems: totalValue,
+    phasingTotal,
     itemBreakdown: includedItems.map(i => ({
       project: i.project_name,
       value: i.invoice_value,
@@ -1119,7 +1129,7 @@ export default function InvoicingPage() {
                     <div className="text-lg font-semibold">
                       Total invoice value this month:{" "}
                       <span className="text-primary">
-                        £{totalValue.toFixed(2)}
+                        £{displayTotal.toFixed(2)}
                       </span>
                     </div>
                     <div className="flex gap-2">
@@ -1155,7 +1165,7 @@ export default function InvoicingPage() {
                           </Button>
                           <Button
                             onClick={handleFinishInvoicing}
-                            disabled={totalValue === 0}
+                            disabled={displayTotal === 0}
                           >
                             <Lock className="mr-2 h-4 w-4" />
                             Finish Invoicing for this Month
