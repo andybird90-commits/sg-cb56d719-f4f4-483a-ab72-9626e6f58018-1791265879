@@ -53,6 +53,14 @@ interface Opportunity {
   expected_fee_value: number | null;
 }
 
+interface CompanyProject {
+  id: string;
+  name: string;
+  status: string;
+  project_reference: string | null;
+  agreed_fee_value: number | null;
+}
+
 function CompanyDetailContent() {
   const { profile } = useAuth();
   const router = useRouter();
@@ -74,6 +82,7 @@ function CompanyDetailContent() {
   });
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [projects, setProjects] = useState<CompanyProject[]>([]);
   
   const [companyLoading, setCompanyLoading] = useState(true);
   const [companyError, setCompanyError] = useState<string | null>(null);
@@ -84,6 +93,9 @@ function CompanyDetailContent() {
   const [opportunitiesLoading, setOpportunitiesLoading] = useState(true);
   const [opportunitiesError, setOpportunitiesError] = useState<string | null>(null);
 
+  const [projectsLoading, setProjectsLoading] = useState(true);
+  const [projectsError, setProjectsError] = useState<string | null>(null);
+
   const canEdit = !!profile;
   const canDelete = profile?.role === "admin" || profile?.role === "director";
 
@@ -92,6 +104,7 @@ function CompanyDetailContent() {
       fetchCompanyData(id);
       fetchContactsData(id);
       fetchOpportunitiesData(id);
+      fetchProjectsData(id);
     }
   }, [id]);
 
@@ -231,6 +244,28 @@ function CompanyDetailContent() {
     }
   };
 
+  const fetchProjectsData = async (companyId: string) => {
+    try {
+      setProjectsLoading(true);
+      setProjectsError(null);
+
+      const { data, error } = await supabase
+        .from("projects")
+        .select("id, name, status, project_reference, agreed_fee_value")
+        .eq("client_company_id", companyId)
+        .eq("archived", false)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setProjects((data as CompanyProject[]) || []);
+    } catch (err) {
+      console.error("Failed to load projects data", err);
+      setProjectsError("Failed to load projects");
+    } finally {
+      setProjectsLoading(false);
+    }
+  };
+
   const formatCurrency = (value: number | null) => {
     if (!value) return "—";
     return new Intl.NumberFormat("en-GB", {
@@ -238,6 +273,23 @@ function CompanyDetailContent() {
       currency: "GBP",
       minimumFractionDigits: 0,
     }).format(value);
+  };
+
+  const getProjectStatusColor = (status: string) => {
+    switch (status) {
+      case "live":
+        return "bg-green-100 text-green-800";
+      case "pipeline":
+        return "bg-blue-100 text-blue-800";
+      case "on_hold":
+        return "bg-yellow-100 text-yellow-800";
+      case "completed":
+        return "bg-slate-100 text-slate-800";
+      case "cancelled":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-slate-100 text-slate-800";
+    }
   };
 
   return (
@@ -598,6 +650,61 @@ function CompanyDetailContent() {
                       <div className="text-left sm:text-right flex-shrink-0">
                         <div className="text-xs sm:text-sm text-slate-500">Expected Value</div>
                         <div className="font-medium text-sm sm:text-base">{formatCurrency(opp.expected_fee_value)}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Projects Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg sm:text-xl">Projects</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {projectsLoading ? (
+              <div className="text-center py-6 text-slate-600">Loading projects...</div>
+            ) : projectsError ? (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>{projectsError}</AlertDescription>
+              </Alert>
+            ) : projects.length === 0 ? (
+              <div className="text-center py-6 sm:py-8 text-slate-600 text-sm sm:text-base">
+                No projects for this company yet.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {projects.map((project) => (
+                  <div
+                    key={project.id}
+                    className="p-3 sm:p-4 border rounded-lg cursor-pointer hover:bg-slate-50 transition-colors"
+                    onClick={() => router.push(`/projects/${project.id}`)}
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                          {project.project_reference && (
+                            <span className="font-mono text-xs text-slate-500">
+                              {project.project_reference}
+                            </span>
+                          )}
+                          <h4 className="font-medium text-sm sm:text-base text-slate-900">
+                            {project.name}
+                          </h4>
+                        </div>
+                        <Badge className={`${getProjectStatusColor(project.status)} w-fit text-xs mt-1`}>
+                          {project.status.replace("_", " ")}
+                        </Badge>
+                      </div>
+                      <div className="text-left sm:text-right flex-shrink-0">
+                        <div className="text-xs sm:text-sm text-slate-500">Agreed Fee</div>
+                        <div className="font-medium text-sm sm:text-base">
+                          {formatCurrency(project.agreed_fee_value)}
+                        </div>
                       </div>
                     </div>
                   </div>
