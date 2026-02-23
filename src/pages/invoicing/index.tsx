@@ -49,7 +49,7 @@ type InvoiceMonth = {
   id: string;
   year: number;
   month: number;
-  status: "open" | "locked";
+  status: string;
   locked_by: string | null;
   locked_at: string | null;
   pdf_url: string | null;
@@ -119,6 +119,7 @@ export default function InvoicingPage() {
   const [invoiceMonth, setInvoiceMonth] = useState<InvoiceMonth | null>(null);
   const [invoiceItems, setInvoiceItems] = useState<InvoiceItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isLocking, setIsLocking] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [editingDescription, setEditingDescription] = useState<string | null>(null);
@@ -205,38 +206,38 @@ export default function InvoicingPage() {
     });
   };
 
-  const loadInvoiceData = useCallback(async () => {
-    try {
+  const loadInvoiceData = useCallback(
+    async (year: number, month: number) => {
       setLoading(true);
-      console.log("Loading invoice data for:", selectedYear, selectedMonth);
-      const month = await invoicingService.getOrCreateInvoiceMonth(selectedYear, selectedMonth);
-      console.log("Invoice month result:", month);
-      if (month) {
-        setInvoiceMonth(month as InvoiceMonth);
-        const items = await invoicingService.getInvoiceItems(month.id);
-        setInvoiceItems(items);
-      } else {
-        setInvoiceMonth(null);
-        setInvoiceItems([]);
-      }
+      setError(null);
+      try {
+        const monthRecord = await invoicingService.getOrCreateInvoiceMonth(year, month);
+        if (!monthRecord) {
+          setInvoiceMonth(null);
+          setInvoiceItems([]);
+          setPhasingTotal(0);
+          setLoading(false);
+          return;
+        }
 
-      const phasingValue = await invoicingService.getProjectPhasingTotal(
-        selectedYear,
-        selectedMonth
-      );
-      setPhasingTotal(phasingValue);
-    } catch (error) {
-      console.error("Error loading invoice data:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load invoice data",
-        variant: "destructive",
-      });
-      setPhasingTotal(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedYear, selectedMonth, toast]);
+        setInvoiceMonth(monthRecord as InvoiceMonth);
+
+        const [items, phasing] = await Promise.all([
+          invoicingService.getInvoiceItems(monthRecord.id),
+          invoicingService.getProjectPhasingTotal(year, month),
+        ]);
+
+        setInvoiceItems(items);
+        setPhasingTotal(phasing);
+      } catch (err: any) {
+        console.error("Failed to load invoice data", err);
+        setError("Failed to load invoice data. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
 
   const fetchCashFlowData = async () => {
     try {
@@ -668,7 +669,7 @@ export default function InvoicingPage() {
         description: "Invoice month locked successfully.",
       });
 
-      loadInvoiceData();
+      loadInvoiceData(selectedYear, selectedMonth);
     } catch (error) {
       console.error("Error locking invoice month:", error);
       toast({
@@ -823,7 +824,7 @@ export default function InvoicingPage() {
       });
 
       // Refresh list
-      await loadInvoiceData();
+      await loadInvoiceData(selectedYear, selectedMonth);
 
     } catch (err) {
       console.error("Failed to sync projects", err);
@@ -844,7 +845,10 @@ export default function InvoicingPage() {
     (sum, item) => sum + (item.invoice_value || 0),
     0
   );
-  const displayTotal = phasingTotal !== null ? phasingTotal : totalValue;
+  const displayedTotal =
+    phasingTotal !== null
+      ? phasingTotal
+      : totalValue;
 
   // Debug logging
   console.log("📊 Invoice Items Debug:", {
@@ -866,8 +870,8 @@ export default function InvoicingPage() {
   );
 
   useEffect(() => {
-    loadInvoiceData();
-  }, [loadInvoiceData]);
+    loadInvoiceData(selectedYear, selectedMonth);
+  }, [loadInvoiceData, selectedYear, selectedMonth]);
 
   const years = Array.from({ length: 10 }, (_, i) => currentDate.getFullYear() - 2 + i);
 
@@ -1129,7 +1133,7 @@ export default function InvoicingPage() {
                     <div className="text-lg font-semibold">
                       Total invoice value this month:{" "}
                       <span className="text-primary">
-                        £{displayTotal.toFixed(2)}
+                        £{displayedTotal.toFixed(2)}
                       </span>
                     </div>
                     <div className="flex gap-2">
@@ -1165,7 +1169,7 @@ export default function InvoicingPage() {
                           </Button>
                           <Button
                             onClick={handleFinishInvoicing}
-                            disabled={displayTotal === 0}
+                            disabled={displayedTotal === 0}
                           >
                             <Lock className="mr-2 h-4 w-4" />
                             Finish Invoicing for this Month
