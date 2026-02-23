@@ -196,7 +196,7 @@ export const invoicingService = {
     const monthStart = new Date(year, month - 1, 1);
     const monthEnd = new Date(year, month, 0);
 
-    const { data: projects, error: projectsError } = await supabase
+    const { data: rawProjects, error: projectsError } = await supabase
       .from("projects" as any)
       .select(`
         id,
@@ -209,6 +209,8 @@ export const invoicingService = {
       .gte("end_date", monthStart.toISOString());
 
     if (projectsError) throw projectsError;
+
+    const projects = (rawProjects || []) as any[];
 
     const { data: phasingRows, error: phasingError } = await supabase
       .from("project_monthly_phasing")
@@ -226,17 +228,17 @@ export const invoicingService = {
     if (projectsWithAnyPhasingError) throw projectsWithAnyPhasingError;
 
     const phasingMap = new Map<string, number>();
-    phasingRows?.forEach((row) => {
+    phasingRows?.forEach((row: any) => {
       phasingMap.set(row.project_id, row.revenue_amount || 0);
     });
 
     const projectsWithAnyPhasingSet = new Set<string>(
-      projectsWithAnyPhasing?.map((p) => p.project_id) || []
+      (projectsWithAnyPhasing || []).map((p: any) => p.project_id)
     );
 
     let total = 0;
 
-    (projects || []).forEach((project) => {
+    projects.forEach((project: any) => {
       if (!project.start_date || !project.end_date) return;
 
       const start = new Date(project.start_date);
