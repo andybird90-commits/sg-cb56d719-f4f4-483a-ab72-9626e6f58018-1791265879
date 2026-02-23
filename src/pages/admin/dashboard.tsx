@@ -59,76 +59,128 @@ function AdminDashboardContent() {
     try {
       const monthlyOutgoings = 165000;
 
-      // Fetch manually phased project revenue for Feb-Dec 2026 (months 2-12)
+      // Fetch manually phased project revenue for Jan–Dec 2026 (months 1–12)
       const { data: phasing2026, error: phasing2026Error } = await supabase
         .from("project_monthly_phasing")
-        .select("month, revenue_amount")
+        .select("project_id, month, revenue_amount")
         .eq("year", 2026)
-        .gte("month", 2)
+        .gte("month", 1)
         .lte("month", 12);
 
       if (phasing2026Error) throw phasing2026Error;
 
-      // Fetch manually phased project revenue for Jan 2027 (month 1)
-      const { data: phasingJan2027, error: phasingJan2027Error } = await supabase
-        .from("project_monthly_phasing")
-        .select("month, revenue_amount")
-        .eq("year", 2027)
-        .eq("month", 1);
-
-      if (phasingJan2027Error) throw phasingJan2027Error;
-
-      // Initialize monthly totals for financial year (Feb 26 - Jan 27)
+      // Initialize monthly totals for calendar year 2026 (Jan–Dec)
       const monthlyRevenue: { [key: string]: number } = {};
-      const monthNames = ["Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan"];
-      
-      // Initialize all months to 0
-      monthNames.forEach(month => {
+      const monthNames = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+      ];
+
+      monthNames.forEach((month) => {
         monthlyRevenue[month] = 0;
       });
 
-      // Add Feb-Dec 2026 phasing
+      // Add Jan–Dec 2026 phasing
       phasing2026?.forEach((entry) => {
-        if (entry.revenue_amount && entry.month >= 2 && entry.month <= 12) {
-          const monthName = monthNames[entry.month - 2]; // Feb=0, Mar=1, etc.
+        if (entry.revenue_amount && entry.month >= 1 && entry.month <= 12) {
+          const monthName = monthNames[entry.month - 1];
           monthlyRevenue[monthName] += Number(entry.revenue_amount);
         }
       });
 
-      // Add Jan 2027 phasing
-      phasingJan2027?.forEach((entry) => {
-        if (entry.revenue_amount) {
-          monthlyRevenue["Jan"] += Number(entry.revenue_amount);
+      // Overlay with invoicing cash-flow: invoice_months + invoice_items + manual invoice_history
+      const { data: invoiceMonths, error: invoiceMonthsError } = await supabase
+        .from("invoice_months")
+        .select("id, year, month")
+        .eq("year", 2026)
+        .gte("month", 1)
+        .lte("month", 12);
+
+      if (invoiceMonthsError) throw invoiceMonthsError;
+
+      const invoiceMonthIdToMonth = new Map<string, number>();
+      const invoiceMonthIds: string[] = [];
+
+      invoiceMonths?.forEach((m) => {
+        invoiceMonthIdToMonth.set(m.id, m.month);
+        invoiceMonthIds.push(m.id);
+      });
+
+      const monthInvoiceTotals: { [month: number]: number } = {};
+
+      if (invoiceMonthIds.length > 0) {
+        const { data: invoiceItems, error: invoiceItemsError } = await supabase
+          .from("invoice_items")
+          .select("invoice_month_id, invoice_value, excluded_this_month")
+          .in("invoice_month_id", invoiceMonthIds);
+
+        if (invoiceItemsError) throw invoiceItemsError;
+
+        invoiceItems?.forEach((item) => {
+          if (item.excluded_this_month || item.invoice_value === null) return;
+          const monthIndex = invoiceMonthIdToMonth.get(item.invoice_month_id);
+          if (!monthIndex) return;
+          if (!monthInvoiceTotals[monthIndex]) monthInvoiceTotals[monthIndex] = 0;
+          monthInvoiceTotals[monthIndex] += Number(item.invoice_value);
+        });
+      }
+
+      const { data: manualInvoices, error: manualInvoicesError } = await supabase
+        .from("invoice_history")
+        .select("invoice_date, net_amount")
+        .gte("invoice_date", "2026-01-01")
+        .lt("invoice_date", "2027-01-01");
+
+      if (manualInvoicesError) throw manualInvoicesError;
+
+      manualInvoices?.forEach((invoice: any) => {
+        if (!invoice.invoice_date || invoice.net_amount === null) return;
+        const date = new Date(invoice.invoice_date);
+        const monthIndex = date.getMonth() + 1;
+        if (monthIndex < 1 || monthIndex > 12) return;
+        if (!monthInvoiceTotals[monthIndex]) monthInvoiceTotals[monthIndex] = 0;
+        monthInvoiceTotals[monthIndex] += Number(invoice.net_amount);
+      });
+
+      // Override phasing with actual invoicing where we have data
+      Object.entries(monthInvoiceTotals).forEach(([monthIndexStr, total]) => {
+        const monthIndex = Number(monthIndexStr);
+        if (monthIndex >= 1 && monthIndex <= 12) {
+          const monthName = monthNames[monthIndex - 1];
+          monthlyRevenue[monthName] = total;
         }
       });
 
-      console.log("Monthly revenue totals (Feb 26 - Jan 27):", monthlyRevenue);
-
-      // Calculate total year revenue
+      // Calculate total year revenue and build chart data + cash waterfall
       let totalYearRevenue = 0;
       const chartData: MonthlyData[] = [];
-
-      monthNames.forEach((monthName) => {
-        const revenue = monthlyRevenue[monthName] || 0;
-        totalYearRevenue += revenue;
-
-        chartData.push({
-          month: `${monthName} 26`,
-          revenue: revenue,
-          costs: monthlyOutgoings,
-          margin: revenue - monthlyOutgoings,
-        });
-      });
-
-      console.log("Total year revenue (Feb 26 - Jan 27):", totalYearRevenue);
-
-      // Build cash waterfall starting from £100k opening cash
       const waterfallData: CashWaterfallEntry[] = [];
       let openingCash = 100000;
       let quarterRevenueAccumulator = 0;
 
       monthNames.forEach((monthName) => {
         const revenue = monthlyRevenue[monthName] || 0;
+        totalYearRevenue += revenue;
+
+        const margin = revenue - monthlyOutgoings;
+
+        chartData.push({
+          month: `${monthName} 26`,
+          revenue,
+          costs: monthlyOutgoings,
+          margin,
+        });
+
         quarterRevenueAccumulator += revenue;
 
         const isQuarterEnd = ["Mar", "Jun", "Sep", "Dec"].includes(monthName);
