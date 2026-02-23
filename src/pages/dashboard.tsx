@@ -582,59 +582,7 @@ function DashboardContent() {
         });
       });
 
-      // Override secured values with actual invoicing totals where invoice months exist
-      const years = Array.from(new Set(monthDates.map((date) => date.getFullYear())));
-      const { data: invoiceMonths, error: invoiceMonthsError } = await supabase
-        .from("invoice_months")
-        .select("id, year, month")
-        .in("year", years);
-
-      if (invoiceMonthsError) {
-        throw invoiceMonthsError;
-      }
-
-      if (invoiceMonths && invoiceMonths.length > 0) {
-        const invoiceMonthIds = invoiceMonths.map((m) => m.id);
-
-        const { data: invoiceItems, error: invoiceItemsError } = await supabase
-          .from("invoice_items")
-          .select("invoice_month_id, invoice_value, excluded_this_month")
-          .in("invoice_month_id", invoiceMonthIds);
-
-        if (invoiceItemsError) {
-          throw invoiceItemsError;
-        }
-
-        const monthIndexMap = new Map<string, number>();
-        monthDates.forEach((date, idx) => {
-          const key = `${date.getFullYear()}-${date.getMonth() + 1}`;
-          monthIndexMap.set(key, idx);
-        });
-
-        const totalsByInvoiceMonthId = new Map<string, number>();
-        (invoiceItems || []).forEach((item) => {
-          if (item.excluded_this_month || item.invoice_value === null) {
-            return;
-          }
-          const currentTotal = totalsByInvoiceMonthId.get(item.invoice_month_id) || 0;
-          totalsByInvoiceMonthId.set(
-            item.invoice_month_id,
-            currentTotal + Number(item.invoice_value)
-          );
-        });
-
-        invoiceMonths.forEach((month) => {
-          const key = `${month.year}-${month.month}`;
-          const monthIndex = monthIndexMap.get(key);
-          if (monthIndex === undefined) return;
-
-          const invoiceTotal = totalsByInvoiceMonthId.get(month.id);
-          if (typeof invoiceTotal !== "number") return;
-
-          initialData[monthIndex].secured = invoiceTotal;
-        });
-      }
-
+      // Compute budget gap based on phasing-only secured + opportunity values
       initialData.forEach((month) => {
         const total = month.secured + month.highPotential + month.bid;
         month.budgetGap = Math.max(0, month.budget - total);

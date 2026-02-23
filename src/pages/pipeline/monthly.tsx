@@ -414,9 +414,9 @@ function PipelineMonthlyContent() {
                 const phasingKey = `${monthData.month.getFullYear()}-${monthData.month.getMonth() + 1}`;
                 const manualPhasing = projPhasingMap.get(proj.id);
                 
-                // CRITICAL: If project has ANY manual phasing entries:
+                // If project has ANY manual phasing entries:
                 //   - Use the specific month's phasing value if it exists
-                //   - Use 0 if no value exists for this month (DO NOT use defaultMonthlyTurnover)
+                //   - Use 0 if no value exists for this month
                 // If project has NO manual phasing at all:
                 //   - Use defaultMonthlyTurnover (calculated fallback)
                 const monthlyTurnover = hasManualPhasing 
@@ -445,63 +445,7 @@ function PipelineMonthlyContent() {
         });
       }
 
-      // Override secured/project portion with actual invoicing totals where invoice months exist
-      const years = Array.from(new Set(months.map((m) => m.month.getFullYear())));
-      const { data: invoiceMonths, error: invoiceMonthsError } = await supabase
-        .from("invoice_months")
-        .select("id, year, month")
-        .in("year", years);
-
-      if (invoiceMonthsError) throw invoiceMonthsError;
-
-      if (invoiceMonths && invoiceMonths.length > 0) {
-        const invoiceMonthIds = invoiceMonths.map((m) => m.id);
-
-        const { data: invoiceItems, error: invoiceItemsError } = await supabase
-          .from("invoice_items")
-          .select("invoice_month_id, invoice_value, excluded_this_month")
-          .in("invoice_month_id", invoiceMonthIds);
-
-        if (invoiceItemsError) throw invoiceItemsError;
-
-        const totalsByInvoiceMonthId = new Map<string, number>();
-        (invoiceItems || []).forEach((item) => {
-          if (item.excluded_this_month || item.invoice_value === null) {
-            return;
-          }
-          const currentTotal = totalsByInvoiceMonthId.get(item.invoice_month_id) || 0;
-          totalsByInvoiceMonthId.set(
-            item.invoice_month_id,
-            currentTotal + Number(item.invoice_value)
-          );
-        });
-
-        const invoiceTotalsByMonthKey = new Map<string, number>();
-        invoiceMonths.forEach((monthRow) => {
-          const key = `${monthRow.year}-${monthRow.month}`;
-          const total = totalsByInvoiceMonthId.get(monthRow.id);
-          if (typeof total === "number") {
-            invoiceTotalsByMonthKey.set(key, total);
-          }
-        });
-
-        // For months with invoice data, set totalTurnover = invoiceTotal (secured/projects) + opportunity phasing
-        months.forEach((monthData) => {
-          const key = `${monthData.month.getFullYear()}-${monthData.month.getMonth() + 1}`;
-          const invoiceTotalForMonth = invoiceTotalsByMonthKey.get(key);
-
-          if (typeof invoiceTotalForMonth !== "number") {
-            return;
-          }
-
-          const opportunitiesTotal = monthData.projects
-            .filter((p) => p.type === "opportunity")
-            .reduce((sum, p) => sum + p.turnover, 0);
-
-          monthData.totalTurnover = invoiceTotalForMonth + opportunitiesTotal;
-        });
-      }
-
+      // Finalise data: totals are driven purely by phasing (projects + opportunities)
       setMonthsData(months);
 
     } catch (err) {
