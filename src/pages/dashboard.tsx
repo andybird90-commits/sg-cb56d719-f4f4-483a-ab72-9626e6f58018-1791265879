@@ -438,78 +438,141 @@ function DashboardContent() {
       setPipelineLoading(true);
       setPipelineError(null);
 
-      const today = new Date();
-      const startOfCurrentMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      const endOfTwelfthMonth = new Date(today.getFullYear(), today.getMonth() + 12, 0);
-      endOfTwelfthMonth.setHours(23, 59, 59, 999);
+      const now = new Date();
+      const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
+      // Build 12-month window starting from current month
       const monthDates: Date[] = [];
       for (let i = 0; i < 12; i++) {
-        monthDates.push(new Date(today.getFullYear(), today.getMonth() + i, 1));
+        monthDates.push(new Date(now.getFullYear(), now.getMonth() + i, 1));
       }
 
-      const initialData: PipelineData[] = monthDates.map((date) => ({
+      const dataByMonth: PipelineData[] = monthDates.map((date) => ({
         month: format(date, "MMM yy"),
         secured: 0,
         highPotential: 0,
         bid: 0,
         budget: 180000,
-        budgetGap: 0
+        budgetGap: 0,
       }));
 
-      const startYear = startOfCurrentMonth.getFullYear();
-      const endYear = endOfTwelfthMonth.getFullYear();
-
-      const { data: opportunityPhasing } = await supabase
-        .from("opportunity_monthly_phasing")
-        .select("opportunity_id, year, month, revenue_amount")
-        .gte("year", startYear)
-        .lte("year", endYear);
-
-      const { data: projectPhasing } = await supabase
-        .from("project_monthly_phasing")
-        .select("project_id, year, month, revenue_amount")
-        .gte("year", startYear)
-        .lte("year", endYear);
-
-      const oppPhasingMap = new Map<string, number>();
-      opportunityPhasing?.forEach((phase) => {
-        const monthStr = phase.month.toString().padStart(2, "0");
-        const key = `${phase.opportunity_id}-${phase.year}-${monthStr}`;
-        oppPhasingMap.set(key, phase.revenue_amount);
-      });
-
-      const projPhasingMap = new Map<string, number>();
-      projectPhasing?.forEach((phase) => {
-        const monthStr = phase.month.toString().padStart(2, "0");
-        const key = `${phase.project_id}-${phase.year}-${monthStr}`;
-        projPhasingMap.set(key, phase.revenue_amount);
-      });
-
-      const { data: opportunities } = await supabase
+      // Opportunities: mirror monthly view filters
+      const { data: oppsData, error: oppsError } = await supabase
         .from("opportunities")
-        .select("id, stage, expected_fee_value, expected_start_date, expected_end_date")
-        .not("expected_fee_value", "is", null)
-        .in("stage", ["bid", "high_potential"])
+        .select(`
+          id,
+          name,
+          stage,
+          expected_start_date,
+          expected_end_date,
+          tender_due_date,
+          expected_fee_value,
+          companies (
+            short_name,
+            name
+          )
+        `)
         .eq("archived", false)
-        .not("status", "in", '("closed_won","closed_lost")')
+        .neq("status", "closed_won")
+        .neq("status", "closed_lost")
+        .not("expected_fee_value", "is", null)
         .gte("expected_end_date", startOfCurrentMonth.toISOString());
 
-      const { data: projects } = await supabase
+      if (oppsError) throw oppsError;
+
+      // Projects: mirror monthly view filters
+      const { data: projectsData, error: projectsError } = await supabase
         .from("projects")
-        .select("id, status, agreed_fee_value, start_date, end_date")
+        .select(`
+          id,
+          code,
+          name,
+          status,
+          start_date,
+          end_date,
+          agreed_fee_value,
+          companies!projects_client_company_id_fkey (
+            short_name,
+            name
+          )
+        `)
+        .eq("archived", false)
         .not("agreed_fee_value", "is", null)
         .gte("end_date", startOfCurrentMonth.toISOString());
 
-      opportunities?.forEach((opp) => {
-        if (!opp.expected_start_date || !opp.expected_end_date || !opp.expected_fee_value) {
+      if (projectsError) throw projectsError;
+
+      // Manual phasing for opportunities
+      const { data: oppPhasingData, error: oppPhasingError } = await supabase
+        .from("opportunity_monthly_phasing")
+        .select("opportunity_id, year, month, revenue_amount")
+        .gte("year", now.getFullYear())
+        .lte("year", now.getFullYear() + 1);
+
+      if (oppPhasingError) throw oppPhasingError;
+
+      // Manual phasing for projects
+      const { data: projPhasingData, error: projPhasingError } = await supabase
+        .from("project_monthly_phasing")
+        .select("project_id, year, month, revenue_amount")
+        .gte("year", now.getFullYear())
+        .lte("year", now.getFullYear() + 1);
+
+      if (projPhasingError) throw projPhasingError;
+
+      // All projects that have ANY manual phasing
+      const { data: projectsWithAnyPhasing, error: projectsWithAnyPhasingError } = await supabase
+        .from("project_monthly_phasing")
+        .select("project_id")
+        .not("revenue_amount", "is", null);
+
+      if (projectsWithAnyPhasingError) throw projectsWithAnyPhasingError;
+
+      // All opportunities that have ANY manual phasing
+      const { data: oppsWithAnyPhasing, error: oppsWithAnyPhasingError } = await supabase
+        .from("opportunity_monthly_phasing")
+        .select("opportunity_id")
+        .not("revenue_amount", "is", null);
+
+      if (oppsWithAnyPhasingError) throw oppsWithAnyPhasingError;
+
+      // Create phasing lookup maps: itemId -> (year-month -> amount)
+      const oppPhasingMap = new Map<string, Map<string, number>>();
+      (oppPhasingData || []).forEach((p) => {
+        if (!oppPhasingMap.has(p.opportunity_id)) {
+          oppPhasingMap.set(p.opportunity_id, new Map());
+        }
+        const key = `${p.year}-${p.month}`;
+        oppPhasingMap.get(p.opportunity_id)!.set(key, p.revenue_amount || 0);
+      });
+
+      const projPhasingMap = new Map<string, Map<string, number>>();
+      (projPhasingData || []).forEach((p) => {
+        if (!projPhasingMap.has(p.project_id)) {
+          projPhasingMap.set(p.project_id, new Map());
+        }
+        const key = `${p.year}-${p.month}`;
+        projPhasingMap.get(p.project_id)!.set(key, p.revenue_amount || 0);
+      });
+
+      const projectsWithAnyPhasingSet = new Set(
+        (projectsWithAnyPhasing || []).map((p) => p.project_id)
+      );
+
+      const oppsWithAnyPhasingSet = new Set(
+        (oppsWithAnyPhasing || []).map((o) => o.opportunity_id)
+      );
+
+      // Distribute opportunities across months using same rules as monthly view
+      (oppsData || []).forEach((opp) => {
+        const startDate = new Date(opp.expected_start_date || opp.tender_due_date || "");
+        const endDate = new Date(opp.expected_end_date || "");
+
+        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
           return;
         }
 
-        const startDate = new Date(opp.expected_start_date);
-        const endDate = new Date(opp.expected_end_date);
-        const totalValue = opp.expected_fee_value;
-        const stage = opp.stage;
+        const hasManualPhasing = oppsWithAnyPhasingSet.has(opp.id);
 
         const durationMonths = Math.max(
           1,
@@ -517,43 +580,56 @@ function DashboardContent() {
             (endDate.getMonth() - startDate.getMonth()) +
             1
         );
-        const defaultMonthlyValue = totalValue / durationMonths;
+        const defaultMonthlyTurnover = (opp.expected_fee_value || 0) / durationMonths;
 
-        const opportunityPhasingKeys = Array.from(oppPhasingMap.keys()).filter((key) =>
-          key.startsWith(`${opp.id}-`)
-        );
-        const hasManualPhasing = opportunityPhasingKeys.length > 0;
-
-        monthDates.forEach((monthDate, idx) => {
-          const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-          const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+        dataByMonth.forEach((monthData, idx) => {
+          const monthStart = new Date(
+            monthDates[idx].getFullYear(),
+            monthDates[idx].getMonth(),
+            1
+          );
+          const monthEnd = new Date(
+            monthDates[idx].getFullYear(),
+            monthDates[idx].getMonth() + 1,
+            0
+          );
 
           if (startDate <= monthEnd && endDate >= monthStart) {
-            const monthData = initialData[idx];
-            const yearMonth = format(monthDate, "yyyy-MM");
-            const phasingKey = `${opp.id}-${yearMonth}`;
+            const phasingKey = `${monthDates[idx].getFullYear()}-${
+              monthDates[idx].getMonth() + 1
+            }`;
+            const manualPhasing = oppPhasingMap.get(opp.id);
 
-            const monthlyValue = hasManualPhasing
-              ? oppPhasingMap.get(phasingKey) || 0
-              : defaultMonthlyValue;
+            // If the opportunity has ANY manual phasing:
+            //   - Use the specific month's phasing value if it exists
+            //   - Use 0 if no value exists for this month
+            // If NO manual phasing at all:
+            //   - Use defaultMonthlyTurnover (equal split)
+            const monthlyTurnover = hasManualPhasing
+              ? manualPhasing?.get(phasingKey) ?? 0
+              : defaultMonthlyTurnover;
 
-            if (stage === "high_potential") {
-              monthData.highPotential += monthlyValue;
-            } else if (stage === "bid") {
-              monthData.bid += monthlyValue;
+            if (opp.stage === "secured") {
+              monthData.secured += monthlyTurnover;
+            } else if (opp.stage === "high_potential") {
+              monthData.highPotential += monthlyTurnover;
+            } else if (opp.stage === "bid") {
+              monthData.bid += monthlyTurnover;
             }
           }
         });
       });
 
-      projects?.forEach((proj) => {
-        if (!proj.start_date || !proj.end_date || !proj.agreed_fee_value) {
+      // Distribute projects across months using same rules as monthly view
+      (projectsData || []).forEach((proj) => {
+        const startDate = new Date(proj.start_date || "");
+        const endDate = new Date(proj.end_date || "");
+
+        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
           return;
         }
 
-        const startDate = new Date(proj.start_date);
-        const endDate = new Date(proj.end_date);
-        const totalValue = proj.agreed_fee_value;
+        const hasManualPhasing = projectsWithAnyPhasingSet.has(proj.id);
 
         const durationMonths = Math.max(
           1,
@@ -561,36 +637,43 @@ function DashboardContent() {
             (endDate.getMonth() - startDate.getMonth()) +
             1
         );
-        const defaultMonthlyValue = totalValue / durationMonths;
+        const defaultMonthlyTurnover = (proj.agreed_fee_value || 0) / durationMonths;
 
-        const projectPhasingKeys = Array.from(projPhasingMap.keys()).filter((key) =>
-          key.startsWith(`${proj.id}-`)
-        );
-        const hasManualPhasing = projectPhasingKeys.length > 0;
-
-        monthDates.forEach((monthDate, idx) => {
-          const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-          const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+        dataByMonth.forEach((monthData, idx) => {
+          const monthStart = new Date(
+            monthDates[idx].getFullYear(),
+            monthDates[idx].getMonth(),
+            1
+          );
+          const monthEnd = new Date(
+            monthDates[idx].getFullYear(),
+            monthDates[idx].getMonth() + 1,
+            0
+          );
 
           if (startDate <= monthEnd && endDate >= monthStart) {
-            const yearMonth = format(monthDate, "yyyy-MM");
-            const phasingKey = `${proj.id}-${yearMonth}`;
+            const phasingKey = `${monthDates[idx].getFullYear()}-${
+              monthDates[idx].getMonth() + 1
+            }`;
+            const manualPhasing = projPhasingMap.get(proj.id);
 
-            const monthlyValue = hasManualPhasing
-              ? projPhasingMap.get(phasingKey) || 0
-              : defaultMonthlyValue;
+            const monthlyTurnover = hasManualPhasing
+              ? manualPhasing?.get(phasingKey) ?? 0
+              : defaultMonthlyTurnover;
 
-            initialData[idx].secured += monthlyValue;
+            // Projects always contribute to secured
+            monthData.secured += monthlyTurnover;
           }
         });
       });
 
-      initialData.forEach((month) => {
+      // Finalise: budget gap per month
+      dataByMonth.forEach((month) => {
         const total = month.secured + month.highPotential + month.bid;
         month.budgetGap = Math.max(0, month.budget - total);
       });
 
-      setPipelineData(initialData);
+      setPipelineData(dataByMonth);
     } catch (error) {
       console.error("Failed to load pipeline data", error);
       setPipelineError("Failed to load pipeline");
