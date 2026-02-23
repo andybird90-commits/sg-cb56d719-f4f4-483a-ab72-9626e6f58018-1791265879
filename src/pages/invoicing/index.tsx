@@ -318,9 +318,9 @@ export default function InvoicingPage() {
           const invoiceRecord = {
             id: item.id,
             invoiceMonthId: month.id,
-            invoiceNumber: `INV-${month.year}-${String(month.month).padStart(2, '0')}`,
-            client: company?.name || 'Unknown',
-            project: item.projects?.name || item.project_name || 'Unknown',
+            invoiceNumber: `INV-${month.year}-${String(month.month).padStart(2, "0")}`,
+            client: company?.name || "Unknown",
+            project: item.projects?.name || item.project_name || "Unknown",
             issueDate,
             dueDate,
             amount: item.invoice_value,
@@ -357,51 +357,78 @@ export default function InvoicingPage() {
       });
 
       // Process manual invoices
-      (manualInvoices || []).map((invoice) => {
+      (manualInvoices || []).forEach((invoice) => {
         const invoiceDate = new Date(invoice.invoice_date);
         const dueDate = new Date(invoice.due_date);
         const daysDiff = Math.floor((dueDate.getTime() - invoiceDate.getTime()) / (1000 * 60 * 60 * 24));
+
+        const net = Number(invoice.net_amount) || 0;
+        const vat = Number(invoice.vat_amount ?? 0) || 0;
+        const gross = Number(invoice.gross_amount ?? net + vat);
+        const paid = Number(invoice.paid_amount ?? 0) || 0;
+
         const isCollected = invoice.status === "paid";
-        const amount = Number(invoice.net_amount);
-        const vatAmount = Number(invoice.vat_amount ?? 0);
-        
+        const outstandingGross = Math.max(0, gross - paid);
+
+        // Record full invoice value for detail views
+        totalVal += gross;
+
+        if (isCollected) {
+          // Fully paid: treat full amount as collected
+          totalCollected += gross;
+        } else {
+          // Unpaid or part paid: only the outstanding portion counts towards outstanding totals
+          totalOut += outstandingGross;
+
+          if (isBefore(dueDate, today)) {
+            totalOverdue += outstandingGross;
+          } else {
+            totalInTerms += outstandingGross;
+          }
+
+          // VAT on outstanding invoices: allocate proportionally based on the remaining gross
+          const vatRatio = gross > 0 ? vat / gross : 0;
+          totalVatOutstanding += outstandingGross * vatRatio;
+
+          // Add outstanding portion into the appropriate week bucket
+          weeks.forEach((week) => {
+            if (isWithinInterval(dueDate, { start: week.weekCommencing, end: week.weekEnding })) {
+              week.invoices.push({
+                id: invoice.id,
+                invoiceNumber: invoice.invoice_number,
+                client: invoice.client_name,
+                project: invoice.project_name || "N/A",
+                issueDate: invoiceDate,
+                dueDate,
+                // Keep full invoice value for display in the row
+                amount: gross,
+                // Track outstanding separately for any future use
+                outstanding: outstandingGross,
+                paymentTerms: daysDiff,
+                collected: isCollected,
+                collectedDate: isCollected ? dueDate : null,
+                is_manual: true
+              });
+              week.total += outstandingGross;
+            }
+          });
+        }
+
+        // Collection list uses the same record shape
         const invoiceRecord = {
           id: invoice.id,
           invoiceNumber: invoice.invoice_number,
           client: invoice.client_name,
           project: invoice.project_name || "N/A",
           issueDate: invoiceDate,
-          dueDate: dueDate,
-          amount: amount,
+          dueDate,
+          amount: gross,
+          outstanding: outstandingGross,
           paymentTerms: daysDiff,
           collected: isCollected,
           collectedDate: isCollected ? dueDate : null,
           is_manual: true
         };
-
-        totalVal += amount;
-
-        if (isCollected) {
-          totalCollected += amount;
-        } else {
-          totalOut += amount;
-          
-          if (isBefore(dueDate, today)) {
-            totalOverdue += amount;
-          } else {
-            totalInTerms += amount;
-          }
-
-          totalVatOutstanding += vatAmount;
-
-          // Add to appropriate week
-          weeks.forEach(week => {
-            if (isWithinInterval(dueDate, { start: week.weekCommencing, end: week.weekEnding })) {
-              week.invoices.push(invoiceRecord);
-              week.total += amount;
-            }
-          });
-        }
 
         allInvoices.push(invoiceRecord);
       });
