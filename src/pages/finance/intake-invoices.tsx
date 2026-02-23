@@ -302,11 +302,11 @@ function IntakeInvoicesContent() {
       }
 
       fetchInvoices();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving invoice:", error);
       toast({
         title: "Error",
-        description: "Failed to save invoice",
+        description: error?.message || "Failed to save invoice",
         variant: "destructive",
       });
     }

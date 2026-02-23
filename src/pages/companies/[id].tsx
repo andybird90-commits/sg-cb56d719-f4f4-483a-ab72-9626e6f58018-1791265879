@@ -164,7 +164,12 @@ function CompanyDetailContent() {
 
   const handleDelete = async () => {
     if (!id || typeof id !== "string") return;
-    if (!confirm("Are you sure you want to delete this company? This will also delete all associated opportunities and contacts.")) return;
+    if (
+      !confirm(
+        "Are you sure you want to delete this company? This will also delete all associated opportunities and contacts."
+      )
+    )
+      return;
 
     try {
       const { error } = await supabase
@@ -174,9 +179,13 @@ function CompanyDetailContent() {
 
       if (error) throw error;
       router.push("/companies");
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to delete company", err);
-      alert("Failed to delete company");
+      const message =
+        err?.code === "23503"
+          ? "This company cannot be deleted because there are related records (for example contacts, opportunities or projects) linked to it. Remove or reassign those records, or set the company status to Inactive instead."
+          : err?.message || "Failed to delete company";
+      alert(message);
     }
   };
 
