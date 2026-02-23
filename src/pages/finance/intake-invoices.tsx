@@ -240,6 +240,7 @@ function IntakeInvoicesContent() {
       const selectedCompany = companies.find(c => c.id === formData.company_id);
       const selectedProject = projects.find(p => p.id === formData.project_id);
 
+      // We calculate grossAmount for display only; the database now owns the gross_amount column
       const invoiceData = {
         company_id: formData.company_id,
         client_name: selectedCompany?.name || null,
@@ -251,7 +252,6 @@ function IntakeInvoicesContent() {
         due_date: formData.due_date,
         net_amount: netAmount,
         vat_amount: vatAmount,
-        gross_amount: grossAmount,
         status: formData.status,
         paid_amount: parseFloat(formData.paid_amount) || 0,
         notes: formData.notes || null,
