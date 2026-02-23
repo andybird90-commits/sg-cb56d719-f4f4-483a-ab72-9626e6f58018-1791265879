@@ -471,14 +471,14 @@ function DashboardContent() {
 
       const oppPhasingMap = new Map<string, number>();
       opportunityPhasing?.forEach((phase) => {
-        const monthStr = phase.month.toString().padStart(2, '0');
+        const monthStr = phase.month.toString().padStart(2, "0");
         const key = `${phase.opportunity_id}-${phase.year}-${monthStr}`;
         oppPhasingMap.set(key, phase.revenue_amount);
       });
 
       const projPhasingMap = new Map<string, number>();
       projectPhasing?.forEach((phase) => {
-        const monthStr = phase.month.toString().padStart(2, '0');
+        const monthStr = phase.month.toString().padStart(2, "0");
         const key = `${phase.project_id}-${phase.year}-${monthStr}`;
         projPhasingMap.set(key, phase.revenue_amount);
       });
@@ -508,14 +508,17 @@ function DashboardContent() {
         const totalValue = opp.expected_fee_value;
         const stage = opp.stage;
 
-        const durationMonths = Math.max(1,
-          (endDate.getFullYear() - startDate.getFullYear()) * 12 + (
-          endDate.getMonth() - startDate.getMonth()) + 1
+        const durationMonths = Math.max(
+          1,
+          (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+            (endDate.getMonth() - startDate.getMonth()) +
+            1
         );
         const defaultMonthlyValue = totalValue / durationMonths;
 
-        const opportunityPhasingKeys = Array.from(oppPhasingMap.keys())
-          .filter(key => key.startsWith(`${opp.id}-`));
+        const opportunityPhasingKeys = Array.from(oppPhasingMap.keys()).filter((key) =>
+          key.startsWith(`${opp.id}-`)
+        );
         const hasManualPhasing = opportunityPhasingKeys.length > 0;
 
         monthDates.forEach((monthDate, idx) => {
@@ -528,7 +531,7 @@ function DashboardContent() {
             const phasingKey = `${opp.id}-${yearMonth}`;
 
             const monthlyValue = hasManualPhasing
-              ? (oppPhasingMap.get(phasingKey) || 0)
+              ? oppPhasingMap.get(phasingKey) || 0
               : defaultMonthlyValue;
 
             if (stage === "high_potential") {
@@ -549,14 +552,17 @@ function DashboardContent() {
         const endDate = new Date(proj.end_date);
         const totalValue = proj.agreed_fee_value;
 
-        const durationMonths = Math.max(1,
-          (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
-          (endDate.getMonth() - startDate.getMonth()) + 1
+        const durationMonths = Math.max(
+          1,
+          (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+            (endDate.getMonth() - startDate.getMonth()) +
+            1
         );
         const defaultMonthlyValue = totalValue / durationMonths;
 
-        const projectPhasingKeys = Array.from(projPhasingMap.keys())
-          .filter(key => key.startsWith(`${proj.id}-`));
+        const projectPhasingKeys = Array.from(projPhasingMap.keys()).filter((key) =>
+          key.startsWith(`${proj.id}-`)
+        );
         const hasManualPhasing = projectPhasingKeys.length > 0;
 
         monthDates.forEach((monthDate, idx) => {
@@ -568,13 +574,66 @@ function DashboardContent() {
             const phasingKey = `${proj.id}-${yearMonth}`;
 
             const monthlyValue = hasManualPhasing
-              ? (projPhasingMap.get(phasingKey) || 0)
+              ? projPhasingMap.get(phasingKey) || 0
               : defaultMonthlyValue;
 
             initialData[idx].secured += monthlyValue;
           }
         });
       });
+
+      // Override secured values with actual invoicing totals where invoice months exist
+      const years = Array.from(new Set(monthDates.map((date) => date.getFullYear())));
+      const { data: invoiceMonths, error: invoiceMonthsError } = await supabase
+        .from("invoice_months")
+        .select("id, year, month")
+        .in("year", years);
+
+      if (invoiceMonthsError) {
+        throw invoiceMonthsError;
+      }
+
+      if (invoiceMonths && invoiceMonths.length > 0) {
+        const invoiceMonthIds = invoiceMonths.map((m) => m.id);
+
+        const { data: invoiceItems, error: invoiceItemsError } = await supabase
+          .from("invoice_items")
+          .select("invoice_month_id, invoice_value, excluded_this_month")
+          .in("invoice_month_id", invoiceMonthIds);
+
+        if (invoiceItemsError) {
+          throw invoiceItemsError;
+        }
+
+        const monthIndexMap = new Map<string, number>();
+        monthDates.forEach((date, idx) => {
+          const key = `${date.getFullYear()}-${date.getMonth() + 1}`;
+          monthIndexMap.set(key, idx);
+        });
+
+        const totalsByInvoiceMonthId = new Map<string, number>();
+        (invoiceItems || []).forEach((item) => {
+          if (item.excluded_this_month || item.invoice_value === null) {
+            return;
+          }
+          const currentTotal = totalsByInvoiceMonthId.get(item.invoice_month_id) || 0;
+          totalsByInvoiceMonthId.set(
+            item.invoice_month_id,
+            currentTotal + Number(item.invoice_value)
+          );
+        });
+
+        invoiceMonths.forEach((month) => {
+          const key = `${month.year}-${month.month}`;
+          const monthIndex = monthIndexMap.get(key);
+          if (monthIndex === undefined) return;
+
+          const invoiceTotal = totalsByInvoiceMonthId.get(month.id);
+          if (typeof invoiceTotal !== "number") return;
+
+          initialData[monthIndex].secured = invoiceTotal;
+        });
+      }
 
       initialData.forEach((month) => {
         const total = month.secured + month.highPotential + month.bid;
