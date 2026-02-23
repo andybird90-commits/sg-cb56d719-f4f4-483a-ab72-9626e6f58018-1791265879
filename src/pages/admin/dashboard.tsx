@@ -29,6 +29,15 @@ interface LeaderboardEntry {
   conversionRate: number;
 }
 
+interface CashWaterfallEntry {
+  month: string;
+  openingCash: number;
+  revenue: number;
+  outgoings: number;
+  vatPayment: number;
+  closingCash: number;
+}
+
 function AdminDashboardContent() {
   const [financialData, setFinancialData] = useState<MonthlyData[]>([]);
   const [conversionData, setConversionData] = useState<ConversionData[]>([]);
@@ -38,6 +47,7 @@ function AdminDashboardContent() {
   const [yearEndMargin, setYearEndMargin] = useState(0);
   const [marginPercent, setMarginPercent] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [cashWaterfallData, setCashWaterfallData] = useState<CashWaterfallEntry[]>([]);
 
   useEffect(() => {
     fetchFinancialTrends();
@@ -47,6 +57,8 @@ function AdminDashboardContent() {
 
   const fetchFinancialTrends = async () => {
     try {
+      const monthlyOutgoings = 165000;
+
       // Fetch manually phased project revenue for Feb-Dec 2026 (months 2-12)
       const { data: phasing2026, error: phasing2026Error } = await supabase
         .from("project_monthly_phasing")
@@ -101,25 +113,61 @@ function AdminDashboardContent() {
       let totalYearRevenue = 0;
       const chartData: MonthlyData[] = [];
 
-      monthNames.forEach((monthName, index) => {
+      monthNames.forEach((monthName) => {
         const revenue = monthlyRevenue[monthName] || 0;
         totalYearRevenue += revenue;
 
         chartData.push({
           month: `${monthName} 26`,
           revenue: revenue,
-          costs: 160000, // £160k/month
-          margin: revenue - 160000,
+          costs: monthlyOutgoings,
+          margin: revenue - monthlyOutgoings,
         });
       });
 
       console.log("Total year revenue (Feb 26 - Jan 27 + £120k delivered):", totalYearRevenue);
 
+      // Build cash waterfall starting from £100k opening cash
+      const waterfallData: CashWaterfallEntry[] = [];
+      let openingCash = 100000;
+      let quarterRevenueAccumulator = 0;
+
+      monthNames.forEach((monthName) => {
+        const revenue = monthlyRevenue[monthName] || 0;
+        quarterRevenueAccumulator += revenue;
+
+        const isQuarterEnd = ["Mar", "Jun", "Sep", "Dec"].includes(monthName);
+        let vatPayment = 0;
+
+        if (isQuarterEnd) {
+          vatPayment = quarterRevenueAccumulator * 0.2;
+          quarterRevenueAccumulator = 0;
+        }
+
+        const closingCash = openingCash + revenue - monthlyOutgoings - vatPayment;
+
+        waterfallData.push({
+          month: `${monthName} 26`,
+          openingCash,
+          revenue,
+          outgoings: monthlyOutgoings,
+          vatPayment,
+          closingCash,
+        });
+
+        openingCash = closingCash;
+      });
+
       setFinancialData(chartData);
       setYearEndRevenue(totalYearRevenue);
-      setYearEndCosts(160000 * 12);
-      setYearEndMargin(totalYearRevenue - (160000 * 12));
-      setMarginPercent(totalYearRevenue > 0 ? ((totalYearRevenue - (160000 * 12)) / totalYearRevenue) * 100 : 0);
+      setYearEndCosts(monthlyOutgoings * 12);
+      setYearEndMargin(totalYearRevenue - monthlyOutgoings * 12);
+      setMarginPercent(
+        totalYearRevenue > 0
+          ? ((totalYearRevenue - monthlyOutgoings * 12) / totalYearRevenue) * 100
+          : 0
+      );
+      setCashWaterfallData(waterfallData);
     } catch (error) {
       console.error("Error fetching financial trends:", error);
     } finally {
@@ -351,7 +399,7 @@ function AdminDashboardContent() {
                 £{yearEndCosts.toLocaleString()}
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                £160k/month × 12 months
+                £165k/month × 12 months
               </p>
             </CardContent>
           </Card>
@@ -390,6 +438,76 @@ function AdminDashboardContent() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Cash Waterfall */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Cash Waterfall</CardTitle>
+            <CardDescription>
+              Opening cash £100,000, secured turnover only, fixed outgoings £165k/month, VAT 20% paid quarterly on turnover.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[300px] mb-6">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={cashWaterfallData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip
+                    formatter={(value, name) => {
+                      if (typeof value !== "number") return value;
+                      return `£${value.toLocaleString()}`;
+                    }}
+                  />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="closingCash"
+                    stroke="#2563eb"
+                    name="Closing Cash"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2 px-3 font-medium">Month</th>
+                    <th className="text-right py-2 px-3 font-medium">Opening Cash</th>
+                    <th className="text-right py-2 px-3 font-medium">Turnover</th>
+                    <th className="text-right py-2 px-3 font-medium">Outgoings</th>
+                    <th className="text-right py-2 px-3 font-medium">VAT Payment</th>
+                    <th className="text-right py-2 px-3 font-medium">Closing Cash</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cashWaterfallData.map((row) => (
+                    <tr key={row.month} className="border-b last:border-0">
+                      <td className="py-2 px-3">{row.month}</td>
+                      <td className="py-2 px-3 text-right">
+                        £{row.openingCash.toLocaleString()}
+                      </td>
+                      <td className="py-2 px-3 text-right">
+                        £{row.revenue.toLocaleString()}
+                      </td>
+                      <td className="py-2 px-3 text-right">
+                        £{row.outgoings.toLocaleString()}
+                      </td>
+                      <td className="py-2 px-3 text-right">
+                        £{row.vatPayment.toLocaleString()}
+                      </td>
+                      <td className="py-2 px-3 text-right font-semibold">
+                        £{row.closingCash.toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Opportunities Converted to Projects */}
         <Card>
