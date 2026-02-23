@@ -102,11 +102,6 @@ function AdminDashboardContent() {
         }
       });
 
-      // Add £120k delivered in Jan 26 to Feb (first month of financial year)
-      // This represents work delivered in Jan 26 that should be counted in FY 2026
-      const deliveredJan26 = 120000;
-      monthlyRevenue["Feb"] += deliveredJan26;
-
       console.log("Monthly revenue totals (Feb 26 - Jan 27):", monthlyRevenue);
 
       // Calculate total year revenue
@@ -125,7 +120,7 @@ function AdminDashboardContent() {
         });
       });
 
-      console.log("Total year revenue (Feb 26 - Jan 27 + £120k delivered):", totalYearRevenue);
+      console.log("Total year revenue (Feb 26 - Jan 27):", totalYearRevenue);
 
       // Build cash waterfall starting from £100k opening cash
       const waterfallData: CashWaterfallEntry[] = [];
