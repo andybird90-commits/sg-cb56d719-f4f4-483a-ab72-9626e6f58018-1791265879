@@ -183,19 +183,37 @@ function IntakeInvoicesContent() {
   }, [formData.company_id, projects]);
 
   // Calculate summary metrics
-  const unpaidInvoices = invoices.filter((inv) => inv.status === "unpaid");
-  const totalOutstandingNet = unpaidInvoices.reduce(
-    (sum, inv) => sum + Number(inv.net_amount),
-    0
+  const openInvoices = invoices.filter(
+    (inv) => inv.status === "unpaid" || inv.status === "part_paid"
   );
-  const totalVatOutstanding = unpaidInvoices.reduce(
-    (sum, inv) => sum + Number(inv.vat_amount),
-    0
+
+  const { totalOutstandingNet, totalVatOutstanding } = openInvoices.reduce(
+    (totals, inv) => {
+      const net = Number(inv.net_amount) || 0;
+      const vat = Number(inv.vat_amount) || 0;
+      const gross = net + vat;
+      const paid = Number(inv.paid_amount) || 0;
+
+      const outstandingGross = Math.max(0, gross - paid);
+
+      if (gross <= 0 || outstandingGross <= 0) {
+        return totals;
+      }
+
+      const netRatio = net / gross;
+      const vatRatio = vat / gross;
+
+      totals.totalOutstandingNet += outstandingGross * netRatio;
+      totals.totalVatOutstanding += outstandingGross * vatRatio;
+
+      return totals;
+    },
+    { totalOutstandingNet: 0, totalVatOutstanding: 0 }
   );
 
   // Filter invoices
   const displayedInvoices = showUnpaidOnly
-    ? unpaidInvoices
+    ? openInvoices
     : invoices;
 
   const handleSubmit = async (saveAndAddAnother: boolean = false) => {
@@ -231,10 +249,11 @@ function IntakeInvoicesContent() {
         invoice_number: formData.invoice_number,
         invoice_date: formData.invoice_date,
         due_date: formData.due_date,
-        net_amount: parseFloat(formData.net_amount),
-        vat_amount: parseFloat(formData.vat_amount),
+        net_amount: netAmount,
+        vat_amount: vatAmount,
+        gross_amount: grossAmount,
         status: formData.status,
-        paid_amount: parseFloat(formData.paid_amount),
+        paid_amount: parseFloat(formData.paid_amount) || 0,
         notes: formData.notes || null,
       };
 
@@ -401,7 +420,7 @@ function IntakeInvoicesContent() {
           <Card>
             <CardHeader className="pb-3">
               <CardDescription>Unpaid Invoices</CardDescription>
-              <CardTitle className="text-3xl">{unpaidInvoices.length}</CardTitle>
+              <CardTitle className="text-3xl">{openInvoices.length}</CardTitle>
             </CardHeader>
           </Card>
           <Card>
