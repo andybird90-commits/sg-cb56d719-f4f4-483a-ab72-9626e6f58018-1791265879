@@ -79,6 +79,7 @@ interface SubcontractorCost {
   variations?: {
     code: string;
   };
+  pdf_url?: string | null;
 }
 
 interface PhasingRow {
@@ -190,6 +191,7 @@ function ProjectDetailContent() {
     cost_date: "",
     variation_id: "none",
   });
+  const [costFile, setCostFile] = useState<File | null>(null);
 
   const canEdit = !!profile;
   const canDelete = profile?.role === "admin" || profile?.role === "director";
@@ -892,50 +894,87 @@ function ProjectDetailContent() {
     e.preventDefault();
     if (!id || typeof id !== "string") return;
 
-    if (editingCost) {
-      const { error } = await supabase
-        .from("subcontractor_costs")
-        .update({
-          supplier_name: costForm.supplier_name,
-          description: costForm.description || null,
-          cost_amount: parseFloat(costForm.cost_amount),
-          cost_date: costForm.cost_date,
-          variation_id: costForm.variation_id === "none" ? null : costForm.variation_id,
-        })
-        .eq("id", editingCost.id);
+    try {
+      let costId: string | undefined = editingCost?.id;
 
-      if (error) {
-        alert("Error updating cost");
-        return;
-      }
-    } else {
-      const { error } = await supabase
-        .from("subcontractor_costs")
-        .insert({
-          project_id: id,
-          supplier_name: costForm.supplier_name,
-          description: costForm.description || null,
-          cost_amount: parseFloat(costForm.cost_amount),
-          cost_date: costForm.cost_date,
-          variation_id: costForm.variation_id === "none" ? null : costForm.variation_id,
-        });
+      if (editingCost) {
+        const { error } = await supabase
+          .from("subcontractor_costs")
+          .update({
+            supplier_name: costForm.supplier_name,
+            description: costForm.description || null,
+            cost_amount: parseFloat(costForm.cost_amount),
+            cost_date: costForm.cost_date,
+            variation_id: costForm.variation_id === "none" ? null : costForm.variation_id,
+          })
+          .eq("id", editingCost.id);
 
-      if (error) {
-        alert("Error creating cost");
-        return;
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase
+          .from("subcontractor_costs")
+          .insert({
+            project_id: id,
+            supplier_name: costForm.supplier_name,
+            description: costForm.description || null,
+            cost_amount: parseFloat(costForm.cost_amount),
+            cost_date: costForm.cost_date,
+            variation_id: costForm.variation_id === "none" ? null : costForm.variation_id,
+          })
+          .select("id")
+          .single();
+
+        if (error) throw error;
+        costId = data?.id;
       }
+
+      if (costId && costFile) {
+        const fileExt = costFile.name.split(".").pop() || "pdf";
+        const filePath = `project-${id}/${costId}-${Date.now()}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("subcontractor_costs")
+          .upload(filePath, costFile, {
+            upsert: true,
+            contentType: costFile.type || "application/pdf",
+          });
+
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = supabase.storage
+          .from("subcontractor_costs")
+          .getPublicUrl(filePath);
+
+        const pdfUrl = publicUrlData?.publicUrl;
+
+        if (pdfUrl) {
+          const { error: updateError } = await supabase
+            .from("subcontractor_costs")
+            .update({ pdf_url: pdfUrl })
+            .eq("id", costId);
+
+          if (updateError) throw updateError;
+        }
+      }
+
+      if (id && typeof id === "string") {
+        await fetchProjectData();
+      }
+
+      setCostFormOpen(false);
+      setEditingCost(null);
+      setCostForm({
+        supplier_name: "",
+        description: "",
+        cost_amount: "",
+        cost_date: "",
+        variation_id: "none",
+      });
+      setCostFile(null);
+    } catch (error) {
+      console.error("Error saving subcontractor cost:", error);
+      alert("Error saving cost");
     }
-
-    await fetchProjectData();
-    setCostFormOpen(false);
-    setEditingCost(null);
-    setCostForm({
-      supplier_name: "",
-      description: "",
-      cost_amount: "",
-      cost_date: "",
-      variation_id: "none",
-    });
   };
 
   const handleEditCost = (cost: SubcontractorCost) => {
@@ -947,6 +986,7 @@ function ProjectDetailContent() {
       cost_date: cost.cost_date,
       variation_id: cost.variation_id || "none",
     });
+    setCostFile(null);
     setCostFormOpen(true);
   };
 
@@ -1671,6 +1711,7 @@ function ProjectDetailContent() {
                           cost_date: "",
                           variation_id: "none",
                         });
+                        setCostFile(null);
                       }}>
                         <Plus className="w-4 h-4" />
                         New Cost
@@ -1746,6 +1787,29 @@ function ProjectDetailContent() {
                           </Select>
                         </div>
 
+                        <div className="space-y-2">
+                          <Label htmlFor="cost_file">Attachment (PDF)</Label>
+                          <Input
+                            id="cost_file"
+                            type="file"
+                            accept="application/pdf"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0] || null;
+                              setCostFile(file);
+                            }}
+                          />
+                          {editingCost?.pdf_url && (
+                            <a
+                              href={editingCost.pdf_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-600 hover:text-blue-800 hover:underline mt-1 inline-block"
+                            >
+                              View existing PDF
+                            </a>
+                          )}
+                        </div>
+
                         <div className="flex gap-3">
                           <Button type="submit">
                             {editingCost ? "Update" : "Create"}
@@ -1789,6 +1853,18 @@ function ProjectDetailContent() {
                                 {formatDate(cost.cost_date)}
                               </div>
                             </div>
+                            {cost.pdf_url && (
+                              <div className="mt-2">
+                                <a
+                                  href={cost.pdf_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                                >
+                                  View PDF
+                                </a>
+                              </div>
+                            )}
                           </div>
                           {canEdit && (
                             <div className="flex gap-2">

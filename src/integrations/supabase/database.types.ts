@@ -1629,6 +1629,7 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          pdf_url: string | null
           project_id: string
           supplier_name: string
           updated_at: string
@@ -1640,6 +1641,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          pdf_url?: string | null
           project_id: string
           supplier_name: string
           updated_at?: string
@@ -1651,6 +1653,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          pdf_url?: string | null
           project_id?: string
           supplier_name?: string
           updated_at?: string
