@@ -457,17 +457,20 @@ function DashboardContent() {
         budgetGap: 0
       }));
 
+      const startYear = startOfCurrentMonth.getFullYear();
+      const endYear = endOfTwelfthMonth.getFullYear();
+
       const { data: opportunityPhasing } = await supabase
         .from("opportunity_monthly_phasing")
         .select("opportunity_id, year, month, revenue_amount")
-        .gte("year", startOfCurrentMonth.getFullYear())
-        .lte("year", endOfTwelfthMonth.getFullYear());
+        .gte("year", startYear)
+        .lte("year", endYear);
 
       const { data: projectPhasing } = await supabase
         .from("project_monthly_phasing")
         .select("project_id, year, month, revenue_amount")
-        .gte("year", startOfCurrentMonth.getFullYear())
-        .lte("year", endOfTwelfthMonth.getFullYear());
+        .gte("year", startYear)
+        .lte("year", endYear);
 
       const oppPhasingMap = new Map<string, number>();
       opportunityPhasing?.forEach((phase) => {
@@ -582,7 +585,62 @@ function DashboardContent() {
         });
       });
 
-      // Compute budget gap based on phasing-only secured + opportunity values
+      const { data: invoiceMonths, error: invoiceMonthsError } = await supabase
+        .from("invoice_months")
+        .select("id, year, month")
+        .gte("year", startYear)
+        .lte("year", endYear);
+
+      if (invoiceMonthsError) {
+        console.error("Failed to load invoice months for pipeline", invoiceMonthsError);
+      } else if (invoiceMonths && invoiceMonths.length > 0) {
+        const monthMetaById = new Map<string, { year: number; month: number }>();
+        (invoiceMonths as any[]).forEach((m) => {
+          monthMetaById.set(m.id, { year: m.year, month: m.month });
+        });
+
+        const monthIds = (invoiceMonths as any[]).map((m) => m.id);
+
+        const { data: invoiceItems, error: invoiceItemsError } = await supabase
+          .from("invoice_items")
+          .select("invoice_month_id, invoice_value, excluded_this_month")
+          .in("invoice_month_id", monthIds)
+          .not("invoice_value", "is", null);
+
+        if (invoiceItemsError) {
+          console.error("Failed to load invoice items for pipeline", invoiceItemsError);
+        } else if (invoiceItems) {
+          const invoiceTotalsByMonthKey = new Map<string, number>();
+
+          (invoiceItems as any[]).forEach((item) => {
+            if (item.excluded_this_month || item.invoice_value === null) {
+              return;
+            }
+
+            const meta = monthMetaById.get(item.invoice_month_id);
+            if (!meta) return;
+
+            const key = `${meta.year}-${String(meta.month).padStart(
+              2,
+              "0"
+            )}`;
+            const current = invoiceTotalsByMonthKey.get(key) || 0;
+            invoiceTotalsByMonthKey.set(key, current + Number(item.invoice_value));
+          });
+
+          monthDates.forEach((monthDate, idx) => {
+            const key = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(
+              2,
+              "0"
+            )}`;
+            const overrideValue = invoiceTotalsByMonthKey.get(key);
+            if (typeof overrideValue === "number") {
+              initialData[idx].secured = overrideValue;
+            }
+          });
+        }
+      }
+
       initialData.forEach((month) => {
         const total = month.secured + month.highPotential + month.bid;
         month.budgetGap = Math.max(0, month.budget - total);
