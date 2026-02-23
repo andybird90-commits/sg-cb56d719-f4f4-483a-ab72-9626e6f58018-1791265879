@@ -184,8 +184,12 @@ function IntakeInvoicesContent() {
 
   // Calculate summary metrics
   const unpaidInvoices = invoices.filter((inv) => inv.status === "unpaid");
-  const totalOutstanding = unpaidInvoices.reduce(
-    (sum, inv) => sum + Number(inv.gross_amount),
+  const totalOutstandingNet = unpaidInvoices.reduce(
+    (sum, inv) => sum + Number(inv.net_amount),
+    0
+  );
+  const totalVatOutstanding = unpaidInvoices.reduce(
+    (sum, inv) => sum + Number(inv.vat_amount),
     0
   );
 
@@ -382,12 +386,12 @@ function IntakeInvoicesContent() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
             <CardHeader className="pb-3">
-              <CardDescription>Total Outstanding (Gross)</CardDescription>
+              <CardDescription>Total Outstanding (Net)</CardDescription>
               <CardTitle className="text-3xl">
-                £{totalOutstanding.toLocaleString("en-GB", {
+                £{totalOutstandingNet.toLocaleString("en-GB", {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}
@@ -398,6 +402,17 @@ function IntakeInvoicesContent() {
             <CardHeader className="pb-3">
               <CardDescription>Unpaid Invoices</CardDescription>
               <CardTitle className="text-3xl">{unpaidInvoices.length}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardDescription>VAT on Unpaid Invoices</CardDescription>
+              <CardTitle className="text-3xl">
+                £{totalVatOutstanding.toLocaleString("en-GB", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </CardTitle>
             </CardHeader>
           </Card>
         </div>

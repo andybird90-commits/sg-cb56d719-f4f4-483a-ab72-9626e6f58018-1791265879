@@ -146,7 +146,8 @@ export default function InvoicingPage() {
     inTerms: 0,
     overdue: 0,
     collected: 0,
-    totalValue: 0
+    totalValue: 0,
+    vatOutstanding: 0
   });
 
   const [invoiceMonths, setInvoiceMonths] = useState<InvoiceMonth[]>([]);
@@ -290,6 +291,7 @@ export default function InvoicingPage() {
       let totalOut = 0;
       let totalOverdue = 0;
       let totalInTerms = 0;
+      let totalVatOutstanding = 0;
 
       const allInvoices: any[] = [];
 
@@ -350,14 +352,15 @@ export default function InvoicingPage() {
         const invoiceDate = new Date(invoice.invoice_date);
         const dueDate = new Date(invoice.due_date);
         const daysDiff = Math.floor((dueDate.getTime() - invoiceDate.getTime()) / (1000 * 60 * 60 * 24));
-        const isCollected = invoice.status === 'paid';
-        const amount = Number(invoice.gross_amount);
+        const isCollected = invoice.status === "paid";
+        const amount = Number(invoice.net_amount);
+        const vatAmount = Number(invoice.vat_amount ?? 0);
         
         const invoiceRecord = {
           id: invoice.id,
           invoiceNumber: invoice.invoice_number,
           client: invoice.client_name,
-          project: invoice.project_name || 'N/A',
+          project: invoice.project_name || "N/A",
           issueDate: invoiceDate,
           dueDate: dueDate,
           amount: amount,
@@ -380,6 +383,8 @@ export default function InvoicingPage() {
             totalInTerms += amount;
           }
 
+          totalVatOutstanding += vatAmount;
+
           // Add to appropriate week
           weeks.forEach(week => {
             if (isWithinInterval(dueDate, { start: week.weekCommencing, end: week.weekEnding })) {
@@ -400,7 +405,8 @@ export default function InvoicingPage() {
         inTerms: totalInTerms,
         overdue: totalOverdue,
         collected: totalCollected,
-        totalValue: totalVal
+        totalValue: totalVal,
+        vatOutstanding: totalVatOutstanding
       });
     } catch (error) {
       console.error("Error fetching cash flow data:", error);
@@ -417,10 +423,10 @@ export default function InvoicingPage() {
   const markAsCollected = async (invoiceId: string, isManual?: boolean) => {
     try {
       if (isManual) {
-        // First get the gross amount
+        // First get the net amount
         const { data: invoiceData } = await supabase
           .from("invoice_history")
-          .select("gross_amount")
+          .select("net_amount, vat_amount")
           .eq("id", invoiceId)
           .single();
 
@@ -428,8 +434,8 @@ export default function InvoicingPage() {
         const { error } = await supabase
           .from("invoice_history")
           .update({ 
-            status: 'paid',
-            paid_amount: invoiceData?.gross_amount || 0
+            status: "paid",
+            paid_amount: invoiceData?.net_amount || 0
           })
           .eq("id", invoiceId);
 
@@ -1168,7 +1174,7 @@ export default function InvoicingPage() {
               ) : (
                 <>
                   {/* Summary Cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
                     <Card>
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-medium text-slate-600">
@@ -1204,6 +1210,19 @@ export default function InvoicingPage() {
                       <CardContent>
                         <div className="text-2xl font-bold text-red-600">
                           £{totals.overdue.toLocaleString()}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-amber-600">
+                          VAT on Outstanding Invoices
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-amber-600">
+                          £{totals.vatOutstanding.toLocaleString()}
                         </div>
                       </CardContent>
                     </Card>
