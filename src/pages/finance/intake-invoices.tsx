@@ -323,10 +323,10 @@ function IntakeInvoicesContent() {
       invoice_number: invoice.invoice_number,
       invoice_date: invoice.invoice_date,
       due_date: invoice.due_date,
-      net_amount: invoice.net_amount.toString(),
-      vat_amount: invoice.vat_amount.toString(),
-      status: invoice.status as "unpaid" | "part_paid" | "paid" | "written_off",
-      paid_amount: invoice.paid_amount.toString(),
+      net_amount: (invoice.net_amount ?? 0).toString(),
+      vat_amount: (invoice.vat_amount ?? 0).toString(),
+      status: (invoice.status as "unpaid" | "part_paid" | "paid" | "written_off") || "unpaid",
+      paid_amount: (invoice.paid_amount ?? 0).toString(),
       notes: invoice.notes || "",
     });
   };
