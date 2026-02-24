@@ -309,18 +309,78 @@ export const invoicingService = {
     doc.text(`${monthName} ${invoiceMonth.year}`, 14, 28);
     
     doc.setFontSize(10);
-    doc.text(`Generated: ${new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })}, ${new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`, 14, 35);
+    doc.text(
+      `Generated: ${new Date().toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      })}, ${new Date().toLocaleTimeString("en-GB", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      })}`,
+      14,
+      35
+    );
 
     const includedItems = items.filter(
       (item) => !item.excluded_this_month && item.invoice_value !== null
     );
 
-    const totalValue = includedItems.reduce(
+    // Enrich items that are missing payment_terms by looking up the client company
+    let enrichedItems: (InvoiceItem & { payment_terms: number | null })[] =
+      includedItems as (InvoiceItem & { payment_terms: number | null })[];
+
+    const itemsNeedingTerms = includedItems.filter(
+      (item) => !item.payment_terms && item.project_id
+    );
+
+    if (itemsNeedingTerms.length > 0) {
+      const projectIds = Array.from(
+        new Set(itemsNeedingTerms.map((item) => item.project_id))
+      );
+
+      if (projectIds.length > 0) {
+        const { data: projects, error: projectsError } = await supabase
+          .from("projects" as any)
+          .select(`
+            id,
+            client_company_id,
+            companies!projects_client_company_id_fkey(
+              payment_terms
+            )
+          `)
+          .in("id", projectIds);
+
+        if (projectsError) throw projectsError;
+
+        const termsByProject = new Map<string, number | null>();
+        (projects || []).forEach((project: any) => {
+          const terms =
+            typeof project.companies?.payment_terms === "number"
+              ? (project.companies.payment_terms as number)
+              : null;
+          termsByProject.set(project.id as string, terms);
+        });
+
+        enrichedItems = includedItems.map((item) => {
+          const fallbackTerms =
+            termsByProject.get(item.project_id as string) ?? null;
+
+          return {
+            ...item,
+            payment_terms: item.payment_terms ?? fallbackTerms ?? null,
+          };
+        }) as (InvoiceItem & { payment_terms: number | null })[];
+      }
+    }
+
+    const totalValue = enrichedItems.reduce(
       (sum, item) => sum + (item.invoice_value || 0),
       0
     );
 
-    const tableData = includedItems.map(item => [
+    const tableData = enrichedItems.map((item) => [
       item.project_code || "—",
       item.project_name || "—",
       item.client_name || "—",
@@ -331,31 +391,59 @@ export const invoicingService = {
       item.project_owner_name || "—",
       item.payment_terms ? `${item.payment_terms} days` : "—",
       `£${item.invoice_value?.toFixed(2) || "0.00"}`,
-      item.description || "—"
+      item.description || "—",
     ]);
 
     (doc as any).autoTable({
       startY: 45,
-      head: [["Code", "Project", "Client", "PO Number", "Email Contact", "Address", "Project Number", "Project Owner", "Payment Terms", "Value", "Description"]],
+      head: [
+        [
+          "Code",
+          "Project",
+          "Client",
+          "PO Number",
+          "Email Contact",
+          "Address",
+          "Project Number",
+          "Project Owner",
+          "Payment Terms",
+          "Value",
+          "Description",
+        ],
+      ],
       body: tableData,
-      foot: [["", "", "", "", "", "", "", "", "TOTAL", `£${totalValue.toFixed(2)}`, ""]],
+      foot: [
+        [
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "TOTAL",
+          `£${totalValue.toFixed(2)}`,
+          "",
+        ],
+      ],
       theme: "grid",
-      styles: { 
+      styles: {
         fontSize: 8,
         cellPadding: 2,
         overflow: "linebreak",
-        cellWidth: "wrap"
+        cellWidth: "wrap",
       },
-      headStyles: { 
+      headStyles: {
         fillColor: [71, 85, 105],
         fontStyle: "bold",
-        fontSize: 8
+        fontSize: 8,
       },
-      footStyles: { 
-        fillColor: [241, 245, 249], 
-        textColor: [0, 0, 0], 
+      footStyles: {
+        fillColor: [241, 245, 249],
+        textColor: [0, 0, 0],
         fontStyle: "bold",
-        fontSize: 9
+        fontSize: 9,
       },
       columnStyles: {
         0: { cellWidth: 20 },
@@ -368,12 +456,14 @@ export const invoicingService = {
         7: { cellWidth: 25 },
         8: { cellWidth: 20 },
         9: { cellWidth: 20 },
-        10: { cellWidth: 35 }
-      }
+        10: { cellWidth: 35 },
+      },
     });
 
     const pdfBlob = doc.output("blob");
-    const fileName = `invoice-${invoiceMonth.year}-${String(invoiceMonth.month).padStart(2, "0")}.pdf`;
+    const fileName = `invoice-${invoiceMonth.year}-${String(
+      invoiceMonth.month
+    ).padStart(2, "0")}.pdf`;
 
     const { error: uploadError } = await supabase.storage
       .from("invoices")
@@ -384,9 +474,9 @@ export const invoicingService = {
 
     if (uploadError) throw uploadError;
 
-    const { data: { publicUrl } } = supabase.storage
-      .from('invoices')
-      .getPublicUrl(fileName);
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from("invoices").getPublicUrl(fileName);
 
     return publicUrl;
   },
