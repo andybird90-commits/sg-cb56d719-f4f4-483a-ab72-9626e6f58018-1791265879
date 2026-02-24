@@ -200,12 +200,21 @@ function AdminDashboardContent() {
           return;
         }
 
-        const closingCash = openingCash + revenue - monthlyOutgoings - vatPayment;
+        // Gross up turnover for waterfall only (net * 1.2 to include VAT on receipts)
+        const grossRevenue = revenue * 1.2;
+
+        // Additional gross cash receipts from outstanding invoicing:
+        // £70,000 at end of Feb, remaining £73,963.04 at end of Mar
+        const additionalCash =
+          monthName === "Feb" ? 70000 : monthName === "Mar" ? 73963.04 : 0;
+
+        const closingCash =
+          openingCash + grossRevenue + additionalCash - monthlyOutgoings - vatPayment;
 
         waterfallData.push({
           month: `${monthName} 26`,
           openingCash,
-          revenue,
+          revenue: grossRevenue,
           outgoings: monthlyOutgoings,
           vatPayment,
           closingCash,

@@ -1,7 +1,7 @@
 import { RequireAuth } from "@/components/RequireAuth";
 import { Layout } from "@/components/Layout";
 import { useAuth } from "@/contexts/AuthContext";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { jsPDF } from "jspdf";
 import { autoTable } from "jspdf-autotable";
 import { format } from "date-fns";
-import { FileText } from "lucide-react";
+import { FileText, ChevronRight, ChevronDown } from "lucide-react";
 
 interface ProjectFinancials {
   project_id: string;
@@ -32,19 +32,29 @@ interface ProjectFinancials {
   stage: string;
 }
 
+interface ProjectDailyEntry {
+  id: string;
+  date: string;
+  hours: number;
+  cost: number;
+}
+
+interface UserProjectBreakdown {
+  project_id: string;
+  project_code: string;
+  project_name: string;
+  hours: number;
+  cost: number;
+  dailyEntries: ProjectDailyEntry[];
+}
+
 interface UserTimeBreakdown {
   user_id: string;
   user_name: string;
   hourly_rate: number;
   total_hours: number;
   total_cost: number;
-  projects: {
-    project_id: string;
-    project_code: string;
-    project_name: string;
-    hours: number;
-    cost: number;
-  }[];
+  projects: UserProjectBreakdown[];
 }
 
 function FinancialsContent() {
@@ -68,6 +78,7 @@ function FinancialsContent() {
   const [userTimesheetBreakdown, setUserTimesheetBreakdown] = useState<UserTimeBreakdown[]>([]);
   const [allSubcontractorCosts, setAllSubcontractorCosts] = useState<any[]>([]);
   const [actualSubcontractorTotal, setActualSubcontractorTotal] = useState(0);
+  const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
 
   // Check user role - only directors and admins can access
   useEffect(() => {
@@ -222,6 +233,8 @@ function FinancialsContent() {
       const { data: timesheetsData, error: timesheetsError } = await supabase
         .from("timesheets")
         .select(`
+          id,
+          date,
           hours,
           project_id,
           user_id,
@@ -246,16 +259,16 @@ function FinancialsContent() {
         );
       });
 
-      // Build user time breakdown
+      // Build user time breakdown with per-day entries
       const userTimeMap = new Map<string, UserTimeBreakdown>();
       (timesheetsData || []).forEach((ts: any) => {
-        const userId = ts.user_id;
+        const userId = ts.user_id as string;
         const userName = ts.profiles?.full_name || "Unknown User";
         const hourlyRate = ts.profiles?.default_hourly_cost_rate || 0;
         const cost = ts.hours * hourlyRate;
+        const date = ts.date as string;
 
-        // Find project details
-        const project = projectsData?.find(p => p.id === ts.project_id);
+        const project = projectsData?.find((p) => p.id === ts.project_id);
         const projectCode = project?.code || "—";
         const projectName = project?.name || "Unknown Project";
 
@@ -266,7 +279,7 @@ function FinancialsContent() {
             hourly_rate: hourlyRate,
             total_hours: 0,
             total_cost: 0,
-            projects: []
+            projects: [],
           });
         }
 
@@ -274,18 +287,29 @@ function FinancialsContent() {
         userBreakdown.total_hours += ts.hours;
         userBreakdown.total_cost += cost;
 
-        // Check if project already exists in user's breakdown
-        const existingProject = userBreakdown.projects.find(p => p.project_id === ts.project_id);
+        const existingProject = userBreakdown.projects.find(
+          (p) => p.project_id === ts.project_id
+        );
+
+        const dailyEntry: ProjectDailyEntry = {
+          id: ts.id as string,
+          date,
+          hours: ts.hours,
+          cost,
+        };
+
         if (existingProject) {
           existingProject.hours += ts.hours;
           existingProject.cost += cost;
+          existingProject.dailyEntries.push(dailyEntry);
         } else {
           userBreakdown.projects.push({
             project_id: ts.project_id,
             project_code: projectCode,
             project_name: projectName,
             hours: ts.hours,
-            cost: cost
+            cost,
+            dailyEntries: [dailyEntry],
           });
         }
       });
@@ -518,6 +542,13 @@ function FinancialsContent() {
       default:
         return "bg-slate-100 text-slate-700";
     }
+  };
+
+  const toggleProjectExpansion = (key: string) => {
+    setExpandedProjects((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
   };
 
   // Calculate total cost including suspense and overhead
@@ -984,35 +1015,147 @@ function FinancialsContent() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {userTimesheetBreakdown.map((user) => (
-                            <>
-                              {user.projects.map((proj, idx) => (
-                                <TableRow key={`${user.user_id}-${proj.project_id}`} className="hover:bg-slate-50">
-                                  {idx === 0 ? (
-                                    <>
-                                      <TableCell className="font-medium text-slate-900" rowSpan={user.projects.length}>
-                                        {user.user_name}
-                                      </TableCell>
-                                      <TableCell className="text-right text-slate-600" rowSpan={user.projects.length}>
-                                        {formatCurrency(user.hourly_rate)}
-                                      </TableCell>
-                                    </>
-                                  ) : null}
-                                  <TableCell className="font-mono text-slate-600">{proj.project_code}</TableCell>
-                                  <TableCell className="text-slate-700">{proj.project_name}</TableCell>
-                                  <TableCell className="text-right font-medium">{proj.hours.toFixed(1)}</TableCell>
-                                  <TableCell className="text-right font-medium">{formatCurrency(proj.cost)}</TableCell>
+                          {userTimesheetBreakdown.map((user) => {
+                            const expandedRowCount = user.projects.reduce(
+                              (count, proj) =>
+                                count +
+                                (expandedProjects[
+                                  `${user.user_id}-${proj.project_id}`
+                                ]
+                                  ? 1
+                                  : 0),
+                              0
+                            );
+                            const rowSpan = user.projects.length + expandedRowCount;
+
+                            return (
+                              <React.Fragment key={user.user_id}>
+                                {user.projects.map((proj, idx) => {
+                                  const rowKey = `${user.user_id}-${proj.project_id}`;
+                                  const isExpanded = !!expandedProjects[rowKey];
+
+                                  return (
+                                    <React.Fragment key={rowKey}>
+                                      <TableRow className="hover:bg-slate-50">
+                                        {idx === 0 && (
+                                          <>
+                                            <TableCell
+                                              className="font-medium text-slate-900"
+                                              rowSpan={rowSpan}
+                                            >
+                                              {user.user_name}
+                                            </TableCell>
+                                            <TableCell
+                                              className="text-right text-slate-600"
+                                              rowSpan={rowSpan}
+                                            >
+                                              {formatCurrency(user.hourly_rate)}
+                                            </TableCell>
+                                          </>
+                                        )}
+                                        <TableCell className="font-mono text-slate-600">
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              toggleProjectExpansion(rowKey);
+                                            }}
+                                            className="mr-2 inline-flex items-center justify-center w-4 h-4 text-slate-500 hover:text-slate-700"
+                                            aria-label={
+                                              isExpanded
+                                                ? "Hide daily breakdown"
+                                                : "Show daily breakdown"
+                                            }
+                                          >
+                                            {isExpanded ? (
+                                              <ChevronDown className="w-4 h-4" />
+                                            ) : (
+                                              <ChevronRight className="w-4 h-4" />
+                                            )}
+                                          </button>
+                                          {proj.project_code}
+                                        </TableCell>
+                                        <TableCell className="text-slate-700">
+                                          {proj.project_name}
+                                        </TableCell>
+                                        <TableCell className="text-right font-medium">
+                                          {proj.hours.toFixed(1)}
+                                        </TableCell>
+                                        <TableCell className="text-right font-medium">
+                                          {formatCurrency(proj.cost)}
+                                        </TableCell>
+                                      </TableRow>
+                                      {isExpanded && proj.dailyEntries.length > 0 && (
+                                        <TableRow className="bg-slate-50">
+                                          <TableCell colSpan={4}>
+                                            <div className="px-6 py-3">
+                                              <div className="text-xs font-semibold text-slate-600 mb-2">
+                                                Daily breakdown
+                                              </div>
+                                              <div className="grid grid-cols-3 text-xs font-medium text-slate-500 mb-1">
+                                                <div>Date</div>
+                                                <div className="text-right">
+                                                  Hours
+                                                </div>
+                                                <div className="text-right">
+                                                  Cost
+                                                </div>
+                                              </div>
+                                              <div className="space-y-1 text-xs text-slate-700">
+                                                {proj.dailyEntries
+                                                  .slice()
+                                                  .sort((a, b) =>
+                                                    a.date.localeCompare(
+                                                      b.date
+                                                    )
+                                                  )
+                                                  .map((entry) => (
+                                                    <div
+                                                      key={entry.id}
+                                                      className="grid grid-cols-3"
+                                                    >
+                                                      <div>
+                                                        {new Date(
+                                                          entry.date
+                                                        ).toLocaleDateString(
+                                                          "en-GB"
+                                                        )}
+                                                      </div>
+                                                      <div className="text-right">
+                                                        {entry.hours.toFixed(1)}
+                                                      </div>
+                                                      <div className="text-right">
+                                                        {formatCurrency(
+                                                          entry.cost
+                                                        )}
+                                                      </div>
+                                                    </div>
+                                                  ))}
+                                              </div>
+                                            </div>
+                                          </TableCell>
+                                        </TableRow>
+                                      )}
+                                    </React.Fragment>
+                                  );
+                                })}
+                                <TableRow className="bg-slate-50">
+                                  <TableCell
+                                    colSpan={4}
+                                    className="text-right font-semibold text-slate-700"
+                                  >
+                                    {user.user_name} Total
+                                  </TableCell>
+                                  <TableCell className="text-right font-semibold">
+                                    {user.total_hours.toFixed(1)}
+                                  </TableCell>
+                                  <TableCell className="text-right font-semibold">
+                                    {formatCurrency(user.total_cost)}
+                                  </TableCell>
                                 </TableRow>
-                              ))}
-                              <TableRow className="bg-slate-50">
-                                <TableCell colSpan={4} className="text-right font-semibold text-slate-700">
-                                  {user.user_name} Total
-                                </TableCell>
-                                <TableCell className="text-right font-semibold">{user.total_hours.toFixed(1)}</TableCell>
-                                <TableCell className="text-right font-semibold">{formatCurrency(user.total_cost)}</TableCell>
-                              </TableRow>
-                            </>
-                          ))}
+                              </React.Fragment>
+                            );
+                          })}
                         </TableBody>
                       </Table>
                     </div>
