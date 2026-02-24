@@ -21,6 +21,7 @@ interface Company {
   created_at: string;
   added_by_user_id: string | null;
   company_number: string | null;
+  payment_terms: number | null;
   added_by_profile?: {
     full_name: string | null;
     email: string;
@@ -179,6 +180,11 @@ function CompaniesContent() {
                       {company.company_number && (
                         <p className="text-xs text-slate-500 mt-1">
                           Company No: {company.company_number}
+                        </p>
+                      )}
+                      {typeof company.payment_terms === "number" && (
+                        <p className="text-xs text-slate-500 mt-1">
+                          Payment terms: {company.payment_terms} days
                         </p>
                       )}
                       {company.added_by_user_id && (

@@ -65,6 +65,14 @@ export interface Database {
           notes: string | null
           created_at: string
           updated_at: string
+          added_by_user_id: string | null
+          payment_terms: number | null
+          company_number: string | null
+          address: string | null
+          vat_number: string | null
+          website: string | null
+          linkedin_url: string | null
+          accounts_email: string | null
         }
         Insert: {
           id?: string
@@ -75,6 +83,14 @@ export interface Database {
           notes?: string | null
           created_at?: string
           updated_at?: string
+          added_by_user_id?: string | null
+          payment_terms?: number | null
+          company_number?: string | null
+          address?: string | null
+          vat_number?: string | null
+          website?: string | null
+          linkedin_url?: string | null
+          accounts_email?: string | null
         }
         Update: {
           id?: string
@@ -85,8 +101,23 @@ export interface Database {
           notes?: string | null
           created_at?: string
           updated_at?: string
+          added_by_user_id?: string | null
+          payment_terms?: number | null
+          company_number?: string | null
+          address?: string | null
+          vat_number?: string | null
+          website?: string | null
+          linkedin_url?: string | null
+          accounts_email?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "companies_added_by_user_id_fkey"
+            columns: ["added_by_user_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       contacts: {
         Row: {
