@@ -451,62 +451,76 @@ function FinancialsContent() {
   const exportUserTimeBreakdownToPDF = () => {
     const doc = new jsPDF();
     
-    // Create a date object for the selected month/year
     const selectedDate = new Date(selectedYear, selectedMonth - 1);
     
-    // Add title
     doc.setFontSize(16);
-    doc.text("User Time Breakdown", 14, 15);
+    doc.text("User Time Breakdown - Detailed", 14, 15);
     doc.setFontSize(10);
     doc.text(`Period: ${format(selectedDate, "MMMM yyyy")}`, 14, 22);
 
-    // Prepare table data
     const tableData: any[] = [];
-    
+
     userTimesheetBreakdown.forEach((user) => {
-      // Add user header row
       tableData.push([
         user.user_name,
         `£${user.hourly_rate.toFixed(2)}`,
         "",
+        "User total",
         "",
         user.total_hours.toFixed(1),
         `£${user.total_cost.toFixed(2)}`
       ]);
-      
-      // Add project rows for this user
+
       user.projects.forEach((project) => {
         tableData.push([
           "",
           "",
           project.project_code,
           project.project_name,
+          "Project total",
           project.hours.toFixed(1),
           `£${project.cost.toFixed(2)}`
         ]);
+
+        const sortedEntries = project.dailyEntries
+          .slice()
+          .sort((a, b) => a.date.localeCompare(b.date));
+
+        sortedEntries.forEach((entry) => {
+          tableData.push([
+            "",
+            "",
+            "",
+            "",
+            format(new Date(entry.date), "dd/MM/yyyy"),
+            entry.hours.toFixed(1),
+            `£${entry.cost.toFixed(2)}`
+          ]);
+        });
       });
+
+      tableData.push(["", "", "", "", "", "", ""]);
     });
 
-    // Generate table
     autoTable(doc, {
       startY: 28,
-      head: [["User", "Hourly Rate", "Project Code", "Project Name", "Hours", "Cost"]],
+      head: [["User", "Hourly Rate", "Project Code", "Project / Note", "Date", "Hours", "Cost"]],
       body: tableData,
       theme: "grid",
       headStyles: { fillColor: [66, 66, 66] },
       styles: { fontSize: 8 },
       columnStyles: {
-        0: { cellWidth: 35 },
-        1: { cellWidth: 25 },
-        2: { cellWidth: 25 },
-        3: { cellWidth: 60 },
-        4: { cellWidth: 20, halign: "right" },
-        5: { cellWidth: 25, halign: "right" }
+        0: { cellWidth: 30 },
+        1: { cellWidth: 20 },
+        2: { cellWidth: 22 },
+        3: { cellWidth: 55 },
+        4: { cellWidth: 20 },
+        5: { cellWidth: 16, halign: "right" },
+        6: { cellWidth: 25, halign: "right" }
       }
     });
 
-    // Save the PDF
-    doc.save(`user-time-breakdown-${selectedMonth}-${selectedYear}.pdf`);
+    doc.save(`user-time-breakdown-detailed-${selectedMonth}-${selectedYear}.pdf`);
   };
 
   const formatCurrency = (value: number | null) => {
