@@ -50,7 +50,7 @@ export const invoicingService = {
     const endOfMonth = new Date(year, month, 0);
 
     const { data: projects, error: projectsError } = await supabase
-      .from("projects")
+      .from("projects" as any)
       .select(`
         id,
         code,
@@ -59,18 +59,32 @@ export const invoicingService = {
         start_date,
         end_date,
         po_number,
+        project_reference,
+        client_company_id,
+        opportunity_id,
+        added_by_user_id,
         companies!projects_client_company_id_fkey (
-          name
+          name,
+          address,
+          accounts_email,
+          payment_terms
+        ),
+        opportunities!projects_opportunity_id_fkey(
+          enquiry_number
+        ),
+        profiles!projects_added_by_user_id_fkey(
+          full_name,
+          email
         )
       `)
       .eq("archived", false);
 
     if (projectsError) throw projectsError;
 
-    const activeProjects = (projects || []).filter((p) => {
+    const activeProjects = (projects || []).filter((p: any) => {
       if (!p.start_date || !p.end_date) return false;
-      const start = new Date(p.start_date);
-      const end = new Date(p.end_date);
+      const start = new Date(p.start_date as string);
+      const end = new Date(p.end_date as string);
       return start <= endOfMonth && end >= startOfMonth;
     });
 
@@ -90,23 +104,23 @@ export const invoicingService = {
     if (projectsWithPhasingError) throw projectsWithPhasingError;
 
     const phasingMap = new Map<string, number>();
-    phasingData?.forEach((p) => {
-      phasingMap.set(p.project_id, p.revenue_amount || 0);
+    phasingData?.forEach((p: any) => {
+      phasingMap.set(p.project_id as string, (p.revenue_amount as number) || 0);
     });
 
     const projectsWithAnyPhasing = new Set(
-      projectsWithPhasing?.map((p) => p.project_id) || []
+      (projectsWithPhasing || []).map((p: any) => p.project_id as string)
     );
 
-    const itemsToInsert = activeProjects.map((project) => {
+    const itemsToInsert = activeProjects.map((project: any) => {
       let invoiceValue = 0;
 
-      if (projectsWithAnyPhasing.has(project.id)) {
-        invoiceValue = phasingMap.get(project.id) || 0;
+      if (projectsWithAnyPhasing.has(project.id as string)) {
+        invoiceValue = phasingMap.get(project.id as string) || 0;
       } else {
         if (project.agreed_fee_value && project.start_date && project.end_date) {
-          const start = new Date(project.start_date);
-          const end = new Date(project.end_date);
+          const start = new Date(project.start_date as string);
+          const end = new Date(project.end_date as string);
           const durationMonths = Math.max(
             1,
             (end.getFullYear() - start.getFullYear()) * 12 +
@@ -122,14 +136,20 @@ export const invoicingService = {
 
       return {
         invoice_month_id: invoiceMonthId,
-        project_id: project.id,
-        project_name: project.name,
-        project_code: project.code || "",
+        project_id: project.id as string,
+        project_name: project.name as string,
+        project_code: (project.code as string) || "",
         client_name: clientName,
         invoice_value: invoiceValue,
         description: "",
         excluded_this_month: false,
-        po_number: project.po_number || null,
+        po_number: (project.po_number as string) || null,
+        accounts_email: project.companies?.accounts_email || null,
+        client_address: project.companies?.address || null,
+        enquiry_number: project.opportunities?.enquiry_number || null,
+        project_reference: project.project_reference || null,
+        project_owner_name: project.profiles?.full_name || null,
+        payment_terms: project.companies?.payment_terms || null
       };
     });
 
