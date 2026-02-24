@@ -157,6 +157,8 @@ export default function InvoicingPage() {
   const topScrollRef = useRef<HTMLDivElement>(null);
   const bottomScrollRef = useRef<HTMLDivElement>(null);
 
+  const topInnerRef = useRef<HTMLDivElement | null>(null);
+
   const isSyncingFromTopRef = useRef(false);
   const isSyncingFromBottomRef = useRef(false);
 
@@ -900,6 +902,15 @@ export default function InvoicingPage() {
     loadInvoiceData(selectedYear, selectedMonth);
   }, [loadInvoiceData, selectedYear, selectedMonth]);
 
+  useEffect(() => {
+    const bottomContainer = bottomScrollRef.current;
+    const topInner = topInnerRef.current;
+
+    if (!bottomContainer || !topInner) return;
+
+    topInner.style.width = `${bottomContainer.scrollWidth}px`;
+  }, [invoiceItems.length]);
+
   const years = Array.from({ length: 10 }, (_, i) => currentDate.getFullYear() - 2 + i);
 
   if (loading) {
@@ -1037,7 +1048,7 @@ export default function InvoicingPage() {
                           className="overflow-x-auto border-b"
                           onScroll={handleTopScroll}
                         >
-                          <div className="h-4 min-w-[1600px]" />
+                          <div ref={topInnerRef} className="h-4" />
                         </div>
 
                         {/* Bottom Scrollable Table */}
