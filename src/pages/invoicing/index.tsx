@@ -641,11 +641,6 @@ export default function InvoicingPage() {
     if (!invoiceMonth) return;
 
     try {
-      if (invoiceMonth.pdf_url) {
-        window.open(invoiceMonth.pdf_url, "_blank");
-        return;
-      }
-
       setLoading(true);
 
       const currentItems = await invoicingService.getInvoiceItems(invoiceMonth.id);
@@ -919,7 +914,7 @@ export default function InvoicingPage() {
     (sum, item) => sum + (item.invoice_value || 0),
     0,
   );
-  const displayedTotal = phasingTotal !== null ? phasingTotal : totalValue;
+  const displayedTotal = totalValue;
 
   console.log("Invoice Items Debug:", {
     totalItems: invoiceItems.length,

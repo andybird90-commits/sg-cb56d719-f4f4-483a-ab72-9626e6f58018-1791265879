@@ -333,208 +333,110 @@ export const invoicingService = {
     items: InvoiceItem[],
     options?: {
       bucket?: string;
-      revision?: number | null;
+      revision?: number;
     }
   ): Promise<string> {
-    const { jsPDF } = await import("jspdf");
-    await import("jspdf-autotable");
+    const bucket = options?.bucket ?? "invoices";
 
-    const doc = new jsPDF("landscape", "mm", "a4");
-    const months = [
-      "January",
-      "February",
-      "March",
-      "April",
-      "May",
-      "June",
-      "July",
-      "August",
-      "September",
-      "October",
-      "November",
-      "December",
-    ];
-    const monthName = months[invoiceMonth.month - 1];
+    const monthPadded = String(invoiceMonth.month).padStart(2, "0");
+    const baseFileName = `invoices-${invoiceMonth.year}-${monthPadded}`;
+    const fileName =
+      options?.revision !== undefined
+        ? `${baseFileName}-rev${options.revision}.pdf`
+        : `${baseFileName}.pdf`;
 
-    doc.setFontSize(18);
-    doc.text(`Invoicing Summary`, 14, 20);
-
-    doc.setFontSize(12);
-    doc.text(`${monthName} ${invoiceMonth.year}`, 14, 28);
-
-    doc.setFontSize(10);
-    doc.text(
-      `Generated: ${new Date().toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      })}, ${new Date().toLocaleTimeString("en-GB", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      })}`,
-      14,
-      35
+    // Use the exact same inclusion rules as the UI:
+    // only items that are not excluded and have a non-null/undefined invoice_value.
+    const includedItems = (items || []).filter(
+      (item) =>
+        !item.excluded_this_month &&
+        item.invoice_value !== null &&
+        item.invoice_value !== undefined
     );
 
-    const includedItems = items.filter(
-      (item) => !item.excluded_this_month && item.invoice_value !== null
-    );
-
-    let enrichedItems: (InvoiceItem & { payment_terms: number | null })[] =
-      includedItems as (InvoiceItem & { payment_terms: number | null })[];
-
-    const itemsNeedingTerms = includedItems.filter(
-      (item) => !item.payment_terms && item.project_id
-    );
-
-    if (itemsNeedingTerms.length > 0) {
-      const projectIds = Array.from(
-        new Set(itemsNeedingTerms.map((item) => item.project_id))
-      );
-
-      if (projectIds.length > 0) {
-        const { data: projects, error: projectsError } = await supabase
-          .from("projects" as any)
-          .select(`
-            id,
-            client_company_id,
-            companies!projects_client_company_id_fkey(
-              payment_terms
-            )
-          `)
-          .in("id", projectIds);
-
-        if (projectsError) throw projectsError;
-
-        const termsByProject = new Map<string, number | null>();
-        (projects || []).forEach((project: any) => {
-          const terms =
-            typeof project.companies?.payment_terms === "number"
-              ? (project.companies.payment_terms as number)
-              : null;
-          termsByProject.set(project.id as string, terms);
-        });
-
-        enrichedItems = includedItems.map((item) => {
-          const fallbackTerms =
-            termsByProject.get(item.project_id as string) ?? null;
-
-          return {
-            ...item,
-            payment_terms: item.payment_terms ?? fallbackTerms ?? null,
-          };
-        }) as (InvoiceItem & { payment_terms: number | null })[];
-      }
-    }
-
-    const totalValue = enrichedItems.reduce(
-      (sum, item) => sum + (item.invoice_value || 0),
+    const totalValue = includedItems.reduce(
+      (sum, item) => sum + (Number(item.invoice_value) || 0),
       0
     );
 
-    const tableData = enrichedItems.map((item) => [
-      item.project_code || "—",
-      item.project_name || "—",
-      item.client_name || "—",
-      item.po_number || "—",
-      item.accounts_email || "—",
-      item.client_address || "—",
-      item.project_reference || "—",
-      item.project_owner_name || "—",
-      item.payment_terms ? `${item.payment_terms} days` : "—",
-      `£${item.invoice_value?.toFixed(2) || "0.00"}`,
-      item.description || "—",
+    // Build table rows for the PDF
+    const tableRows = includedItems.map((item) => [
+      item.project_code || "",
+      item.project_name || "",
+      item.client_name || "",
+      item.po_number || "",
+      `£${(Number(item.invoice_value) || 0).toFixed(2)}`,
+      item.description || "",
+      (item as any).accounts_email || "",
+      (item as any).project_reference || "",
+      (item as any).project_owner_name || "",
+      (item as any).payment_terms
+        ? `${(item as any).payment_terms} days`
+        : "",
     ]);
 
+    const doc = new jsPDF();
+
+    doc.setFontSize(16);
+    doc.text(
+      `Invoice Summary - ${invoiceMonth.year}-${monthPadded}`,
+      14,
+      20
+    );
+
+    doc.setFontSize(11);
+    doc.text(`Status: ${invoiceMonth.status}`, 14, 28);
+    doc.text(
+      `Total (matches UI): £${totalValue.toFixed(2)}`,
+      14,
+      34
+    );
+
     (doc as any).autoTable({
-      startY: 45,
       head: [
         [
-          "Code",
-          "Project",
+          "Project Code",
+          "Project Name",
           "Client",
           "PO Number",
-          "Email Contact",
-          "Address",
-          "Project Number",
-          "Project Owner",
-          "Payment Terms",
           "Value",
           "Description",
+          "Email",
+          "Project Ref",
+          "Owner",
+          "Terms",
         ],
       ],
-      body: tableData,
-      foot: [
-        [
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "TOTAL",
-          `£${totalValue.toFixed(2)}`,
-          "",
-        ],
-      ],
-      theme: "grid",
+      body: tableRows,
+      startY: 42,
       styles: {
         fontSize: 8,
         cellPadding: 2,
-        overflow: "linebreak",
-        cellWidth: "wrap",
       },
       headStyles: {
-        fillColor: [71, 85, 105],
-        fontStyle: "bold",
-        fontSize: 8,
-      },
-      footStyles: {
-        fillColor: [241, 245, 249],
-        textColor: [0, 0, 0],
-        fontStyle: "bold",
-        fontSize: 9,
-      },
-      columnStyles: {
-        0: { cellWidth: 20 },
-        1: { cellWidth: 30 },
-        2: { cellWidth: 25 },
-        3: { cellWidth: 20 },
-        4: { cellWidth: 30 },
-        5: { cellWidth: 30 },
-        6: { cellWidth: 20 },
-        7: { cellWidth: 25 },
-        8: { cellWidth: 20 },
-        9: { cellWidth: 20 },
-        10: { cellWidth: 35 },
+        fillColor: [15, 23, 42],
+        textColor: 255,
       },
     });
 
     const pdfBlob = doc.output("blob");
+    const pdfBuffer = await pdfBlob.arrayBuffer();
 
-    const revisionSuffix =
-      typeof options?.revision === "number" ? `-rev${options.revision}` : "";
-    const baseName = `invoice-${invoiceMonth.year}-${String(
-      invoiceMonth.month
-    ).padStart(2, "0")}`;
-    const fileName = `${baseName}${revisionSuffix}.pdf`;
-    const bucket = options?.bucket ?? "invoices";
-
-    const { error: uploadError } = await supabase.storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
       .from(bucket)
-      .upload(fileName, pdfBlob, {
+      .upload(fileName, pdfBuffer, {
         contentType: "application/pdf",
         upsert: true,
       });
 
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+      console.error("Error uploading invoice PDF", uploadError);
+      throw uploadError;
+    }
 
     const {
       data: { publicUrl },
-    } = supabase.storage.from(bucket).getPublicUrl(fileName);
+    } = supabase.storage.from(bucket).getPublicUrl(uploadData.path);
 
     return publicUrl;
   },
