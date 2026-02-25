@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { PDFDocument, StandardFonts } from "pdf-lib";
+import type { PDFFont } from "pdf-lib";
 
 type InvoicePdfItem = {
   id: string;
@@ -28,6 +29,47 @@ type GeneratePdfPayload = {
   totalValue: number;
 };
 
+const formatCurrency = (value: number): string =>
+  value.toLocaleString("en-GB", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+const wrapText = (
+  text: string,
+  maxWidth: number,
+  font: PDFFont,
+  fontSize: number
+): string[] => {
+  if (!text) {
+    return [];
+  }
+
+  const words = text.split(" ");
+  const lines: string[] = [];
+  let currentLine = "";
+
+  for (const word of words) {
+    const testLine = currentLine ? `${currentLine} ${word}` : word;
+    const testWidth = font.widthOfTextAtSize(testLine, fontSize);
+
+    if (testWidth <= maxWidth) {
+      currentLine = testLine;
+    } else {
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+      currentLine = word;
+    }
+  }
+
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+
+  return lines;
+};
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -49,119 +91,211 @@ export default async function handler(
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-    let y = height - 50;
+    const topMargin = 50;
+    const bottomMargin = 60;
+    const leftMargin = 50;
+    const rightMargin = width - 50;
+    const contentWidth = rightMargin - leftMargin;
+
+    let y = height - topMargin;
+
+    const projectColX = leftMargin;
+    const clientColX = leftMargin + contentWidth * 0.45;
+    const valueColRightX = rightMargin;
+
+    const headerTextSize = 16;
+    const bodyTextSize = 10;
+    const detailTextSize = 9;
+    const lineGap = 4;
 
     const title = `Invoice Summary - ${year}-${String(month).padStart(2, "0")}`;
-    page.drawText(title, { x: 50, y, size: 16, font: fontBold });
-    y -= 30;
+    page.drawText(title, {
+      x: leftMargin,
+      y,
+      size: headerTextSize,
+      font: fontBold,
+    });
+    y -= headerTextSize + 10;
 
     page.drawText(`Invoice Month ID: ${invoiceMonthId}`, {
-      x: 50,
+      x: leftMargin,
       y,
       size: 10,
       font,
     });
-    y -= 20;
+    y -= 22;
 
-    const header = "Project                             Client                             Value";
-    page.drawText(header, { x: 50, y, size: 10, font: fontBold });
-    y -= 15;
+    const drawHeaderRow = (): void => {
+      const header = ["Project", "Client", "Value"];
+      page.drawText(header[0], {
+        x: projectColX,
+        y,
+        size: bodyTextSize,
+        font: fontBold,
+      });
+      page.drawText(header[1], {
+        x: clientColX,
+        y,
+        size: bodyTextSize,
+        font: fontBold,
+      });
+
+      const valueHeaderWidth = fontBold.widthOfTextAtSize(
+        header[2],
+        bodyTextSize
+      );
+      page.drawText(header[2], {
+        x: valueColRightX - valueHeaderWidth,
+        y,
+        size: bodyTextSize,
+        font: fontBold,
+      });
+
+      y -= bodyTextSize + lineGap;
+    };
+
+    drawHeaderRow();
 
     const ensureSpaceForLines = (lineCount: number): void => {
-      const requiredHeight = lineCount * 12 + 40;
-      if (y - requiredHeight < 40) {
+      const requiredHeight = lineCount * (detailTextSize + 2) + 2 * lineGap;
+      if (y - requiredHeight < bottomMargin) {
         page.drawText("Continued on next page...", {
-          x: 50,
-          y: 40,
-          size: 9,
+          x: leftMargin,
+          y: bottomMargin - 15,
+          size: 8,
           font,
         });
         page = pdfDoc.addPage();
-        y = height - 50;
-        page.drawText(header, { x: 50, y, size: 10, font: fontBold });
-        y -= 15;
+        y = height - topMargin;
+        drawHeaderRow();
       }
     };
 
     for (const item of items) {
-      const detailLines: string[] = [];
+      const detailLineTexts: string[] = [];
 
-      if (item.po_number) {
-        detailLines.push(`PO Number: ${item.po_number}`);
+      const projectRefParts: string[] = [];
+      if (item.project_reference) {
+        projectRefParts.push(`Project Ref: ${item.project_reference}`);
+      }
+      if (item.enquiry_number) {
+        projectRefParts.push(`Enquiry: ${item.enquiry_number}`);
+      }
+      if (projectRefParts.length > 0) {
+        detailLineTexts.push(projectRefParts.join(" | "));
       }
 
-      if (item.enquiry_number || item.project_reference) {
-        const parts: string[] = [];
-        if (item.enquiry_number) {
-          parts.push(`Enquiry: ${item.enquiry_number}`);
-        }
-        if (item.project_reference) {
-          parts.push(`Project Ref: ${item.project_reference}`);
-        }
-        detailLines.push(parts.join(" | "));
+      if (item.po_number) {
+        detailLineTexts.push(`PO Number: ${item.po_number}`);
       }
 
       if (item.project_owner_name) {
-        detailLines.push(`Project Owner: ${item.project_owner_name}`);
+        detailLineTexts.push(`Project Owner: ${item.project_owner_name}`);
       }
 
       if (item.payment_terms !== null && item.payment_terms !== undefined) {
-        detailLines.push(`Payment Terms: ${item.payment_terms} days`);
+        detailLineTexts.push(`Payment Terms: ${item.payment_terms} days`);
       }
 
       if (item.updated_at) {
         const dateOnly = item.updated_at.split("T")[0];
-        detailLines.push(`Last Updated: ${dateOnly}`);
+        detailLineTexts.push(`Last Updated: ${dateOnly}`);
       }
 
       if (item.description) {
-        detailLines.push(`Description: ${item.description}`);
+        detailLineTexts.push(`Description: ${item.description}`);
       }
 
       if (item.accounts_email) {
-        detailLines.push(`Email Contact: ${item.accounts_email}`);
+        detailLineTexts.push(`Email Contact: ${item.accounts_email}`);
       }
 
       if (item.client_address) {
-        detailLines.push(`Address: ${item.client_address}`);
+        detailLineTexts.push(`Address: ${item.client_address}`);
       }
 
-      ensureSpaceForLines(1 + detailLines.length + 1);
+      const wrappedDetailLines: string[] = [];
+      const maxDetailWidth = contentWidth - 20;
+
+      for (const text of detailLineTexts) {
+        const wrapped = wrapText(text, maxDetailWidth, font, detailTextSize);
+        if (wrapped.length === 0) {
+          continue;
+        }
+        wrappedDetailLines.push(...wrapped);
+      }
+
+      const totalLinesForItem =
+        1 + wrappedDetailLines.length + 1;
+
+      ensureSpaceForLines(totalLinesForItem);
 
       const projectLabel =
-        `${item.project_code ?? ""} ${item.project_name ?? ""}`.trim() || "N/A";
+        `${item.project_code ?? ""} ${item.project_name ?? ""}`.trim() ||
+        "N/A";
       const clientLabel = item.client_name ?? "N/A";
-      const valueLabel =
+      const valueNumber =
         item.invoice_value !== null && item.invoice_value !== undefined
-          ? item.invoice_value.toFixed(2)
-          : "0.00";
+          ? item.invoice_value
+          : 0;
+      const valueLabel = formatCurrency(valueNumber);
 
-      page.drawText(projectLabel, { x: 50, y, size: 10, font });
-      page.drawText(clientLabel, { x: 220, y, size: 10, font });
-      page.drawText(valueLabel, { x: 400, y, size: 10, font });
-      y -= 14;
+      page.drawText(projectLabel, {
+        x: projectColX,
+        y,
+        size: bodyTextSize,
+        font,
+      });
+      page.drawText(clientLabel, {
+        x: clientColX,
+        y,
+        size: bodyTextSize,
+        font,
+      });
 
-      for (const line of detailLines) {
-        page.drawText(line, { x: 60, y, size: 9, font });
-        y -= 12;
+      const valueWidth = font.widthOfTextAtSize(valueLabel, bodyTextSize);
+      page.drawText(valueLabel, {
+        x: valueColRightX - valueWidth,
+        y,
+        size: bodyTextSize,
+        font,
+      });
+
+      y -= bodyTextSize + lineGap;
+
+      const detailIndentX = leftMargin + 10;
+
+      for (const line of wrappedDetailLines) {
+        page.drawText(line, {
+          x: detailIndentX,
+          y,
+          size: detailTextSize,
+          font,
+        });
+        y -= detailTextSize + 2;
       }
 
-      y -= 6;
+      y -= lineGap + 2;
     }
 
-    if (y < 80) {
+    if (y < bottomMargin + 20) {
       page.drawText("Continued on next page...", {
-        x: 50,
-        y: 40,
-        size: 9,
+        x: leftMargin,
+        y: bottomMargin - 15,
+        size: 8,
         font,
       });
       page = pdfDoc.addPage();
-      y = height - 80;
+      y = height - topMargin - 20;
     }
 
-    const totalText = `Total Invoiced Value: ${totalValue.toFixed(2)}`;
-    page.drawText(totalText, { x: 50, y, size: 12, font: fontBold });
+    const totalText = `Total Invoiced Value: ${formatCurrency(totalValue)}`;
+    page.drawText(totalText, {
+      x: leftMargin,
+      y,
+      size: 12,
+      font: fontBold,
+    });
 
     const pdfBytes = await pdfDoc.save();
     const fileName = `invoice-${year}-${String(month).padStart(
