@@ -6,12 +6,13 @@ interface InvoiceItemPayload {
   project_name?: string | null;
   project_code?: string | null;
   client_name?: string | null;
-  invoice_value?: number | null;
+  invoice_value?: number | string | null;
   description?: string | null;
   po_number?: string | null;
   project_reference?: string | null;
+  enquiry_number?: string | null;
   project_owner_name?: string | null;
-  payment_terms?: number | null;
+  payment_terms?: number | string | null;
   updated_at?: string | null;
   accounts_email?: string | null;
   client_address?: string | null;
@@ -42,10 +43,7 @@ const MONTHS = [
 
 function toNumber(value: unknown): number {
   if (typeof value === "number") {
-    if (Number.isFinite(value)) {
-      return value;
-    }
-    return 0;
+    return Number.isFinite(value) ? value : 0;
   }
   if (typeof value === "string") {
     const parsed = Number(value);
@@ -83,7 +81,6 @@ function wrapText(
       if (currentLine) {
         lines.push(currentLine);
       }
-      // If a single word is longer than maxWidth, still add it on its own line
       const wordWidth = font.widthOfTextAtSize(word, fontSize);
       if (wordWidth > maxWidth && word.length > 0) {
         lines.push(word);
@@ -112,47 +109,56 @@ export default async function handler(
   }
 
   try {
-    const rawBody = req.body as GeneratePdfRequestBody | undefined;
+    const raw = req.body as GeneratePdfRequestBody | string | undefined;
+
+    let body: GeneratePdfRequestBody;
+    if (typeof raw === "string") {
+      try {
+        body = JSON.parse(raw) as GeneratePdfRequestBody;
+      } catch {
+        body = {};
+      }
+    } else {
+      body = raw ?? {};
+    }
 
     const invoiceMonthId =
-      typeof rawBody?.invoiceMonthId === "string"
-        ? rawBody.invoiceMonthId
+      typeof body.invoiceMonthId === "string" && body.invoiceMonthId.trim().length > 0
+        ? body.invoiceMonthId.trim()
         : "Unknown";
 
-    const yearValue = rawBody?.year;
-    const monthValue = rawBody?.month;
+    const yearRaw = body.year;
+    const monthRaw = body.month;
 
-    const year =
-      typeof yearValue === "number"
-        ? yearValue
-        : typeof yearValue === "string"
-        ? Number(yearValue) || 0
-        : 0;
+    const year = toNumber(yearRaw);
+    const month = toNumber(monthRaw);
 
-    const month =
-      typeof monthValue === "number"
-        ? monthValue
-        : typeof monthValue === "string"
-        ? Number(monthValue) || 0
-        : 0;
+    const safeYear =
+      year > 0 && Number.isFinite(year) ? Math.trunc(year) : 0;
+    const safeMonth =
+      month >= 1 && month <= 12 && Number.isFinite(month) ? Math.trunc(month) : 0;
 
     const monthName =
-      month >= 1 && month <= 12 ? MONTHS[month - 1] : "Unknown month";
+      safeMonth >= 1 && safeMonth <= 12 ? MONTHS[safeMonth - 1] : "Unknown month";
 
-    const items = Array.isArray(rawBody?.items)
-      ? (rawBody?.items as InvoiceItemPayload[])
-      : [];
+    const items = Array.isArray(body.items) ? body.items : [];
 
-    const totalValue = toNumber(rawBody?.totalValue ?? 0);
+    const totalValue = toNumber(body.totalValue);
+
+    console.log("Invoice PDF generation payload:", {
+      invoiceMonthId,
+      year: safeYear,
+      month: safeMonth,
+      itemsCount: items.length,
+      totalValue,
+    });
 
     const pdfDoc = await PDFDocument.create();
     const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-    const page = pdfDoc.addPage();
-    let currentPage = page;
-
-    const { width, height } = currentPage.getSize();
+    let page = pdfDoc.addPage();
+    let { width, height } = page.getSize();
 
     const marginLeft = 50;
     const marginRight = 50;
@@ -162,21 +168,23 @@ export default async function handler(
     const titleFontSize = 18;
     const headerFontSize = 12;
     const bodyFontSize = 10;
+    const detailFontSize = 9;
     const lineGap = 4;
-    const sectionGap = 10;
+    const itemGap = 10;
 
     const contentWidth = width - marginLeft - marginRight;
     const lineHeight = bodyFontSize + lineGap;
+    const detailLineHeight = detailFontSize + 2;
 
     let y = height - marginTop;
 
     const title =
-      year > 0
-        ? `Invoice Summary - ${monthName} ${year}`
+      safeYear > 0
+        ? `Invoice Summary - ${monthName} ${safeYear}`
         : `Invoice Summary - ${monthName}`;
 
     const titleWidth = boldFont.widthOfTextAtSize(title, titleFontSize);
-    currentPage.drawText(title, {
+    page.drawText(title, {
       x: (width - titleWidth) / 2,
       y,
       size: titleFontSize,
@@ -185,7 +193,7 @@ export default async function handler(
     y -= 30;
 
     const idLine = `Invoice Month ID: ${invoiceMonthId}`;
-    currentPage.drawText(idLine, {
+    page.drawText(idLine, {
       x: marginLeft,
       y,
       size: bodyFontSize,
@@ -193,138 +201,193 @@ export default async function handler(
     });
     y -= 20;
 
-    const headerLine = "Project / Client / Value";
-    currentPage.drawText(headerLine, {
-      x: marginLeft,
+    const headerProjectX = marginLeft;
+    const headerClientX = marginLeft + contentWidth * 0.45;
+    const headerValueX = width - marginRight - 80;
+
+    page.drawText("Project", {
+      x: headerProjectX,
       y,
       size: headerFontSize,
       font: boldFont,
     });
-    y -= 16;
+    page.drawText("Client", {
+      x: headerClientX,
+      y,
+      size: headerFontSize,
+      font: boldFont,
+    });
+    page.drawText("Value", {
+      x: headerValueX,
+      y,
+      size: headerFontSize,
+      font: boldFont,
+    });
+    y -= 18;
 
     const ensureSpace = (linesNeeded: number) => {
-      const neededHeight = linesNeeded * lineHeight + sectionGap;
+      const neededHeight = linesNeeded * detailLineHeight + itemGap;
       if (y - neededHeight < marginBottom) {
-        currentPage = pdfDoc.addPage();
-        const size = currentPage.getSize();
-        const newWidth = size.width;
-        const newHeight = size.height;
+        page = pdfDoc.addPage();
+        ({ width, height } = page.getSize());
+        y = height - marginTop;
 
-        y = newHeight - marginTop;
-
-        const continuedTitle = `${title} (continued)`;
-        const continuedWidth = boldFont.widthOfTextAtSize(
-          continuedTitle,
-          headerFontSize,
-        );
-        currentPage.drawText(continuedTitle, {
-          x: (newWidth - continuedWidth) / 2,
+        const contTitle = `${title} (continued)`;
+        const contWidth = boldFont.widthOfTextAtSize(contTitle, headerFontSize);
+        page.drawText(contTitle, {
+          x: (width - contWidth) / 2,
           y,
           size: headerFontSize,
           font: boldFont,
         });
         y -= 24;
 
-        currentPage.drawText(headerLine, {
-          x: marginLeft,
+        page.drawText("Project", {
+          x: headerProjectX,
           y,
           size: headerFontSize,
           font: boldFont,
         });
-        y -= 16;
+        page.drawText("Client", {
+          x: headerClientX,
+          y,
+          size: headerFontSize,
+          font: boldFont,
+        });
+        page.drawText("Value", {
+          x: headerValueX,
+          y,
+          size: headerFontSize,
+          font: boldFont,
+        });
+        y -= 18;
       }
     };
 
-    for (const rawItem of items) {
-      const projectName = (rawItem.project_name ?? "").toString().trim();
-      const projectCode = (rawItem.project_code ?? "").toString().trim();
-      const clientName = (rawItem.client_name ?? "").toString().trim();
+    for (const item of items) {
+      const projectCode = (item.project_code ?? "").toString().trim();
+      const projectName = (item.project_name ?? "").toString().trim();
+      const clientName = (item.client_name ?? "").toString().trim();
 
       const projectLabelBase = [projectCode, projectName].filter(Boolean).join(" ");
-      const projectLabel =
-        projectLabelBase.length > 0 ? projectLabelBase : "Unknown project";
+      const projectLabel = projectLabelBase || "Unknown project";
+      const clientLabel = clientName || "Unknown client";
 
-      const clientLabel =
-        clientName.length > 0 ? clientName : "Unknown client";
+      const valueNumber = toNumber(item.invoice_value ?? 0);
+      const valueLabel = formatCurrency(valueNumber);
 
-      const numericValue = toNumber(rawItem.invoice_value ?? 0);
-      const valueLabel = formatCurrency(numericValue);
-
-      const mainLine = `${projectLabel}  –  ${clientLabel}  –  ${valueLabel}`;
-      const mainLines = wrapText(
-        mainLine,
-        contentWidth,
+      const projectLines = wrapText(
+        projectLabel,
+        contentWidth * 0.45,
+        regularFont,
+        bodyFontSize,
+      );
+      const clientLines = wrapText(
+        clientLabel,
+        contentWidth * 0.35,
         regularFont,
         bodyFontSize,
       );
 
-      const detailLinesRaw: string[] = [];
+      const detailLines: string[] = [];
 
-      if (rawItem.description) {
-        detailLinesRaw.push(`Description: ${rawItem.description}`);
+      if (item.project_reference) {
+        detailLines.push(`Project Ref: ${item.project_reference}`);
       }
-      if (rawItem.po_number) {
-        detailLinesRaw.push(`PO Number: ${rawItem.po_number}`);
+      if (item.enquiry_number) {
+        detailLines.push(`Enquiry: ${item.enquiry_number}`);
       }
-      if (rawItem.project_reference) {
-        detailLinesRaw.push(`Project Ref: ${rawItem.project_reference}`);
+      if (item.po_number) {
+        detailLines.push(`PO Number: ${item.po_number}`);
       }
-      if (rawItem.project_owner_name) {
-        detailLinesRaw.push(`Project Owner: ${rawItem.project_owner_name}`);
+      if (item.project_owner_name) {
+        detailLines.push(`Project Owner: ${item.project_owner_name}`);
       }
-      if (rawItem.payment_terms !== null && rawItem.payment_terms !== undefined) {
-        detailLinesRaw.push(`Payment Terms: ${rawItem.payment_terms} days`);
-      }
-      if (rawItem.updated_at) {
-        const date = new Date(rawItem.updated_at);
-        if (!Number.isNaN(date.getTime())) {
-          const iso = date.toISOString().slice(0, 10);
-          detailLinesRaw.push(`Last Updated: ${iso}`);
+      if (item.payment_terms !== null && item.payment_terms !== undefined) {
+        const termsNumber = toNumber(item.payment_terms);
+        if (termsNumber > 0) {
+          detailLines.push(`Payment Terms: ${termsNumber} days`);
         }
       }
-      if (rawItem.accounts_email) {
-        detailLinesRaw.push(`Accounts Email: ${rawItem.accounts_email}`);
+      if (item.updated_at) {
+        const d = new Date(item.updated_at);
+        if (!Number.isNaN(d.getTime())) {
+          const iso = d.toISOString().slice(0, 10);
+          detailLines.push(`Last Updated: ${iso}`);
+        }
       }
-      if (rawItem.client_address) {
-        detailLinesRaw.push(`Address: ${rawItem.client_address}`);
+      if (item.description) {
+        detailLines.push(`Description: ${item.description}`);
+      }
+      if (item.accounts_email) {
+        detailLines.push(`Email Contact: ${item.accounts_email}`);
+      }
+      if (item.client_address) {
+        detailLines.push(`Address: ${item.client_address}`);
       }
 
-      const wrappedDetailLines = detailLinesRaw.flatMap((line) =>
-        wrapText(line, contentWidth - 20, regularFont, bodyFontSize),
+      const wrappedDetails = detailLines.flatMap((line) =>
+        wrapText(line, contentWidth - 20, regularFont, detailFontSize),
       );
 
       const totalLinesForItem =
-        mainLines.length + wrappedDetailLines.length + 1;
+        Math.max(projectLines.length, clientLines.length) + wrappedDetails.length + 1;
 
       ensureSpace(totalLinesForItem);
 
-      for (const line of mainLines) {
-        currentPage.drawText(line, {
-          x: marginLeft,
-          y,
-          size: bodyFontSize,
-          font: regularFont,
-        });
+      const maxMainLines = Math.max(projectLines.length, clientLines.length);
+
+      for (let i = 0; i < maxMainLines; i++) {
+        const projText = projectLines[i] ?? "";
+        const clientText = clientLines[i] ?? "";
+
+        if (projText) {
+          page.drawText(projText, {
+            x: headerProjectX,
+            y,
+            size: bodyFontSize,
+            font: regularFont,
+          });
+        }
+        if (clientText) {
+          page.drawText(clientText, {
+            x: headerClientX,
+            y,
+            size: bodyFontSize,
+            font: regularFont,
+          });
+        }
+
+        if (i === 0) {
+          const valueWidth = regularFont.widthOfTextAtSize(valueLabel, bodyFontSize);
+          page.drawText(valueLabel, {
+            x: headerValueX + 80 - valueWidth,
+            y,
+            size: bodyFontSize,
+            font: regularFont,
+          });
+        }
+
         y -= lineHeight;
       }
 
-      for (const line of wrappedDetailLines) {
-        currentPage.drawText(line, {
+      for (const line of wrappedDetails) {
+        page.drawText(line, {
           x: marginLeft + 12,
           y,
-          size: bodyFontSize,
+          size: detailFontSize,
           font: regularFont,
         });
-        y -= lineHeight;
+        y -= detailLineHeight;
       }
 
-      y -= sectionGap;
+      y -= itemGap;
     }
 
     ensureSpace(2);
 
     const totalText = `Total Invoiced Value: ${formatCurrency(totalValue)}`;
-    currentPage.drawText(totalText, {
+    page.drawText(totalText, {
       x: marginLeft,
       y,
       size: bodyFontSize + 1,
@@ -333,10 +396,10 @@ export default async function handler(
 
     const pdfBytes = await pdfDoc.save();
 
-    const safeYearLabel = year > 0 ? year.toString() : "unknown-year";
+    const safeYearLabel = safeYear > 0 ? safeYear.toString() : "unknown-year";
     const safeMonthLabel =
-      month >= 1 && month <= 12
-        ? month.toString().padStart(2, "0")
+      safeMonth >= 1 && safeMonth <= 12
+        ? safeMonth.toString().padStart(2, "0")
         : "unknown-month";
 
     const fileName = `invoice-summary-${safeYearLabel}-${safeMonthLabel}.pdf`;
