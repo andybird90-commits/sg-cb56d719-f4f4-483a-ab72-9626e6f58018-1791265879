@@ -730,37 +730,38 @@ export default function InvoicingPage() {
 
       const typedProjects = (projects || []) as any[];
 
-      const activeProjects = typedProjects.filter((p) => {
+      const activeProjectsByDates = typedProjects.filter((p) => {
         if (!p.start_date || !p.end_date) return false;
-        const start = new Date(p.start_date);
-        const end = new Date(p.end_date);
+        const start = new Date(p.start_date as string);
+        const end = new Date(p.end_date as string);
         return start <= endOfMonth && end >= startOfMonth;
       });
 
-      const activeProjectIds = new Set<string>(
-        activeProjects.map((p) => p.id as string),
+      const activeProjectIdsByDates = new Set<string>(
+        activeProjectsByDates.map((p) => p.id as string),
       );
-      const activeProjectIdsArray = Array.from(activeProjectIds);
+
+      const allProjectIds = typedProjects.map((p) => p.id as string);
 
       let manuallyPhasedProjectIds = new Set<string>();
       const monthPhasingMap = new Map<string, number>();
 
-      if (activeProjectIdsArray.length > 0) {
-        const { data: allPhasingForActive, error: allPhasingError } =
+      if (allProjectIds.length > 0) {
+        const { data: allPhasingForProjects, error: allPhasingError } =
           await supabase
             .from("project_monthly_phasing")
             .select("project_id, year, month, revenue_amount")
-            .in("project_id", activeProjectIdsArray);
+            .in("project_id", allProjectIds);
 
         if (allPhasingError) throw allPhasingError;
 
         manuallyPhasedProjectIds = new Set(
-          (allPhasingForActive || []).map(
+          (allPhasingForProjects || []).map(
             (p: any) => p.project_id as string,
           ),
         );
 
-        (allPhasingForActive || []).forEach((p: any) => {
+        (allPhasingForProjects || []).forEach((p: any) => {
           if (p.year === selectedYear && p.month === selectedMonth) {
             monthPhasingMap.set(
               p.project_id as string,
@@ -776,15 +777,14 @@ export default function InvoicingPage() {
       });
 
       const shouldKeepItem = (item: InvoiceItem): boolean => {
-        const isActiveByDates = activeProjectIds.has(item.project_id);
         const isManuallyPhased = manuallyPhasedProjectIds.has(item.project_id);
         const hasPhasingThisMonth = monthPhasingMap.has(item.project_id);
 
         if (isManuallyPhased) {
-          return isActiveByDates && hasPhasingThisMonth;
+          return hasPhasingThisMonth;
         }
 
-        return isActiveByDates;
+        return activeProjectIdsByDates.has(item.project_id);
       };
 
       const itemsToRemove = invoiceItems.filter((item) => !shouldKeepItem(item));
@@ -794,29 +794,36 @@ export default function InvoicingPage() {
         await supabase.from("invoice_items").delete().in("id", removeIds);
 
         console.log(
-          `Removed ${itemsToRemove.length} invoice items no longer valid for this month (including manually phased projects without phasing this month)`,
+          `Removed ${itemsToRemove.length} invoice items no longer valid for this month (including manually phased projects without phasing this month).`,
         );
       }
 
-      for (const p of activeProjects) {
+      for (const p of typedProjects) {
         const projectId = p.id as string;
         const isManuallyPhased = manuallyPhasedProjectIds.has(projectId);
-        const phasingValueThisMonth = monthPhasingMap.get(projectId);
+        const hasPhasingThisMonth = monthPhasingMap.has(projectId);
+        const isActiveByDates = activeProjectIdsByDates.has(projectId);
 
-        if (isManuallyPhased && phasingValueThisMonth === undefined) {
-          continue;
+        if (isManuallyPhased) {
+          if (!hasPhasingThisMonth) {
+            continue;
+          }
+        } else {
+          if (!isActiveByDates) {
+            continue;
+          }
         }
 
         let monthlyRevenue = 0;
 
         if (isManuallyPhased) {
-          monthlyRevenue = phasingValueThisMonth || 0;
+          monthlyRevenue = monthPhasingMap.get(projectId) || 0;
         } else {
           const { start_date, end_date, agreed_fee_value } = p;
 
           if (start_date && end_date && agreed_fee_value) {
-            const start = new Date(start_date);
-            const end = new Date(end_date);
+            const start = new Date(start_date as string);
+            const end = new Date(end_date as string);
             const durationMonths = Math.max(
               1,
               (end.getFullYear() - start.getFullYear()) * 12 +
@@ -824,6 +831,8 @@ export default function InvoicingPage() {
                 1,
             );
             monthlyRevenue = (Number(agreed_fee_value) || 0) / durationMonths;
+          } else {
+            monthlyRevenue = 0;
           }
         }
 

@@ -81,12 +81,7 @@ export const invoicingService = {
 
     if (projectsError) throw projectsError;
 
-    const activeProjects = (projects || []).filter((p: any) => {
-      if (!p.start_date || !p.end_date) return false;
-      const start = new Date(p.start_date as string);
-      const end = new Date(p.end_date as string);
-      return start <= endOfMonth && end >= startOfMonth;
-    });
+    const allProjects = (projects || []) as any[];
 
     const { data: phasingData, error: phasingError } = await supabase
       .from("project_monthly_phasing")
@@ -115,36 +110,47 @@ export const invoicingService = {
       (projectsWithPhasing || []).map((p: any) => p.project_id as string)
     );
 
-    const itemsToInsert = activeProjects.reduce<any[]>((acc, project: any) => {
+    const itemsToInsert: any[] = [];
+
+    allProjects.forEach((project: any) => {
       const projectId = project.id as string;
       const hasManualPhasing = projectsWithAnyPhasing.has(projectId);
       const hasPhasingThisMonth = phasingMap.has(projectId);
 
-      if (hasManualPhasing && !hasPhasingThisMonth) {
-        return acc;
+      if (hasManualPhasing) {
+        if (!hasPhasingThisMonth) {
+          return;
+        }
+      } else {
+        if (!project.start_date || !project.end_date) {
+          return;
+        }
+        const start = new Date(project.start_date as string);
+        const end = new Date(project.end_date as string);
+        if (start > endOfMonth || end < startOfMonth) {
+          return;
+        }
       }
 
       let invoiceValue = 0;
 
       if (hasManualPhasing) {
         invoiceValue = phasingMap.get(projectId) || 0;
-      } else {
-        if (project.agreed_fee_value && project.start_date && project.end_date) {
-          const start = new Date(project.start_date as string);
-          const end = new Date(project.end_date as string);
-          const durationMonths = Math.max(
-            1,
-            (end.getFullYear() - start.getFullYear()) * 12 +
-              (end.getMonth() - start.getMonth()) +
-              1
-          );
-          invoiceValue = Number(project.agreed_fee_value) / durationMonths;
-        }
+      } else if (project.agreed_fee_value && project.start_date && project.end_date) {
+        const start = new Date(project.start_date as string);
+        const end = new Date(project.end_date as string);
+        const durationMonths = Math.max(
+          1,
+          (end.getFullYear() - start.getFullYear()) * 12 +
+            (end.getMonth() - start.getMonth()) +
+            1
+        );
+        invoiceValue = Number(project.agreed_fee_value) / durationMonths;
       }
 
       const clientName = project.companies?.name || "Unknown Client";
 
-      acc.push({
+      itemsToInsert.push({
         invoice_month_id: invoiceMonthId,
         project_id: projectId,
         project_name: project.name as string,
@@ -161,9 +167,7 @@ export const invoicingService = {
         project_owner_name: project.profiles?.full_name || null,
         payment_terms: project.companies?.payment_terms || null,
       });
-
-      return acc;
-    }, []);
+    });
 
     if (itemsToInsert.length > 0) {
       const { error: insertError } = await supabase
@@ -198,12 +202,14 @@ export const invoicingService = {
   },
 
   async lockInvoiceMonth(invoiceMonthId: string): Promise<void> {
+    const { data: authData } = await supabase.auth.getUser();
+
     const { error } = await supabase
       .from("invoice_months")
       .update({
         status: "locked",
         locked_at: new Date().toISOString(),
-        locked_by: (await supabase.auth.getUser()).data.user?.id || null,
+        locked_by: authData.user?.id || null,
       })
       .eq("id", invoiceMonthId);
 
@@ -264,38 +270,42 @@ export const invoicingService = {
 
     const phasingMap = new Map<string, number>();
     phasingRows?.forEach((row: any) => {
-      phasingMap.set(row.project_id, row.revenue_amount || 0);
+      phasingMap.set(row.project_id as string, (row.revenue_amount as number) || 0);
     });
 
     const projectsWithAnyPhasingSet = new Set<string>(
-      (projectsWithAnyPhasing || []).map((p: any) => p.project_id)
+      (projectsWithAnyPhasing || []).map((p: any) => p.project_id as string)
     );
 
     let total = 0;
 
     projects.forEach((project: any) => {
+      const projectId = project.id as string;
+      const isManuallyPhased = projectsWithAnyPhasingSet.has(projectId);
+
+      if (isManuallyPhased) {
+        if (!phasingMap.has(projectId)) {
+          return;
+        }
+        total += phasingMap.get(projectId) || 0;
+        return;
+      }
+
       if (!project.start_date || !project.end_date) return;
 
-      const start = new Date(project.start_date);
-      const end = new Date(project.end_date);
+      const start = new Date(project.start_date as string);
+      const end = new Date(project.end_date as string);
 
       if (start > monthEnd || end < monthStart) return;
 
-      const hasManualPhasing = projectsWithAnyPhasingSet.has(project.id);
-      let monthlyRevenue = 0;
-
-      if (hasManualPhasing) {
-        monthlyRevenue = phasingMap.get(project.id) || 0;
-      } else {
-        const durationMonths = Math.max(
-          1,
-          (end.getFullYear() - start.getFullYear()) * 12 +
-            (end.getMonth() - start.getMonth()) +
-            1
-        );
-        monthlyRevenue =
-          (Number(project.agreed_fee_value) || 0) / durationMonths;
-      }
+      const durationMonths = Math.max(
+        1,
+        (end.getFullYear() - start.getFullYear()) * 12 +
+          (end.getMonth() - start.getMonth()) +
+          1
+      );
+      const monthlyRevenue =
+        (Number(project.agreed_fee_value) || 0) / durationMonths;
 
       total += monthlyRevenue;
     });
