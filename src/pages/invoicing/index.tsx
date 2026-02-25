@@ -790,7 +790,7 @@ export default function InvoicingPage() {
           return phasingAmount > 0;
         }
 
-        // Non-manual projects: keep items only if the project is active by dates for this month
+        // Non-manual projects: only keep if the project is active by dates
         return activeProjectIdsByDates.has(item.project_id);
       };
 
@@ -1089,22 +1089,44 @@ export default function InvoicingPage() {
                           containerRef={bottomScrollRef}
                           onContainerScroll={handleBottomScroll}
                         >
-                          <TableHeader className="sticky top-4 z-10 bg-white">
+                          <TableHeader className="bg-white">
                             <TableRow>
-                              <TableHead className="w-[50px]">Include</TableHead>
-                              <TableHead className="min-w-[150px]">Project</TableHead>
-                              <TableHead className="min-w-[120px]">Client</TableHead>
-                              <TableHead className="min-w-[120px]">PO Number</TableHead>
-                              <TableHead className="min-w-[150px]">Email Contact</TableHead>
-                              <TableHead className="min-w-[200px]">Address</TableHead>
-                              <TableHead className="min-w-[100px]">Project Number</TableHead>
-                              <TableHead className="min-w-[120px]">Project Owner</TableHead>
-                              <TableHead className="min-w-[100px]">Payment Terms</TableHead>
-                              <TableHead className="min-w-[150px]">
+                              <TableHead className="sticky top-0 z-10 bg-white w-[50px]">
+                                Include
+                              </TableHead>
+                              <TableHead className="sticky top-0 z-10 bg-white min-w-[150px]">
+                                Project
+                              </TableHead>
+                              <TableHead className="sticky top-0 z-10 bg-white min-w-[120px]">
+                                Client
+                              </TableHead>
+                              <TableHead className="sticky top-0 z-10 bg-white min-w-[120px]">
+                                PO Number
+                              </TableHead>
+                              <TableHead className="sticky top-0 z-10 bg-white min-w-[150px]">
                                 Invoice Value (from Monthly Phasing)
                               </TableHead>
-                              <TableHead className="min-w-[200px]">Description</TableHead>
-                              <TableHead className="min-w-[100px]">Last Updated</TableHead>
+                              <TableHead className="sticky top-0 z-10 bg-white min-w-[200px]">
+                                Description
+                              </TableHead>
+                              <TableHead className="sticky top-0 z-10 bg-white min-w-[150px]">
+                                Email Contact
+                              </TableHead>
+                              <TableHead className="sticky top-0 z-10 bg-white min-w-[200px]">
+                                Address
+                              </TableHead>
+                              <TableHead className="sticky top-0 z-10 bg-white min-w-[100px]">
+                                Project Number
+                              </TableHead>
+                              <TableHead className="sticky top-0 z-10 bg-white min-w-[120px]">
+                                Project Owner
+                              </TableHead>
+                              <TableHead className="sticky top-0 z-10 bg-white min-w-[100px]">
+                                Payment Terms
+                              </TableHead>
+                              <TableHead className="sticky top-0 z-10 bg-white min-w-[100px]">
+                                Last Updated
+                              </TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -1134,7 +1156,9 @@ export default function InvoicingPage() {
                                     {item.project_code} - {item.project_name}
                                   </Link>
                                 </TableCell>
-                                <TableCell className="px-4 py-3 text-sm">{item.client_name}</TableCell>
+                                <TableCell className="px-4 py-3 text-sm">
+                                  {item.client_name}
+                                </TableCell>
                                 <TableCell className="px-4 py-3 text-sm">
                                   {item.po_number || "—"}
                                 </TableCell>
