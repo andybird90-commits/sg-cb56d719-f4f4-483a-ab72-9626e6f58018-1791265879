@@ -551,12 +551,38 @@ export default function InvoicingPage() {
     try {
       setLoading(true);
 
-      const pdfUrl = await invoicingService.generateAndUploadPdf(
-        invoiceMonth,
-        invoiceItems
-      );
+      const response = await fetch("/api/invoicing/generate-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          invoiceMonthId: invoiceMonth.id,
+          year: invoiceMonth.year,
+          month: invoiceMonth.month,
+          items: includedItems,
+          totalValue: displayedTotal,
+        }),
+      });
 
-      window.open(pdfUrl, "_blank");
+      if (!response.ok) {
+        throw new Error("Failed to generate invoice PDF");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const monthLabel = String(invoiceMonth.month).padStart(2, "0");
+
+      link.href = url;
+      link.download = `invoice-${invoiceMonth.year}-${monthLabel}-${invoiceMonth.id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "PDF ready",
+        description: "Invoice summary downloaded.",
+      });
     } catch (error) {
       console.error(error);
       toast({
@@ -575,23 +601,17 @@ export default function InvoicingPage() {
     try {
       setLoading(true);
 
-      const pdfUrl = await invoicingService.generateAndUploadPdf(
-        invoiceMonth,
-        invoiceItems
-      );
-
-      await invoicingService.savePdfUrl(invoiceMonth.id, pdfUrl);
+      await invoicingService.lockInvoiceMonth(invoiceMonth.id);
 
       setInvoiceMonth({
         ...invoiceMonth,
         status: "locked",
-        pdf_url: pdfUrl,
       });
       setShowLockDialog(false);
 
       toast({
         title: "Success",
-        description: "Invoice period locked and PDF generated successfully",
+        description: "Invoice period locked successfully.",
       });
     } catch (error) {
       console.error(error);
@@ -611,17 +631,11 @@ export default function InvoicingPage() {
     try {
       setLoading(true);
 
-      const pdfUrl = await invoicingService.generateAndUploadPdf(
-        invoiceMonth,
-        invoiceItems
-      );
-
-      await invoicingService.savePdfUrl(invoiceMonth.id, pdfUrl);
+      await invoicingService.lockInvoiceMonth(invoiceMonth.id);
 
       setInvoiceMonth({
         ...invoiceMonth,
         status: "locked",
-        pdf_url: pdfUrl,
       });
 
       toast({
