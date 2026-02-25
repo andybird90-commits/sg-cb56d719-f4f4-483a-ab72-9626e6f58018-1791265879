@@ -11,23 +11,19 @@ export type InvoicingPdfItem = {
   id: string;
   invoice_month_id: string;
   project_id: string;
-  project_name: string;
-  project_code: string;
-  client_name: string;
-  invoice_value: number | null;
+  project_name: string | null;
+  project_code: string | null;
+  client_name: string | null;
   po_number: string | null;
-  description: string;
-  excluded_this_month: boolean;
-  invoice_reference: string | null;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-  accounts_email?: string | null;
-  client_address?: string | null;
-  enquiry_number?: string | null;
-  project_reference?: string | null;
-  project_owner_name?: string | null;
-  payment_terms?: number | null;
+  invoice_value: number | null;
+  description: string | null;
+  accounts_email: string | null;
+  client_address: string | null;
+  enquiry_number: string | null;
+  project_reference: string | null;
+  project_owner_name: string | null;
+  payment_terms: number | null;
+  updated_at: string | null;
 };
 
 export const invoicingService = {
@@ -351,35 +347,57 @@ export const invoicingService = {
   },
 
   async generateAndUploadPdf(
-    invoiceMonth: InvoiceMonth,
-    items: InvoicingPdfItem[],
-    options?: { bucket?: string; filenameSuffix?: string; revision?: number }
+    invoiceMonth: Tables<"invoice_months">,
+    items: InvoiceItem[],
+    options?: { bucket?: string; revisionLabel?: string }
   ): Promise<string> {
-    const included = items.filter(
-      (item) =>
-        !item.excluded_this_month &&
-        item.invoice_value !== null &&
-        item.invoice_value !== undefined
+    const includedItems: InvoicingPdfItem[] = items
+      .filter(
+        (item) =>
+          !item.excluded_this_month &&
+          item.invoice_value !== null &&
+          item.invoice_value !== undefined
+      )
+      .map((item) => ({
+        id: item.id,
+        invoice_month_id: item.invoice_month_id,
+        project_id: item.project_id,
+        project_name: item.project_name ?? null,
+        project_code: item.project_code ?? null,
+        client_name: item.client_name ?? null,
+        po_number: item.po_number ?? null,
+        invoice_value: item.invoice_value ?? null,
+        description: item.description ?? null,
+        accounts_email: item.accounts_email ?? null,
+        client_address: item.client_address ?? null,
+        enquiry_number: item.enquiry_number ?? null,
+        project_reference: item.project_reference ?? null,
+        project_owner_name: item.project_owner_name ?? null,
+        payment_terms: item.payment_terms ?? null,
+        updated_at: item.updated_at ?? null,
+      }));
+
+    const totalValue = includedItems.reduce(
+      (sum, item) => sum + (item.invoice_value ?? 0),
+      0
     );
 
-    const totalValue = included.reduce((sum, item) => {
-      const value = typeof item.invoice_value === "number" ? item.invoice_value : 0;
-      return sum + value;
-    }, 0);
+    const { data, error } = await supabase.functions.invoke(
+      "generate-invoice-pdf",
+      {
+        body: {
+          invoiceMonthId: invoiceMonth.id,
+          year: invoiceMonth.year,
+          month: invoiceMonth.month,
+          items: includedItems,
+          totalValue,
+          options,
+        },
+      }
+    );
 
-    const { data, error } = await supabase.functions.invoke("generate-invoice-pdf", {
-      body: {
-        invoiceMonthId: invoiceMonth.id,
-        year: invoiceMonth.year,
-        month: invoiceMonth.month,
-        items: included,
-        totalValue,
-        options,
-      },
-    });
-
-    if (error || !data || !data.pdfUrl) {
-      throw error || new Error("Failed to generate invoice PDF");
+    if (error || !data || !("pdfUrl" in data)) {
+      throw new Error("Failed to generate invoice PDF");
     }
 
     return data.pdfUrl as string;

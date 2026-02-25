@@ -8,22 +8,24 @@ const corsHeaders: Record<string, string> = {
 
 type InvoicePdfItem = {
   id: string;
-  project_name?: string | null;
-  project_code?: string | null;
-  client_name?: string | null;
-  invoice_value?: number | null;
-  description?: string | null;
-  po_number?: string | null;
-  accounts_email?: string | null;
-  client_address?: string | null;
-  project_reference?: string | null;
-  project_owner_name?: string | null;
-  payment_terms?: number | null;
-  enquiry_number?: string | null;
-  updated_at?: string | null;
+  invoice_month_id: string;
+  project_id: string;
+  project_name: string | null;
+  project_code: string | null;
+  client_name: string | null;
+  po_number: string | null;
+  invoice_value: number | null;
+  description: string | null;
+  accounts_email: string | null;
+  client_address: string | null;
+  enquiry_number: string | null;
+  project_reference: string | null;
+  project_owner_name: string | null;
+  payment_terms: string | null;
+  updated_at: string | null;
 };
 
-type GeneratePdfBody = {
+type GeneratePdfPayload = {
   invoiceMonthId: string;
   year: number;
   month: number;
@@ -31,183 +33,145 @@ type GeneratePdfBody = {
   totalValue: number;
   options?: {
     bucket?: string;
-    filenameSuffix?: string;
-    revision?: number;
+    revisionLabel?: string;
   };
 };
 
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { status: 200, headers: corsHeaders });
   }
 
   try {
-    const json = (await req.json()) as GeneratePdfBody;
-
-    const { invoiceMonthId, year, month, items, totalValue, options } = json;
-
-    if (!invoiceMonthId || !year || !month || !Array.isArray(items)) {
-      return new Response(
-        JSON.stringify({
-          error: "invoiceMonthId, year, month and items are required",
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
+    const { invoiceMonthId, year, month, items, totalValue, options } =
+      (await req.json()) as GeneratePdfPayload;
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
-    if (!supabaseUrl || !serviceKey) {
-      return new Response(
-        JSON.stringify({ error: "Supabase environment not configured" }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    const supabase = createClient(supabaseUrl, serviceKey);
-
-    // Build PDF with pdf-lib
     const pdfDoc = await PDFDocument.create();
-    let page = pdfDoc.addPage();
+    const page = pdfDoc.addPage();
     const { width, height } = page.getSize();
+
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
     let y = height - 50;
 
-    const title = `Invoice Summary - ${year}-${String(month).padStart(2, "0")}`;
-    page.drawText(title, {
-      x: 50,
-      y,
-      size: 18,
-      font,
-    });
-
+    const title = `Invoice Summary - ${year}-${String(month).padStart(
+      2,
+      "0"
+    )}`;
+    page.drawText(title, { x: 50, y, size: 16, font: fontBold });
     y -= 30;
 
-    const periodText = `Invoice Month ID: ${invoiceMonthId}`;
-    page.drawText(periodText, {
+    page.drawText(`Invoice Month ID: ${invoiceMonthId}`, {
       x: 50,
       y,
       size: 10,
       font,
     });
+    y -= 20;
 
-    y -= 30;
-
-    // Header for the main row columns
-    page.drawText("Project", { x: 50, y, size: 10, font });
-    page.drawText("Client", { x: 250, y, size: 10, font });
-    page.drawText("Value", { x: 430, y, size: 10, font });
-
-    y -= 16;
-
-    const ensureRoomForRow = () => {
-      if (y < 80) {
-        page = pdfDoc.addPage();
-        const pageSize = page.getSize();
-        y = pageSize.height - 50;
-        page.drawText("Project", { x: 50, y, size: 10, font });
-        page.drawText("Client", { x: 250, y, size: 10, font });
-        page.drawText("Value", { x: 430, y, size: 10, font });
-        y -= 16;
-      }
-    };
+    const header = "Project                             Client                             Value";
+    page.drawText(header, { x: 50, y, size: 10, font: fontBold });
+    y -= 15;
 
     for (const item of items) {
-      ensureRoomForRow();
+      if (y < 100) {
+        page.drawText("Continued on next page...", {
+          x: 50,
+          y: 50,
+          size: 9,
+          font,
+        });
+        const newPage = pdfDoc.addPage();
+        y = height - 50;
+        newPage.drawText(header, { x: 50, y, size: 10, font: fontBold });
+        y -= 15;
+      }
 
-      const projectLabel = `${item.project_code ?? ""} ${item.project_name ?? ""}`
-        .trim()
-        .slice(0, 60);
-      const clientLabel = (item.client_name ?? "").slice(0, 40);
+      const projectLabel = `${item.project_code ?? ""} ${
+        item.project_name ?? ""
+      }`.trim() || "N/A";
+      const clientLabel = item.client_name ?? "N/A";
       const valueLabel =
-        typeof item.invoice_value === "number"
-          ? `£${item.invoice_value.toFixed(2)}`
-          : "";
+        item.invoice_value !== null && item.invoice_value !== undefined
+          ? item.invoice_value.toFixed(2)
+          : "0.00";
 
-      // Main row (matches key columns: Project, Client, Value)
-      page.drawText(projectLabel, { x: 50, y, size: 9, font });
-      page.drawText(clientLabel, { x: 250, y, size: 9, font });
-      page.drawText(valueLabel, { x: 430, y, size: 9, font });
+      page.drawText(projectLabel, { x: 50, y, size: 10, font });
+      page.drawText(clientLabel, { x: 220, y, size: 10, font });
+      page.drawText(valueLabel, { x: 400, y, size: 10, font });
+      y -= 14;
 
-      y -= 12;
-      ensureRoomForRow();
+      const detailLines: string[] = [];
 
-      // Detail line 1: PO, Project Number, Owner, Terms, Last Updated
-      const po = item.po_number ?? "—";
-      const projectRef = item.project_reference ?? "—";
-      const owner = item.project_owner_name ?? "—";
-      const terms =
-        typeof item.payment_terms === "number"
-          ? `${item.payment_terms} days`
-          : "—";
-      const updated =
-        item.updated_at != null
-          ? item.updated_at.slice(0, 10)
-          : "—";
-
-      const detailLine1 = `PO: ${po} | Project #: ${projectRef} | Owner: ${owner} | Terms: ${terms} | Last updated: ${updated}`;
-      page.drawText(detailLine1.slice(0, 140), { x: 50, y, size: 8, font });
-
-      y -= 10;
-      ensureRoomForRow();
-
-      // Detail line 2: Description
-      const description = (item.description ?? "").trim();
-      if (description) {
-        const descLabel = `Description: ${description}`;
-        page.drawText(descLabel.slice(0, 160), { x: 50, y, size: 8, font });
-        y -= 10;
-        ensureRoomForRow();
+      if (item.po_number) {
+        detailLines.push(`PO Number: ${item.po_number}`);
       }
-
-      // Detail line 3: Email
+      if (item.enquiry_number || item.project_reference) {
+        const parts: string[] = [];
+        if (item.enquiry_number) parts.push(`Enquiry: ${item.enquiry_number}`);
+        if (item.project_reference)
+          parts.push(`Project Ref: ${item.project_reference}`);
+        detailLines.push(parts.join(" | "));
+      }
+      if (item.project_owner_name) {
+        detailLines.push(`Project Owner: ${item.project_owner_name}`);
+      }
+      if (item.payment_terms) {
+        detailLines.push(`Payment Terms: ${item.payment_terms}`);
+      }
+      if (item.updated_at) {
+        const dateOnly = item.updated_at.split("T")[0];
+        detailLines.push(`Last Updated: ${dateOnly}`);
+      }
+      if (item.description) {
+        detailLines.push(`Description: ${item.description}`);
+      }
       if (item.accounts_email) {
-        const emailLabel = `Email: ${item.accounts_email}`;
-        page.drawText(emailLabel.slice(0, 160), { x: 50, y, size: 8, font });
-        y -= 10;
-        ensureRoomForRow();
+        detailLines.push(`Accounts Email: ${item.accounts_email}`);
+      }
+      if (item.client_address) {
+        detailLines.push(`Address: ${item.client_address}`);
       }
 
-      // Detail line 4: Address
-      const address = (item.client_address ?? "").trim();
-      if (address) {
-        const addressLabel = `Address: ${address}`;
-        page.drawText(addressLabel.slice(0, 160), { x: 50, y, size: 8, font });
-        y -= 10;
-        ensureRoomForRow();
+      for (const line of detailLines) {
+        if (y < 80) {
+          page.drawText("Continued on next page...", {
+            x: 50,
+            y: 50,
+            size: 9,
+            font,
+          });
+          const newPage = pdfDoc.addPage();
+          y = height - 50;
+          newPage.drawText(header, { x: 50, y, size: 10, font: fontBold });
+          y -= 15;
+        }
+        page.drawText(line, { x: 60, y, size: 9, font });
+        y -= 12;
       }
 
       y -= 6;
     }
 
-    // Total line
-    ensureRoomForRow();
-    y -= 10;
-    const totalNumber = Number(totalValue || 0);
-    const totalText = `Total: £${totalNumber.toFixed(2)}`;
-    page.drawText(totalText, { x: 50, y, size: 12, font });
+    if (y < 60) {
+      const newPage = pdfDoc.addPage();
+      y = height - 50;
+    }
+
+    const totalText = `Total Invoiced Value: ${totalValue.toFixed(2)}`;
+    page.drawText(totalText, { x: 50, y: 40, size: 12, font: fontBold });
 
     const pdfBytes = await pdfDoc.save();
 
-    // Upload to Supabase Storage
-    const bucket = options?.bucket ?? "invoices";
-
-    const baseName = `invoice-${year}-${String(month).padStart(2, "0")}-${invoiceMonthId}`;
-    const suffix =
-      typeof options?.filenameSuffix === "string"
-        ? options.filenameSuffix
-        : options && typeof options.revision === "number"
-        ? `-rev${options.revision}`
-        : "";
-    const fileName = `${baseName}${suffix}.pdf`;
+    const bucket = options?.bucket || "invoices";
+    const fileName = options?.revisionLabel
+      ? `${invoiceMonthId}-${options.revisionLabel}.pdf`
+      : `${invoiceMonthId}.pdf`;
 
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from(bucket)
@@ -216,40 +180,33 @@ Deno.serve(async (req: Request): Promise<Response> => {
         upsert: true,
       });
 
-    if (uploadError) {
+    if (uploadError || !uploadData) {
       console.error("PDF upload error:", uploadError);
       return new Response(
-        JSON.stringify({ error: "Failed to upload PDF" }),
+        JSON.stringify({ error: "Failed to upload invoice PDF" }),
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
+        }
       );
     }
 
-    const { data: publicData } = supabase.storage
-      .from(bucket)
-      .getPublicUrl(uploadData.path);
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from(bucket).getPublicUrl(uploadData.path);
 
-    const pdfUrl = publicData.publicUrl;
-
+    return new Response(JSON.stringify({ pdfUrl: publicUrl }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    console.error("generate-invoice-pdf error:", err);
     return new Response(
-      JSON.stringify({ pdfUrl }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
-    );
-  } catch (error) {
-    console.error("generate-invoice-pdf error:", error);
-    return new Response(
-      JSON.stringify({
-        error: error instanceof Error ? error.message : "Unknown error",
-      }),
+      JSON.stringify({ error: "Failed to generate invoice PDF" }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
+      }
     );
   }
 });

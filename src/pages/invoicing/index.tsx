@@ -41,6 +41,7 @@ import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format, addDays, startOfWeek, endOfWeek, addWeeks, isBefore, isWithinInterval } from "date-fns";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import type { Database } from "@/integrations/supabase/types";
 
 type InvoiceMonth = {
   id: string;
@@ -54,29 +55,7 @@ type InvoiceMonth = {
   updated_at: string;
 };
 
-type InvoiceItem = {
-  id: string;
-  invoice_month_id: string;
-  project_id: string;
-  project_name: string;
-  project_code: string;
-  client_name: string;
-  invoice_value: number | null;
-  po_number: string | null;
-  description: string;
-  excluded_this_month: boolean;
-  invoice_reference: string | null;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-  accounts_email?: string | null;
-  client_address?: string | null;
-  enquiry_number?: string | null;
-  project_reference?: string | null;
-  project_owner_name?: string | null;
-  payment_terms?: number | null;
-};
-
+type InvoiceItem = Database["public"]["Tables"]["invoice_items"]["Row"];
 const MONTHS = [
   "January",
   "February",
