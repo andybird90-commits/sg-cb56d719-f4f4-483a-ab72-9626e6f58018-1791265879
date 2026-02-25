@@ -71,6 +71,31 @@ function wrapText(
   const lines: string[] = [];
   let currentLine = "";
 
+  const breakLongWord = (word: string): string[] => {
+    const segments: string[] = [];
+    let segment = "";
+
+    for (const char of word) {
+      const candidate = segment + char;
+      const candidateWidth = font.widthOfTextAtSize(candidate, fontSize);
+
+      if (candidateWidth <= maxWidth) {
+        segment = candidate;
+      } else {
+        if (segment) {
+          segments.push(segment);
+        }
+        segment = char;
+      }
+    }
+
+    if (segment) {
+      segments.push(segment);
+    }
+
+    return segments;
+  };
+
   for (const word of words) {
     const candidate = currentLine ? `${currentLine} ${word}` : word;
     const width = font.widthOfTextAtSize(candidate, fontSize);
@@ -81,10 +106,19 @@ function wrapText(
       if (currentLine) {
         lines.push(currentLine);
       }
+
       const wordWidth = font.widthOfTextAtSize(word, fontSize);
       if (wordWidth > maxWidth && word.length > 0) {
-        lines.push(word);
-        currentLine = "";
+        const segments = breakLongWord(word);
+
+        for (let i = 0; i < segments.length; i++) {
+          const segment = segments[i];
+          if (i === segments.length - 1) {
+            currentLine = segment;
+          } else {
+            lines.push(segment);
+          }
+        }
       } else {
         currentLine = word;
       }
