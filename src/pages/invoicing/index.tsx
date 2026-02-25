@@ -1089,10 +1089,10 @@ export default function InvoicingPage() {
                           className="overflow-x-hidden"
                           onScroll={handleBottomScroll}
                         >
-                          <div className="min-w-[1600px]">
+                          <div className="min-w-[2600px]">
                             {/* Header table (does not scroll vertically) */}
                             <div className="pr-4">
-                              <Table className="w-full min-w-[1600px] table-fixed">
+                              <Table className="w-full min-w-[2600px] table-fixed">
                                 <TableHeader className="bg-white">
                                   <TableRow>
                                     <TableHead className="w-[50px] px-4 py-3">Include</TableHead>
@@ -1103,8 +1103,12 @@ export default function InvoicingPage() {
                                       Invoice Value (from Monthly Phasing)
                                     </TableHead>
                                     <TableHead className="min-w-[220px] px-4 py-3">Description</TableHead>
-                                    <TableHead className="min-w-[320px] px-4 py-3">Email Contact</TableHead>
-                                    <TableHead className="min-w-[260px] px-4 py-3">Address</TableHead>
+                                    <TableHead className="px-4 py-2 text-left text-sm font-semibold text-slate-600 min-w-[260px] whitespace-nowrap pr-8">
+                                      Email Contact
+                                    </TableHead>
+                                    <TableHead className="px-6 py-2 text-left text-sm font-semibold text-slate-600 min-w-[320px] border-l-2 border-slate-300 bg-slate-50">
+                                      Address
+                                    </TableHead>
                                     <TableHead className="min-w-[130px] px-4 py-3">Project Number</TableHead>
                                     <TableHead className="min-w-[150px] px-4 py-3">Project Owner</TableHead>
                                     <TableHead className="min-w-[130px] px-4 py-3">Payment Terms</TableHead>
@@ -1116,7 +1120,7 @@ export default function InvoicingPage() {
 
                             {/* Body table: vertically scrollable, header stays fixed above */}
                             <div className="max-h-[560px] overflow-y-auto overflow-x-hidden">
-                              <Table className="w-full min-w-[1600px] table-fixed">
+                              <Table className="w-full min-w-[2600px] table-fixed">
                                 <TableBody>
                                   {invoiceItems.map((item) => (
                                     <TableRow
@@ -1191,7 +1195,7 @@ export default function InvoicingPage() {
                                         )}
                                       </TableCell>
                                       {/* Email Contact */}
-                                      <TableCell className="min-w-[320px] px-4 py-3 text-sm">
+                                      <TableCell className="px-4 py-2 align-middle text-sm text-slate-800 min-w-[260px] whitespace-nowrap pr-8">
                                         {item.accounts_email ? (
                                           <a
                                             href={`mailto:${item.accounts_email}`}
@@ -1205,7 +1209,7 @@ export default function InvoicingPage() {
                                       </TableCell>
                                       {/* Address */}
                                       <TableCell
-                                        className="min-w-[260px] px-4 py-3 text-sm truncate"
+                                        className="min-w-[320px] px-6 py-2 align-middle text-sm text-slate-800 border-l-2 border-slate-300 whitespace-pre-wrap bg-slate-50"
                                         title={item.client_address || ""}
                                       >
                                         {item.client_address || "—"}
