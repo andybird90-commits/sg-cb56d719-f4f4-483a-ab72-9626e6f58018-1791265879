@@ -330,7 +330,11 @@ export const invoicingService = {
 
   async generateAndUploadPdf(
     invoiceMonth: InvoiceMonth,
-    items: InvoiceItem[]
+    items: InvoiceItem[],
+    options?: {
+      bucket?: string;
+      revision?: number | null;
+    }
   ): Promise<string> {
     const { jsPDF } = await import("jspdf");
     await import("jspdf-autotable");
@@ -510,12 +514,17 @@ export const invoicingService = {
     });
 
     const pdfBlob = doc.output("blob");
-    const fileName = `invoice-${invoiceMonth.year}-${String(
+
+    const revisionSuffix =
+      typeof options?.revision === "number" ? `-rev${options.revision}` : "";
+    const baseName = `invoice-${invoiceMonth.year}-${String(
       invoiceMonth.month
-    ).padStart(2, "0")}.pdf`;
+    ).padStart(2, "0")}`;
+    const fileName = `${baseName}${revisionSuffix}.pdf`;
+    const bucket = options?.bucket ?? "invoices";
 
     const { error: uploadError } = await supabase.storage
-      .from("invoices")
+      .from(bucket)
       .upload(fileName, pdfBlob, {
         contentType: "application/pdf",
         upsert: true,
@@ -525,9 +534,48 @@ export const invoicingService = {
 
     const {
       data: { publicUrl },
-    } = supabase.storage.from("invoices").getPublicUrl(fileName);
+    } = supabase.storage.from(bucket).getPublicUrl(fileName);
 
     return publicUrl;
+  },
+
+  async createInvoiceArchiveSnapshot(
+    invoiceMonth: InvoiceMonth,
+    items: InvoiceItem[]
+  ): Promise<void> {
+    const { data: authData } = await supabase.auth.getUser();
+
+    const { data: existing, error: existingError } = await supabase
+      .from("invoice_month_archives")
+      .select("revision")
+      .eq("invoice_month_id", invoiceMonth.id)
+      .order("revision", { ascending: false })
+      .limit(1);
+
+    if (existingError) throw existingError;
+
+    const nextRevision =
+      existing && existing.length > 0 && typeof existing[0].revision === "number"
+        ? existing[0].revision + 1
+        : 0;
+
+    const pdfUrl = await this.generateAndUploadPdf(invoiceMonth, items, {
+      bucket: "invoice-archive",
+      revision: nextRevision,
+    });
+
+    const { error: insertError } = await supabase
+      .from("invoice_month_archives")
+      .insert({
+        invoice_month_id: invoiceMonth.id,
+        year: invoiceMonth.year,
+        month: invoiceMonth.month,
+        revision: nextRevision,
+        pdf_url: pdfUrl,
+        created_by_user_id: authData.user?.id ?? null,
+      });
+
+    if (insertError) throw insertError;
   },
 
   async savePdfUrl(invoiceMonthId: string, pdfUrl: string): Promise<void> {

@@ -55,6 +55,24 @@ function ArchiveIndexContent() {
               </Button>
             </CardContent>
           </Card>
+
+          {/* Invoicing Archive Card */}
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push("/invoicing/archive")}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ArchiveIcon className="w-5 h-5 text-purple-600" />
+                Invoicing Archive
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-slate-600 mb-4">
+                View locked invoicing periods and their historical revisions. Download archived PDF summaries for each revision.
+              </p>
+              <Button variant="outline" className="w-full">
+                View Invoicing Archive
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </Layout>

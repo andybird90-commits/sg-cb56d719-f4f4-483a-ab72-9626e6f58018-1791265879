@@ -572,14 +572,13 @@ export default function InvoicingPage() {
     try {
       setLoading(true);
 
-      // Generate and upload PDF first
       const currentItems = await invoicingService.getInvoiceItems(invoiceMonth.id);
       const pdfUrl = await invoicingService.generateAndUploadPdf(invoiceMonth, currentItems);
 
-      // Save PDF URL
       await invoicingService.savePdfUrl(invoiceMonth.id, pdfUrl);
 
-      // Lock the month
+      await invoicingService.createInvoiceArchiveSnapshot(invoiceMonth, currentItems);
+
       await invoicingService.lockInvoiceMonth(invoiceMonth.id);
 
       setInvoiceMonth({
@@ -605,66 +604,19 @@ export default function InvoicingPage() {
     }
   }
 
-  async function handleReopenMonth() {
-    if (!invoiceMonth) return;
-
-    try {
-      await invoicingService.reopenInvoiceMonth(invoiceMonth.id);
-      setInvoiceMonth({ ...invoiceMonth, status: "open", pdf_url: null });
-
-      toast({
-        title: "Success",
-        description: "Invoice period reopened",
-      });
-    } catch (error) {
-      console.error("Error reopening invoice month:", error);
-      toast({
-        title: "Error",
-        description: "Failed to reopen invoice period",
-        variant: "destructive",
-      });
-    }
-  }
-
-  async function handleDownloadPdf() {
+  const handleFinishInvoicing = async () => {
     if (!invoiceMonth) return;
 
     try {
       setLoading(true);
 
-      let pdfUrl = invoiceMonth.pdf_url;
+      const currentItems = await invoicingService.getInvoiceItems(invoiceMonth.id);
+      const pdfUrl = await invoicingService.generateAndUploadPdf(invoiceMonth, currentItems);
 
-      // If no PDF exists yet, generate it
-      if (!pdfUrl) {
-        const currentItems = await invoicingService.getInvoiceItems(invoiceMonth.id);
-        pdfUrl = await invoicingService.generateAndUploadPdf(invoiceMonth, currentItems);
-        await invoicingService.savePdfUrl(invoiceMonth.id, pdfUrl);
-        setInvoiceMonth({ ...invoiceMonth, pdf_url: pdfUrl });
-      }
+      await invoicingService.savePdfUrl(invoiceMonth.id, pdfUrl);
 
-      // Open PDF in new tab
-      window.open(pdfUrl, "_blank");
+      await invoicingService.createInvoiceArchiveSnapshot(invoiceMonth, currentItems);
 
-      toast({
-        title: "Success",
-        description: "PDF opened in new tab",
-      });
-    } catch (error) {
-      console.error("Error downloading PDF:", error);
-      toast({
-        title: "Error",
-        description: "Failed to generate PDF",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const handleFinishInvoicing = async () => {
-    if (!invoiceMonth) return;
-
-    try {
       await invoicingService.lockInvoiceMonth(invoiceMonth.id);
 
       toast({
@@ -680,6 +632,8 @@ export default function InvoicingPage() {
         description: "Failed to lock invoice month.",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
