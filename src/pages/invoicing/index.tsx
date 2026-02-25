@@ -637,6 +637,70 @@ export default function InvoicingPage() {
     }
   };
 
+  const handleDownloadPdf = async () => {
+    if (!invoiceMonth) return;
+
+    try {
+      if (invoiceMonth.pdf_url) {
+        window.open(invoiceMonth.pdf_url, "_blank");
+        return;
+      }
+
+      setLoading(true);
+
+      const currentItems = await invoicingService.getInvoiceItems(invoiceMonth.id);
+      const pdfUrl = await invoicingService.generateAndUploadPdf(invoiceMonth, currentItems);
+
+      await invoicingService.savePdfUrl(invoiceMonth.id, pdfUrl);
+
+      setInvoiceMonth({
+        ...invoiceMonth,
+        pdf_url: pdfUrl,
+      });
+
+      window.open(pdfUrl, "_blank");
+    } catch (error) {
+      console.error("Error downloading invoice PDF:", error);
+      toast({
+        title: "Error",
+        description: "Failed to generate or open the invoice PDF.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleReopenMonth = async () => {
+    if (!invoiceMonth) return;
+
+    try {
+      setLoading(true);
+
+      await invoicingService.reopenInvoiceMonth(invoiceMonth.id);
+
+      setInvoiceMonth({
+        ...invoiceMonth,
+        status: "open",
+        pdf_url: null,
+      });
+
+      toast({
+        title: "Invoice month reopened",
+        description: "You can now edit invoice values and descriptions again.",
+      });
+    } catch (error) {
+      console.error("Error reopening invoice month:", error);
+      toast({
+        title: "Error",
+        description: "Failed to reopen invoice month.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   async function handleSyncProjects() {
     if (!invoiceMonth) return;
 
@@ -709,14 +773,12 @@ export default function InvoicingPage() {
 
         if (allPhasingError) throw allPhasingError;
 
-        // Any project that has at least one phasing row in any month is considered "manual"
         manuallyPhasedProjectIds = new Set(
           (allPhasingForProjects || []).map(
             (p: any) => p.project_id as string,
           ),
         );
 
-        // Phasing values for the currently selected month
         (allPhasingForProjects || []).forEach((p: any) => {
           if (p.year === selectedYear && p.month === selectedMonth) {
             monthPhasingMap.set(
@@ -732,7 +794,6 @@ export default function InvoicingPage() {
         existingItemsMap.set(item.project_id, item);
       });
 
-      // Decide which existing items to keep based on manual phasing vs date logic
       const shouldKeepItem = (item: InvoiceItem): boolean => {
         const isManuallyPhased = manuallyPhasedProjectIds.has(item.project_id);
         const phasingAmountRaw = monthPhasingMap.get(item.project_id);
@@ -740,11 +801,9 @@ export default function InvoicingPage() {
           typeof phasingAmountRaw === "number" ? phasingAmountRaw : 0;
 
         if (isManuallyPhased) {
-          // Manual phasing overrides dates: only keep items where this month’s phasing value is > 0
           return phasingAmount > 0;
         }
 
-        // Non-manual projects: only keep if the project is active by dates
         return activeProjectIdsByDates.has(item.project_id);
       };
 
@@ -768,12 +827,10 @@ export default function InvoicingPage() {
         const isActiveByDates = activeProjectIdsByDates.has(projectId);
 
         if (isManuallyPhased) {
-          // Manual phasing: only include months where the phasing value is > 0
           if (phasingAmount <= 0) {
             continue;
           }
         } else {
-          // Non-manual: only include if the project is active by dates
           if (!isActiveByDates) {
             continue;
           }

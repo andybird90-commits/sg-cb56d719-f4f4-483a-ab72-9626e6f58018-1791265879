@@ -2,17 +2,22 @@ import { useEffect, useState } from "react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { Layout } from "@/components/Layout";
 import { supabase } from "@/integrations/supabase/client";
-import type { Database } from "@/integrations/supabase/types";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Archive as ArchiveIcon, Download, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-type InvoiceMonthArchiveRow =
-  Database["public"]["Tables"]["invoice_month_archives"]["Row"];
-
-interface ArchiveRecord extends InvoiceMonthArchiveRow {}
+type ArchiveRecord = {
+  id: string;
+  invoice_month_id: string;
+  year: number;
+  month: number;
+  revision: number | null;
+  pdf_url: string | null;
+  created_at: string | null;
+  created_by_user_id: string | null;
+};
 
 function InvoiceArchiveContent() {
   const { toast } = useToast();
@@ -26,7 +31,7 @@ function InvoiceArchiveContent() {
       setError(null);
       setLoading(true);
 
-      const { data, error: queryError } = await supabase
+      const { data, error: queryError } = await (supabase as any)
         .from("invoice_month_archives")
         .select("*")
         .order("year", { ascending: false })
@@ -35,7 +40,7 @@ function InvoiceArchiveContent() {
 
       if (queryError) throw queryError;
 
-      setArchives(data || []);
+      setArchives((data as ArchiveRecord[] | null) || []);
     } catch (err) {
       console.error("Failed to load invoice month archives", err);
       setError("Failed to load invoicing archive");
@@ -65,7 +70,7 @@ function InvoiceArchiveContent() {
     {}
   );
 
-  const handleOpenPdf = (url: string) => {
+  const handleOpenPdf = (url: string | null) => {
     if (!url) {
       toast({
         title: "Error",

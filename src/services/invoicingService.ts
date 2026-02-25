@@ -545,7 +545,7 @@ export const invoicingService = {
   ): Promise<void> {
     const { data: authData } = await supabase.auth.getUser();
 
-    const { data: existing, error: existingError } = await supabase
+    const { data: existing, error: existingError } = await (supabase as any)
       .from("invoice_month_archives")
       .select("revision")
       .eq("invoice_month_id", invoiceMonth.id)
@@ -554,9 +554,13 @@ export const invoicingService = {
 
     if (existingError) throw existingError;
 
+    const existingArray =
+      (existing as { revision: number | null }[] | null) || [];
+
     const nextRevision =
-      existing && existing.length > 0 && typeof existing[0].revision === "number"
-        ? existing[0].revision + 1
+      existingArray.length > 0 &&
+      typeof existingArray[0].revision === "number"
+        ? existingArray[0].revision + 1
         : 0;
 
     const pdfUrl = await this.generateAndUploadPdf(invoiceMonth, items, {
@@ -564,7 +568,7 @@ export const invoicingService = {
       revision: nextRevision,
     });
 
-    const { error: insertError } = await supabase
+    const { error: insertError } = await (supabase as any)
       .from("invoice_month_archives")
       .insert({
         invoice_month_id: invoiceMonth.id,
