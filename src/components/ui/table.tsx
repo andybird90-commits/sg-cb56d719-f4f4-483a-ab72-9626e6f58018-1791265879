@@ -11,7 +11,7 @@ const Table = React.forwardRef<HTMLTableElement, TableProps>(
   ({ className, containerRef, onContainerScroll, ...props }, ref) => (
     <div
       ref={containerRef}
-      className="relative w-full overflow-auto"
+      className="relative w-full overflow-x-auto"
       onScroll={onContainerScroll}
     >
       <table

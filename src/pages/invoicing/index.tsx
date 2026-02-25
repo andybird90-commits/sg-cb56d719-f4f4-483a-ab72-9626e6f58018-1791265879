@@ -1073,11 +1073,11 @@ export default function InvoicingPage() {
                     {invoiceItems.length === 0 ? (
                       <div className="p-8 text-center text-gray-500">No invoices for this period</div>
                     ) : (
-                      <>
-                        {/* Top Scrollbar */}
+                      <div className="max-h-[600px] overflow-y-auto">
+                        {/* Top Scrollbar (horizontal only, sticky inside table container) */}
                         <div
                           ref={topScrollRef}
-                          className="overflow-x-auto border-b"
+                          className="sticky top-0 z-20 overflow-x-auto border-b bg-white"
                           onScroll={handleTopScroll}
                         >
                           <div ref={topInnerRef} className="h-4" />
@@ -1089,7 +1089,7 @@ export default function InvoicingPage() {
                           containerRef={bottomScrollRef}
                           onContainerScroll={handleBottomScroll}
                         >
-                          <TableHeader>
+                          <TableHeader className="sticky top-4 z-10 bg-white">
                             <TableRow>
                               <TableHead className="w-[50px]">Include</TableHead>
                               <TableHead className="min-w-[150px]">Project</TableHead>
@@ -1206,7 +1206,7 @@ export default function InvoicingPage() {
                             ))}
                           </TableBody>
                         </Table>
-                      </>
+                      </div>
                     )}
                   </div>
 
