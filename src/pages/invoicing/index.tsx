@@ -572,12 +572,19 @@ export default function InvoicingPage() {
     try {
       setLoading(true);
 
-      const currentItems = await invoicingService.getInvoiceItems(invoiceMonth.id);
-      const pdfUrl = await invoicingService.generateAndUploadPdf(invoiceMonth, currentItems);
+      const currentItems = invoiceItems;
+
+      const pdfUrl = await invoicingService.generateAndUploadPdf(
+        invoiceMonth,
+        currentItems
+      );
 
       await invoicingService.savePdfUrl(invoiceMonth.id, pdfUrl);
 
-      await invoicingService.createInvoiceArchiveSnapshot(invoiceMonth, currentItems);
+      await invoicingService.createInvoiceArchiveSnapshot(
+        invoiceMonth,
+        currentItems
+      );
 
       await invoicingService.lockInvoiceMonth(invoiceMonth.id);
 
@@ -610,12 +617,19 @@ export default function InvoicingPage() {
     try {
       setLoading(true);
 
-      const currentItems = await invoicingService.getInvoiceItems(invoiceMonth.id);
-      const pdfUrl = await invoicingService.generateAndUploadPdf(invoiceMonth, currentItems);
+      const currentItems = invoiceItems;
+
+      const pdfUrl = await invoicingService.generateAndUploadPdf(
+        invoiceMonth,
+        currentItems
+      );
 
       await invoicingService.savePdfUrl(invoiceMonth.id, pdfUrl);
 
-      await invoicingService.createInvoiceArchiveSnapshot(invoiceMonth, currentItems);
+      await invoicingService.createInvoiceArchiveSnapshot(
+        invoiceMonth,
+        currentItems
+      );
 
       await invoicingService.lockInvoiceMonth(invoiceMonth.id);
 
@@ -643,8 +657,12 @@ export default function InvoicingPage() {
     try {
       setLoading(true);
 
-      const currentItems = await invoicingService.getInvoiceItems(invoiceMonth.id);
-      const pdfUrl = await invoicingService.generateAndUploadPdf(invoiceMonth, currentItems);
+      const currentItems = invoiceItems;
+
+      const pdfUrl = await invoicingService.generateAndUploadPdf(
+        invoiceMonth,
+        currentItems
+      );
 
       await invoicingService.savePdfUrl(invoiceMonth.id, pdfUrl);
 
