@@ -96,7 +96,10 @@ export const invoicingService = {
 
     if (phasingError) throw phasingError;
 
-    const { data: projectsWithPhasing, error: projectsWithPhasingError } = await supabase
+    const {
+      data: projectsWithPhasing,
+      error: projectsWithPhasingError,
+    } = await supabase
       .from("project_monthly_phasing")
       .select("project_id")
       .not("revenue_amount", "is", null);
@@ -112,11 +115,19 @@ export const invoicingService = {
       (projectsWithPhasing || []).map((p: any) => p.project_id as string)
     );
 
-    const itemsToInsert = activeProjects.map((project: any) => {
+    const itemsToInsert = activeProjects.reduce<any[]>((acc, project: any) => {
+      const projectId = project.id as string;
+      const hasManualPhasing = projectsWithAnyPhasing.has(projectId);
+      const hasPhasingThisMonth = phasingMap.has(projectId);
+
+      if (hasManualPhasing && !hasPhasingThisMonth) {
+        return acc;
+      }
+
       let invoiceValue = 0;
 
-      if (projectsWithAnyPhasing.has(project.id as string)) {
-        invoiceValue = phasingMap.get(project.id as string) || 0;
+      if (hasManualPhasing) {
+        invoiceValue = phasingMap.get(projectId) || 0;
       } else {
         if (project.agreed_fee_value && project.start_date && project.end_date) {
           const start = new Date(project.start_date as string);
@@ -131,12 +142,11 @@ export const invoicingService = {
         }
       }
 
-      const clientName =
-        project.companies?.name || "Unknown Client";
+      const clientName = project.companies?.name || "Unknown Client";
 
-      return {
+      acc.push({
         invoice_month_id: invoiceMonthId,
-        project_id: project.id as string,
+        project_id: projectId,
         project_name: project.name as string,
         project_code: (project.code as string) || "",
         client_name: clientName,
@@ -149,9 +159,11 @@ export const invoicingService = {
         enquiry_number: project.opportunities?.enquiry_number || null,
         project_reference: project.project_reference || null,
         project_owner_name: project.profiles?.full_name || null,
-        payment_terms: project.companies?.payment_terms || null
-      };
-    });
+        payment_terms: project.companies?.payment_terms || null,
+      });
+
+      return acc;
+    }, []);
 
     if (itemsToInsert.length > 0) {
       const { error: insertError } = await supabase
@@ -188,10 +200,10 @@ export const invoicingService = {
   async lockInvoiceMonth(invoiceMonthId: string): Promise<void> {
     const { error } = await supabase
       .from("invoice_months")
-      .update({ 
+      .update({
         status: "locked",
         locked_at: new Date().toISOString(),
-        locked_by: (await supabase.auth.getUser()).data.user?.id || null
+        locked_by: (await supabase.auth.getUser()).data.user?.id || null,
       })
       .eq("id", invoiceMonthId);
 
@@ -201,11 +213,11 @@ export const invoicingService = {
   async reopenInvoiceMonth(invoiceMonthId: string): Promise<void> {
     const { error } = await supabase
       .from("invoice_months")
-      .update({ 
+      .update({
         status: "open",
         locked_at: null,
         locked_by: null,
-        pdf_url: null
+        pdf_url: null,
       })
       .eq("id", invoiceMonthId);
 
@@ -240,7 +252,10 @@ export const invoicingService = {
 
     if (phasingError) throw phasingError;
 
-    const { data: projectsWithAnyPhasing, error: projectsWithAnyPhasingError } = await supabase
+    const {
+      data: projectsWithAnyPhasing,
+      error: projectsWithAnyPhasingError,
+    } = await supabase
       .from("project_monthly_phasing")
       .select("project_id")
       .not("revenue_amount", "is", null);
@@ -297,8 +312,18 @@ export const invoicingService = {
 
     const doc = new jsPDF("landscape", "mm", "a4");
     const months = [
-      "January", "February", "March", "April", "May", "June",
-      "July", "August", "September", "October", "November", "December"
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
     ];
     const monthName = months[invoiceMonth.month - 1];
 
@@ -307,7 +332,7 @@ export const invoicingService = {
 
     doc.setFontSize(12);
     doc.text(`${monthName} ${invoiceMonth.year}`, 14, 28);
-    
+
     doc.setFontSize(10);
     doc.text(
       `Generated: ${new Date().toLocaleDateString("en-GB", {
@@ -327,7 +352,6 @@ export const invoicingService = {
       (item) => !item.excluded_this_month && item.invoice_value !== null
     );
 
-    // Enrich items that are missing payment_terms by looking up the client company
     let enrichedItems: (InvoiceItem & { payment_terms: number | null })[] =
       includedItems as (InvoiceItem & { payment_terms: number | null })[];
 
@@ -488,5 +512,5 @@ export const invoicingService = {
       .eq("id", invoiceMonthId);
 
     if (error) throw error;
-  }
+  },
 };

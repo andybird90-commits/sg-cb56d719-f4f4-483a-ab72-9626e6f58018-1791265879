@@ -692,7 +692,6 @@ export default function InvoicingPage() {
       const startOfMonth = new Date(selectedYear, selectedMonth - 1, 1);
       const endOfMonth = new Date(selectedYear, selectedMonth, 0);
 
-      // 1. Get all active projects for this period with client details
       const { data: projects, error: projectsError } = await supabase
         .from("projects" as any)
         .select(
@@ -731,7 +730,6 @@ export default function InvoicingPage() {
 
       const typedProjects = (projects || []) as any[];
 
-      // Filter for projects active in this month (start <= month_end AND end >= month_start)
       const activeProjects = typedProjects.filter((p) => {
         if (!p.start_date || !p.end_date) return false;
         const start = new Date(p.start_date);
@@ -739,57 +737,100 @@ export default function InvoicingPage() {
         return start <= endOfMonth && end >= startOfMonth;
       });
 
-      // Get active project IDs
-      const activeProjectIds = new Set(activeProjects.map((p) => p.id));
+      const activeProjectIds = new Set<string>(
+        activeProjects.map((p) => p.id as string),
+      );
+      const activeProjectIdsArray = Array.from(activeProjectIds);
 
-      // 2. Get existing invoice items
+      let manuallyPhasedProjectIds = new Set<string>();
+      const monthPhasingMap = new Map<string, number>();
+
+      if (activeProjectIdsArray.length > 0) {
+        const { data: allPhasingForActive, error: allPhasingError } =
+          await supabase
+            .from("project_monthly_phasing")
+            .select("project_id, year, month, revenue_amount")
+            .in("project_id", activeProjectIdsArray);
+
+        if (allPhasingError) throw allPhasingError;
+
+        manuallyPhasedProjectIds = new Set(
+          (allPhasingForActive || []).map(
+            (p: any) => p.project_id as string,
+          ),
+        );
+
+        (allPhasingForActive || []).forEach((p: any) => {
+          if (p.year === selectedYear && p.month === selectedMonth) {
+            monthPhasingMap.set(
+              p.project_id as string,
+              (p.revenue_amount as number) || 0,
+            );
+          }
+        });
+      }
+
       const existingItemsMap = new Map<string, InvoiceItem>();
       invoiceItems.forEach((item) => {
         existingItemsMap.set(item.project_id, item);
       });
 
-      // 3. Remove invoice items for projects no longer active in this month
-      const itemsToRemove = invoiceItems.filter((item) => !activeProjectIds.has(item.project_id));
+      const shouldKeepItem = (item: InvoiceItem): boolean => {
+        const isActiveByDates = activeProjectIds.has(item.project_id);
+        const isManuallyPhased = manuallyPhasedProjectIds.has(item.project_id);
+        const hasPhasingThisMonth = monthPhasingMap.has(item.project_id);
+
+        if (isManuallyPhased) {
+          return isActiveByDates && hasPhasingThisMonth;
+        }
+
+        return isActiveByDates;
+      };
+
+      const itemsToRemove = invoiceItems.filter((item) => !shouldKeepItem(item));
+
       if (itemsToRemove.length > 0) {
         const removeIds = itemsToRemove.map((item) => item.id);
         await supabase.from("invoice_items").delete().in("id", removeIds);
 
         console.log(
-          `Removed ${itemsToRemove.length} invoice items for projects no longer active in this month`,
+          `Removed ${itemsToRemove.length} invoice items no longer valid for this month (including manually phased projects without phasing this month)`,
         );
       }
 
-      // 4. Process each active project
       for (const p of activeProjects) {
-        // Calculate monthly revenue from phasing or spread
-        const { data: phasingData } = await supabase
-          .from("project_monthly_phasing")
-          .select("revenue_amount")
-          .eq("project_id", p.id)
-          .eq("year", selectedYear)
-          .eq("month", selectedMonth)
-          .maybeSingle();
+        const projectId = p.id as string;
+        const isManuallyPhased = manuallyPhasedProjectIds.has(projectId);
+        const phasingValueThisMonth = monthPhasingMap.get(projectId);
 
-        let monthlyRevenue = 0;
-        if (phasingData?.revenue_amount) {
-          monthlyRevenue = Number(phasingData.revenue_amount);
-        } else if (p.start_date && p.end_date) {
-          const start = new Date(p.start_date);
-          const end = new Date(p.end_date);
-          const durationMonths = Math.max(
-            1,
-            (end.getFullYear() - start.getFullYear()) * 12 +
-              (end.getMonth() - start.getMonth()) +
-              1,
-          );
-          monthlyRevenue = (Number(p.agreed_fee_value) || 0) / durationMonths;
+        if (isManuallyPhased && phasingValueThisMonth === undefined) {
+          continue;
         }
 
-        const existingItem = existingItemsMap.get(p.id);
+        let monthlyRevenue = 0;
+
+        if (isManuallyPhased) {
+          monthlyRevenue = phasingValueThisMonth || 0;
+        } else {
+          const { start_date, end_date, agreed_fee_value } = p;
+
+          if (start_date && end_date && agreed_fee_value) {
+            const start = new Date(start_date);
+            const end = new Date(end_date);
+            const durationMonths = Math.max(
+              1,
+              (end.getFullYear() - start.getFullYear()) * 12 +
+                (end.getMonth() - start.getMonth()) +
+                1,
+            );
+            monthlyRevenue = (Number(agreed_fee_value) || 0) / durationMonths;
+          }
+        }
+
+        const existingItem = existingItemsMap.get(projectId);
         const clientName = p.companies?.name || "Unknown Client";
 
         if (existingItem) {
-          // UPDATE: Only update value and metadata, PRESERVE description
           await invoicingService.updateInvoiceItem(existingItem.id, {
             invoice_value: monthlyRevenue,
             project_code: p.code || "",
@@ -802,10 +843,9 @@ export default function InvoicingPage() {
             payment_terms: p.companies?.payment_terms || null,
           });
         } else {
-          // CREATE: New item for this project
           await supabase.from("invoice_items").insert({
             invoice_month_id: invoiceMonth.id,
-            project_id: p.id,
+            project_id: projectId,
             project_name: p.name,
             project_code: p.code || "",
             client_name: clientName,
@@ -825,10 +865,9 @@ export default function InvoicingPage() {
 
       toast({
         title: "Synced",
-        description: `Projects synced successfully. ${itemsToRemove.length} inactive projects removed.`,
+        description: `Projects synced successfully. ${itemsToRemove.length} projects/items removed because they are no longer active or have no manual phasing for this month.`,
       });
 
-      // Refresh list
       await loadInvoiceData(selectedYear, selectedMonth);
     } catch (err) {
       console.error("Failed to sync projects", err);
