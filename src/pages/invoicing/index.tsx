@@ -1091,30 +1091,32 @@ export default function InvoicingPage() {
                         >
                           <div className="min-w-[1600px]">
                             {/* Header table (does not scroll vertically) */}
-                            <Table className="w-full">
-                              <TableHeader className="bg-white">
-                                <TableRow>
-                                  <TableHead className="w-[50px]">Include</TableHead>
-                                  <TableHead className="min-w-[150px]">Project</TableHead>
-                                  <TableHead className="min-w-[120px]">Client</TableHead>
-                                  <TableHead className="min-w-[120px]">PO Number</TableHead>
-                                  <TableHead className="min-w-[150px]">
-                                    Invoice Value (from Monthly Phasing)
-                                  </TableHead>
-                                  <TableHead className="min-w-[200px]">Description</TableHead>
-                                  <TableHead className="min-w-[150px]">Email Contact</TableHead>
-                                  <TableHead className="min-w-[200px]">Address</TableHead>
-                                  <TableHead className="min-w-[100px]">Project Number</TableHead>
-                                  <TableHead className="min-w-[120px]">Project Owner</TableHead>
-                                  <TableHead className="min-w-[100px]">Payment Terms</TableHead>
-                                  <TableHead className="min-w-[100px]">Last Updated</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                            </Table>
+                            <div className="pr-4">
+                              <Table className="w-full min-w-[1600px] table-fixed">
+                                <TableHeader className="bg-white">
+                                  <TableRow>
+                                    <TableHead className="w-[50px] px-4 py-3">Include</TableHead>
+                                    <TableHead className="min-w-[200px] px-4 py-3">Project</TableHead>
+                                    <TableHead className="min-w-[140px] px-4 py-3">Client</TableHead>
+                                    <TableHead className="min-w-[140px] px-4 py-3">PO Number</TableHead>
+                                    <TableHead className="min-w-[180px] px-4 py-3">
+                                      Invoice Value (from Monthly Phasing)
+                                    </TableHead>
+                                    <TableHead className="min-w-[220px] px-4 py-3">Description</TableHead>
+                                    <TableHead className="min-w-[160px] px-4 py-3">Email Contact</TableHead>
+                                    <TableHead className="min-w-[260px] px-4 py-3">Address</TableHead>
+                                    <TableHead className="min-w-[130px] px-4 py-3">Project Number</TableHead>
+                                    <TableHead className="min-w-[150px] px-4 py-3">Project Owner</TableHead>
+                                    <TableHead className="min-w-[130px] px-4 py-3">Payment Terms</TableHead>
+                                    <TableHead className="min-w-[130px] px-4 py-3">Last Updated</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                              </Table>
+                            </div>
 
                             {/* Body table: vertically scrollable, header stays fixed above */}
                             <div className="max-h-[560px] overflow-y-auto">
-                              <Table className="w-full">
+                              <Table className="w-full min-w-[1600px] table-fixed">
                                 <TableBody>
                                   {invoiceItems.map((item) => (
                                     <TableRow
@@ -1122,7 +1124,7 @@ export default function InvoicingPage() {
                                       className={item.excluded_this_month ? "opacity-50" : ""}
                                     >
                                       {/* Include */}
-                                      <TableCell className="px-4 py-3">
+                                      <TableCell className="w-[50px] px-4 py-3">
                                         <Checkbox
                                           checked={!item.excluded_this_month}
                                           disabled={!canEdit || isLocked}
@@ -1136,7 +1138,7 @@ export default function InvoicingPage() {
                                         />
                                       </TableCell>
                                       {/* Project */}
-                                      <TableCell className="px-4 py-3">
+                                      <TableCell className="min-w-[200px] px-4 py-3">
                                         <Link
                                           href={`/projects/${item.project_id}`}
                                           className="text-blue-600 hover:underline"
@@ -1145,15 +1147,15 @@ export default function InvoicingPage() {
                                         </Link>
                                       </TableCell>
                                       {/* Client */}
-                                      <TableCell className="px-4 py-3 text-sm">
+                                      <TableCell className="min-w-[140px] px-4 py-3 text-sm">
                                         {item.client_name}
                                       </TableCell>
                                       {/* PO Number */}
-                                      <TableCell className="px-4 py-3 text-sm">
+                                      <TableCell className="min-w-[140px] px-4 py-3 text-sm">
                                         {item.po_number || "—"}
                                       </TableCell>
                                       {/* Invoice Value (from Monthly Phasing) */}
-                                      <TableCell className="px-4 py-3">
+                                      <TableCell className="min-w-[180px] px-4 py-3">
                                         <div className="flex items-center gap-2">
                                           <span className="text-sm font-medium">
                                             {item.invoice_value
@@ -1166,7 +1168,7 @@ export default function InvoicingPage() {
                                         </div>
                                       </TableCell>
                                       {/* Description */}
-                                      <TableCell className="px-4 py-3">
+                                      <TableCell className="min-w-[220px] px-4 py-3">
                                         {canEdit && !isLocked && !item.excluded_this_month ? (
                                           <Button
                                             variant="outline"
@@ -1189,7 +1191,7 @@ export default function InvoicingPage() {
                                         )}
                                       </TableCell>
                                       {/* Email Contact */}
-                                      <TableCell className="px-4 py-3 text-sm">
+                                      <TableCell className="min-w-[160px] px-4 py-3 text-sm">
                                         {item.accounts_email ? (
                                           <a
                                             href={`mailto:${item.accounts_email}`}
@@ -1203,25 +1205,25 @@ export default function InvoicingPage() {
                                       </TableCell>
                                       {/* Address */}
                                       <TableCell
-                                        className="px-4 py-3 text-sm max-w-xs truncate"
+                                        className="min-w-[260px] px-4 py-3 text-sm truncate"
                                         title={item.client_address || ""}
                                       >
                                         {item.client_address || "—"}
                                       </TableCell>
                                       {/* Project Number */}
-                                      <TableCell className="px-4 py-3 text-sm font-mono">
+                                      <TableCell className="min-w-[130px] px-4 py-3 text-sm font-mono">
                                         {item.project_reference || "—"}
                                       </TableCell>
                                       {/* Project Owner */}
-                                      <TableCell className="px-4 py-3 text-sm">
+                                      <TableCell className="min-w-[150px] px-4 py-3 text-sm">
                                         {item.project_owner_name || "—"}
                                       </TableCell>
                                       {/* Payment Terms */}
-                                      <TableCell className="px-4 py-3 text-sm">
+                                      <TableCell className="min-w-[130px] px-4 py-3 text-sm">
                                         {item.payment_terms ? `${item.payment_terms} days` : "—"}
                                       </TableCell>
                                       {/* Last Updated */}
-                                      <TableCell className="px-4 py-3 text-sm text-gray-500">
+                                      <TableCell className="min-w-[130px] px-4 py-3 text-sm text-gray-500">
                                         {new Date(item.updated_at).toLocaleDateString()}
                                       </TableCell>
                                     </TableRow>
