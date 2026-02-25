@@ -83,6 +83,12 @@ export default async function handler(
   try {
     const rawBody = req.body as Partial<GeneratePdfPayload> | undefined;
 
+    console.log("Generate invoice PDF payload debug:", {
+      type: typeof rawBody,
+      hasBody: !!rawBody,
+      keys: rawBody && typeof rawBody === "object" ? Object.keys(rawBody) : null,
+    });
+
     const invoiceMonthId =
       typeof rawBody?.invoiceMonthId === "string"
         ? rawBody.invoiceMonthId
@@ -344,13 +350,15 @@ export default async function handler(
 
     const message =
       error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error ? error.stack : undefined;
 
-    const responseBody: { error: string; details?: string } = {
+    const responseBody: { error: string; details: string; stack?: string } = {
       error: "Failed to generate invoice PDF",
+      details: message,
     };
 
-    if (process.env.NODE_ENV !== "production") {
-      responseBody.details = message;
+    if (process.env.NODE_ENV !== "production" && stack) {
+      responseBody.stack = stack;
     }
 
     res.status(500).json(responseBody);
