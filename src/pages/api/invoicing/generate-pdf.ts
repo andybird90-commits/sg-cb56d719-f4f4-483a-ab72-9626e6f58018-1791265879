@@ -81,8 +81,35 @@ export default async function handler(
   }
 
   try {
-    const { invoiceMonthId, year, month, items, totalValue } =
-      req.body as GeneratePdfPayload;
+    const rawBody = req.body as Partial<GeneratePdfPayload> | undefined;
+
+    const invoiceMonthId =
+      typeof rawBody?.invoiceMonthId === "string"
+        ? rawBody.invoiceMonthId
+        : "Unknown";
+
+    const yearRaw = rawBody?.year as number | string | undefined;
+    const monthRaw = rawBody?.month as number | string | undefined;
+    const totalValueRaw = rawBody?.totalValue as number | string | undefined;
+
+    const year =
+      typeof yearRaw === "number"
+        ? yearRaw
+        : Number(yearRaw ?? 0) || 0;
+
+    const month =
+      typeof monthRaw === "number"
+        ? monthRaw
+        : Number(monthRaw ?? 0) || 0;
+
+    const items = Array.isArray(rawBody?.items)
+      ? (rawBody.items as InvoicePdfItem[])
+      : [];
+
+    const totalValue =
+      typeof totalValueRaw === "number"
+        ? totalValueRaw
+        : Number(totalValueRaw ?? 0) || 0;
 
     const pdfDoc = await PDFDocument.create();
     let page = pdfDoc.addPage();
@@ -108,7 +135,10 @@ export default async function handler(
     const detailTextSize = 9;
     const lineGap = 4;
 
-    const title = `Invoice Summary - ${year}-${String(month).padStart(2, "0")}`;
+    const title = `Invoice Summary - ${year}-${String(month).padStart(
+      2,
+      "0"
+    )}`;
     page.drawText(title, {
       x: leftMargin,
       y,
@@ -225,8 +255,7 @@ export default async function handler(
         wrappedDetailLines.push(...wrapped);
       }
 
-      const totalLinesForItem =
-        1 + wrappedDetailLines.length + 1;
+      const totalLinesForItem = 1 + wrappedDetailLines.length + 1;
 
       ensureSpaceForLines(totalLinesForItem);
 
@@ -312,8 +341,18 @@ export default async function handler(
     res.status(200).send(Buffer.from(pdfBytes));
   } catch (error) {
     console.error("Error generating invoice PDF:", error);
-    res
-      .status(500)
-      .json({ error: "Failed to generate invoice PDF" });
+
+    const message =
+      error instanceof Error ? error.message : String(error);
+
+    const responseBody: { error: string; details?: string } = {
+      error: "Failed to generate invoice PDF",
+    };
+
+    if (process.env.NODE_ENV !== "production") {
+      responseBody.details = message;
+    }
+
+    res.status(500).json(responseBody);
   }
 }
