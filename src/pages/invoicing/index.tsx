@@ -1089,44 +1089,22 @@ export default function InvoicingPage() {
                           containerRef={bottomScrollRef}
                           onContainerScroll={handleBottomScroll}
                         >
-                          <TableHeader className="bg-white">
+                          <TableHeader className="bg-white sticky top-4 z-10">
                             <TableRow>
-                              <TableHead className="sticky top-4 z-10 bg-white w-[50px]">
-                                Include
-                              </TableHead>
-                              <TableHead className="sticky top-4 z-10 bg-white min-w-[150px]">
-                                Project
-                              </TableHead>
-                              <TableHead className="sticky top-4 z-10 bg-white min-w-[120px]">
-                                Client
-                              </TableHead>
-                              <TableHead className="sticky top-4 z-10 bg-white min-w-[120px]">
-                                PO Number
-                              </TableHead>
-                              <TableHead className="sticky top-4 z-10 bg-white min-w-[150px]">
+                              <TableHead className="w-[50px]">Include</TableHead>
+                              <TableHead className="min-w-[150px]">Project</TableHead>
+                              <TableHead className="min-w-[120px]">Client</TableHead>
+                              <TableHead className="min-w-[120px]">PO Number</TableHead>
+                              <TableHead className="min-w-[150px]">
                                 Invoice Value (from Monthly Phasing)
                               </TableHead>
-                              <TableHead className="sticky top-4 z-10 bg-white min-w-[200px]">
-                                Description
-                              </TableHead>
-                              <TableHead className="sticky top-4 z-10 bg-white min-w-[150px]">
-                                Email Contact
-                              </TableHead>
-                              <TableHead className="sticky top-4 z-10 bg-white min-w-[200px]">
-                                Address
-                              </TableHead>
-                              <TableHead className="sticky top-4 z-10 bg-white min-w-[100px]">
-                                Project Number
-                              </TableHead>
-                              <TableHead className="sticky top-4 z-10 bg-white min-w-[120px]">
-                                Project Owner
-                              </TableHead>
-                              <TableHead className="sticky top-4 z-10 bg-white min-w-[100px]">
-                                Payment Terms
-                              </TableHead>
-                              <TableHead className="sticky top-4 z-10 bg-white min-w-[100px]">
-                                Last Updated
-                              </TableHead>
+                              <TableHead className="min-w-[200px]">Description</TableHead>
+                              <TableHead className="min-w-[150px]">Email Contact</TableHead>
+                              <TableHead className="min-w-[200px]">Address</TableHead>
+                              <TableHead className="min-w-[100px]">Project Number</TableHead>
+                              <TableHead className="min-w-[120px]">Project Owner</TableHead>
+                              <TableHead className="min-w-[100px]">Payment Terms</TableHead>
+                              <TableHead className="min-w-[100px]">Last Updated</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
