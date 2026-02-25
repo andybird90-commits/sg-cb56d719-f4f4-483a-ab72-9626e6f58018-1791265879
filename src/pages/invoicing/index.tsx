@@ -1083,10 +1083,10 @@ export default function InvoicingPage() {
                           <div ref={topInnerRef} className="h-4" />
                         </div>
 
-                        {/* Main horizontal scroll container for header + body */}
+                        {/* Main horizontal scroll container for header + body (no own horizontal scrollbar) */}
                         <div
                           ref={bottomScrollRef}
-                          className="overflow-x-auto"
+                          className="overflow-x-hidden"
                           onScroll={handleBottomScroll}
                         >
                           <div className="min-w-[1600px]">
@@ -1103,7 +1103,7 @@ export default function InvoicingPage() {
                                       Invoice Value (from Monthly Phasing)
                                     </TableHead>
                                     <TableHead className="min-w-[220px] px-4 py-3">Description</TableHead>
-                                    <TableHead className="min-w-[160px] px-4 py-3">Email Contact</TableHead>
+                                    <TableHead className="min-w-[320px] px-4 py-3">Email Contact</TableHead>
                                     <TableHead className="min-w-[260px] px-4 py-3">Address</TableHead>
                                     <TableHead className="min-w-[130px] px-4 py-3">Project Number</TableHead>
                                     <TableHead className="min-w-[150px] px-4 py-3">Project Owner</TableHead>
@@ -1115,7 +1115,7 @@ export default function InvoicingPage() {
                             </div>
 
                             {/* Body table: vertically scrollable, header stays fixed above */}
-                            <div className="max-h-[560px] overflow-y-auto">
+                            <div className="max-h-[560px] overflow-y-auto overflow-x-hidden">
                               <Table className="w-full min-w-[1600px] table-fixed">
                                 <TableBody>
                                   {invoiceItems.map((item) => (
@@ -1191,7 +1191,7 @@ export default function InvoicingPage() {
                                         )}
                                       </TableCell>
                                       {/* Email Contact */}
-                                      <TableCell className="min-w-[160px] px-4 py-3 text-sm">
+                                      <TableCell className="min-w-[320px] px-4 py-3 text-sm">
                                         {item.accounts_email ? (
                                           <a
                                             href={`mailto:${item.accounts_email}`}
