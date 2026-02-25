@@ -1265,7 +1265,7 @@ export default function InvoicingPage() {
                             Sync Projects
                           </Button>
                           <Button
-                            onClick={handleFinishInvoicing}
+                            onClick={() => setShowLockDialog(true)}
                             disabled={displayedTotal === 0}
                           >
                             <Lock className="mr-2 h-4 w-4" />
