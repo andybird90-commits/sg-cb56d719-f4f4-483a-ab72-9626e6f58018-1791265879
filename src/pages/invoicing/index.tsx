@@ -1135,6 +1135,7 @@ export default function InvoicingPage() {
                                 key={item.id}
                                 className={item.excluded_this_month ? "opacity-50" : ""}
                               >
+                                {/* Include */}
                                 <TableCell className="px-4 py-3">
                                   <Checkbox
                                     checked={!item.excluded_this_month}
@@ -1148,6 +1149,7 @@ export default function InvoicingPage() {
                                     }
                                   />
                                 </TableCell>
+                                {/* Project */}
                                 <TableCell className="px-4 py-3">
                                   <Link
                                     href={`/projects/${item.project_id}`}
@@ -1156,39 +1158,15 @@ export default function InvoicingPage() {
                                     {item.project_code} - {item.project_name}
                                   </Link>
                                 </TableCell>
+                                {/* Client */}
                                 <TableCell className="px-4 py-3 text-sm">
                                   {item.client_name}
                                 </TableCell>
+                                {/* PO Number */}
                                 <TableCell className="px-4 py-3 text-sm">
                                   {item.po_number || "—"}
                                 </TableCell>
-                                <TableCell className="px-4 py-3 text-sm">
-                                  {item.accounts_email ? (
-                                    <a
-                                      href={`mailto:${item.accounts_email}`}
-                                      className="text-blue-600 hover:underline"
-                                    >
-                                      {item.accounts_email}
-                                    </a>
-                                  ) : (
-                                    "—"
-                                  )}
-                                </TableCell>
-                                <TableCell
-                                  className="px-4 py-3 text-sm max-w-xs truncate"
-                                  title={item.client_address || ""}
-                                >
-                                  {item.client_address || "—"}
-                                </TableCell>
-                                <TableCell className="px-4 py-3 text-sm font-mono">
-                                  {item.project_reference || "—"}
-                                </TableCell>
-                                <TableCell className="px-4 py-3 text-sm">
-                                  {item.project_owner_name || "—"}
-                                </TableCell>
-                                <TableCell className="px-4 py-3 text-sm">
-                                  {item.payment_terms ? `${item.payment_terms} days` : "—"}
-                                </TableCell>
+                                {/* Invoice Value (from Monthly Phasing) */}
                                 <TableCell className="px-4 py-3">
                                   <div className="flex items-center gap-2">
                                     <span className="text-sm font-medium">
@@ -1201,6 +1179,7 @@ export default function InvoicingPage() {
                                     </span>
                                   </div>
                                 </TableCell>
+                                {/* Description */}
                                 <TableCell className="px-4 py-3">
                                   {canEdit && !isLocked && !item.excluded_this_month ? (
                                     <Button
@@ -1223,6 +1202,39 @@ export default function InvoicingPage() {
                                     </span>
                                   )}
                                 </TableCell>
+                                {/* Email Contact */}
+                                <TableCell className="px-4 py-3 text-sm">
+                                  {item.accounts_email ? (
+                                    <a
+                                      href={`mailto:${item.accounts_email}`}
+                                      className="text-blue-600 hover:underline"
+                                    >
+                                      {item.accounts_email}
+                                    </a>
+                                  ) : (
+                                    "—"
+                                  )}
+                                </TableCell>
+                                {/* Address */}
+                                <TableCell
+                                  className="px-4 py-3 text-sm max-w-xs truncate"
+                                  title={item.client_address || ""}
+                                >
+                                  {item.client_address || "—"}
+                                </TableCell>
+                                {/* Project Number */}
+                                <TableCell className="px-4 py-3 text-sm font-mono">
+                                  {item.project_reference || "—"}
+                                </TableCell>
+                                {/* Project Owner */}
+                                <TableCell className="px-4 py-3 text-sm">
+                                  {item.project_owner_name || "—"}
+                                </TableCell>
+                                {/* Payment Terms */}
+                                <TableCell className="px-4 py-3 text-sm">
+                                  {item.payment_terms ? `${item.payment_terms} days` : "—"}
+                                </TableCell>
+                                {/* Last Updated */}
                                 <TableCell className="px-4 py-3 text-sm text-gray-500">
                                   {new Date(item.updated_at).toLocaleDateString()}
                                 </TableCell>
