@@ -755,12 +755,14 @@ export default function InvoicingPage() {
 
         if (allPhasingError) throw allPhasingError;
 
+        // Any project that has at least one phasing row in any month is considered "manual"
         manuallyPhasedProjectIds = new Set(
           (allPhasingForProjects || []).map(
             (p: any) => p.project_id as string,
           ),
         );
 
+        // Phasing values for the currently selected month
         (allPhasingForProjects || []).forEach((p: any) => {
           if (p.year === selectedYear && p.month === selectedMonth) {
             monthPhasingMap.set(
@@ -776,14 +778,19 @@ export default function InvoicingPage() {
         existingItemsMap.set(item.project_id, item);
       });
 
+      // Decide which existing items to keep based on manual phasing vs date logic
       const shouldKeepItem = (item: InvoiceItem): boolean => {
         const isManuallyPhased = manuallyPhasedProjectIds.has(item.project_id);
-        const hasPhasingThisMonth = monthPhasingMap.has(item.project_id);
+        const phasingAmountRaw = monthPhasingMap.get(item.project_id);
+        const phasingAmount =
+          typeof phasingAmountRaw === "number" ? phasingAmountRaw : 0;
 
         if (isManuallyPhased) {
-          return hasPhasingThisMonth;
+          // Manual phasing overrides dates: only keep items where this month’s phasing value is > 0
+          return phasingAmount > 0;
         }
 
+        // Non-manual projects: keep items only if the project is active by dates for this month
         return activeProjectIdsByDates.has(item.project_id);
       };
 
@@ -794,21 +801,25 @@ export default function InvoicingPage() {
         await supabase.from("invoice_items").delete().in("id", removeIds);
 
         console.log(
-          `Removed ${itemsToRemove.length} invoice items no longer valid for this month (including manually phased projects without phasing this month).`,
+          `Removed ${itemsToRemove.length} invoice items no longer valid for this month (including manually phased projects with no phasing for this month or zero value).`,
         );
       }
 
       for (const p of typedProjects) {
         const projectId = p.id as string;
         const isManuallyPhased = manuallyPhasedProjectIds.has(projectId);
-        const hasPhasingThisMonth = monthPhasingMap.has(projectId);
+        const phasingAmountRaw = monthPhasingMap.get(projectId);
+        const phasingAmount =
+          typeof phasingAmountRaw === "number" ? phasingAmountRaw : 0;
         const isActiveByDates = activeProjectIdsByDates.has(projectId);
 
         if (isManuallyPhased) {
-          if (!hasPhasingThisMonth) {
+          // Manual phasing: only include months where the phasing value is > 0
+          if (phasingAmount <= 0) {
             continue;
           }
         } else {
+          // Non-manual: only include if the project is active by dates
           if (!isActiveByDates) {
             continue;
           }
@@ -817,7 +828,7 @@ export default function InvoicingPage() {
         let monthlyRevenue = 0;
 
         if (isManuallyPhased) {
-          monthlyRevenue = monthPhasingMap.get(projectId) || 0;
+          monthlyRevenue = phasingAmount;
         } else {
           const { start_date, end_date, agreed_fee_value } = p;
 
@@ -874,7 +885,7 @@ export default function InvoicingPage() {
 
       toast({
         title: "Synced",
-        description: `Projects synced successfully. ${itemsToRemove.length} projects/items removed because they are no longer active or have no manual phasing for this month.`,
+        description: `Projects synced successfully. ${itemsToRemove.length} projects/items removed because they are no longer active or have no manual phasing > 0 for this month.`,
       });
 
       await loadInvoiceData(selectedYear, selectedMonth);

@@ -83,6 +83,7 @@ export const invoicingService = {
 
     const allProjects = (projects || []) as any[];
 
+    // Phasing for the specific invoice month
     const { data: phasingData, error: phasingError } = await supabase
       .from("project_monthly_phasing")
       .select("project_id, revenue_amount")
@@ -91,6 +92,7 @@ export const invoicingService = {
 
     if (phasingError) throw phasingError;
 
+    // All projects that have ANY manual phasing (in any month)
     const {
       data: projectsWithPhasing,
       error: projectsWithPhasingError,
@@ -115,13 +117,22 @@ export const invoicingService = {
     allProjects.forEach((project: any) => {
       const projectId = project.id as string;
       const hasManualPhasing = projectsWithAnyPhasing.has(projectId);
-      const hasPhasingThisMonth = phasingMap.has(projectId);
+      const manualPhasingAmountRaw = phasingMap.get(projectId);
+      const manualPhasingAmount =
+        typeof manualPhasingAmountRaw === "number" ? manualPhasingAmountRaw : 0;
 
+      // MANUAL PHASING PROJECTS:
+      // If a project has ANY manual phasing, that schedule is the only source of truth.
+      // We only invoice in months where the phasing value is > 0.
       if (hasManualPhasing) {
-        if (!hasPhasingThisMonth) {
+        if (manualPhasingAmount <= 0) {
+          // Either no row for this month or explicitly set to 0:
+          // do NOT include this project in this invoice month.
           return;
         }
       } else {
+        // NON-MANUAL PROJECTS:
+        // Fall back to automatic, date-based allocation.
         if (!project.start_date || !project.end_date) {
           return;
         }
@@ -135,8 +146,12 @@ export const invoicingService = {
       let invoiceValue = 0;
 
       if (hasManualPhasing) {
-        invoiceValue = phasingMap.get(projectId) || 0;
-      } else if (project.agreed_fee_value && project.start_date && project.end_date) {
+        invoiceValue = manualPhasingAmount;
+      } else if (
+        project.agreed_fee_value &&
+        project.start_date &&
+        project.end_date
+      ) {
         const start = new Date(project.start_date as string);
         const end = new Date(project.end_date as string);
         const durationMonths = Math.max(
