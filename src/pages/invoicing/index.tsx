@@ -566,27 +566,42 @@ export default function InvoicingPage() {
     setEditingDescription("");
   }
 
+  const handleDownloadPdf = async () => {
+    if (!invoiceMonth) return;
+
+    try {
+      setLoading(true);
+
+      const pdfUrl = await invoicingService.generateAndUploadPdf(
+        invoiceMonth,
+        invoiceItems
+      );
+
+      window.open(pdfUrl, "_blank");
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: "Error",
+        description: "Failed to generate invoice PDF.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   async function handleLockMonth() {
     if (!invoiceMonth) return;
 
     try {
       setLoading(true);
 
-      const currentItems = invoiceItems;
-
       const pdfUrl = await invoicingService.generateAndUploadPdf(
         invoiceMonth,
-        currentItems
+        invoiceItems
       );
 
       await invoicingService.savePdfUrl(invoiceMonth.id, pdfUrl);
-
-      await invoicingService.createInvoiceArchiveSnapshot(
-        invoiceMonth,
-        currentItems
-      );
-
-      await invoicingService.lockInvoiceMonth(invoiceMonth.id);
 
       setInvoiceMonth({
         ...invoiceMonth,
@@ -600,10 +615,10 @@ export default function InvoicingPage() {
         description: "Invoice period locked and PDF generated successfully",
       });
     } catch (error) {
-      console.error("Error locking invoice month:", error);
+      console.error(error);
       toast({
         title: "Error",
-        description: "Failed to lock invoice period. Please try again.",
+        description: "Failed to lock invoicing month.",
         variant: "destructive",
       });
     } finally {
@@ -617,21 +632,18 @@ export default function InvoicingPage() {
     try {
       setLoading(true);
 
-      const currentItems = invoiceItems;
-
       const pdfUrl = await invoicingService.generateAndUploadPdf(
         invoiceMonth,
-        currentItems
+        invoiceItems
       );
 
       await invoicingService.savePdfUrl(invoiceMonth.id, pdfUrl);
 
-      await invoicingService.createInvoiceArchiveSnapshot(
-        invoiceMonth,
-        currentItems
-      );
-
-      await invoicingService.lockInvoiceMonth(invoiceMonth.id);
+      setInvoiceMonth({
+        ...invoiceMonth,
+        status: "locked",
+        pdf_url: pdfUrl,
+      });
 
       toast({
         title: "Success",
@@ -640,43 +652,10 @@ export default function InvoicingPage() {
 
       loadInvoiceData(selectedYear, selectedMonth);
     } catch (error) {
-      console.error("Error locking invoice month:", error);
+      console.error(error);
       toast({
         title: "Error",
-        description: "Failed to lock invoice month.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDownloadPdf = async () => {
-    if (!invoiceMonth) return;
-
-    try {
-      setLoading(true);
-
-      const currentItems = invoiceItems;
-
-      const pdfUrl = await invoicingService.generateAndUploadPdf(
-        invoiceMonth,
-        currentItems
-      );
-
-      await invoicingService.savePdfUrl(invoiceMonth.id, pdfUrl);
-
-      setInvoiceMonth({
-        ...invoiceMonth,
-        pdf_url: pdfUrl,
-      });
-
-      window.open(pdfUrl, "_blank");
-    } catch (error) {
-      console.error("Error downloading invoice PDF:", error);
-      toast({
-        title: "Error",
-        description: "Failed to generate or open the invoice PDF.",
+        description: "Failed to finish invoicing for this month.",
         variant: "destructive",
       });
     } finally {

@@ -1,12 +1,34 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
-import jsPDF from "jspdf";
-import "jspdf-autotable";
 
 type Tables<T extends keyof Database["public"]["Tables"]> =
   Database["public"]["Tables"][T]["Row"];
 type InvoiceMonth = Tables<"invoice_months">;
 type InvoiceItem = Tables<"invoice_items">;
+
+// Define a shared, relaxed type for invoice items used in PDF and archive operations
+export type InvoicingPdfItem = {
+  id: string;
+  invoice_month_id: string;
+  project_id: string;
+  project_name: string;
+  project_code: string;
+  client_name: string;
+  invoice_value: number | null;
+  po_number: string | null;
+  description: string;
+  excluded_this_month: boolean;
+  invoice_reference: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  accounts_email?: string | null;
+  client_address?: string | null;
+  enquiry_number?: string | null;
+  project_reference?: string | null;
+  project_owner_name?: string | null;
+  payment_terms?: number | null;
+};
 
 export const invoicingService = {
   async getOrCreateInvoiceMonth(
@@ -330,120 +352,42 @@ export const invoicingService = {
 
   async generateAndUploadPdf(
     invoiceMonth: InvoiceMonth,
-    items: InvoiceItem[],
-    options?: {
-      bucket?: string;
-      revision?: number;
-    }
+    items: InvoicingPdfItem[],
+    options?: { bucket?: string; filenameSuffix?: string; revision?: number }
   ): Promise<string> {
-    const bucket = options?.bucket ?? "invoices";
-
-    const monthPadded = String(invoiceMonth.month).padStart(2, "0");
-    const baseFileName = `invoices-${invoiceMonth.year}-${monthPadded}`;
-    const fileName =
-      options?.revision !== undefined
-        ? `${baseFileName}-rev${options.revision}.pdf`
-        : `${baseFileName}.pdf`;
-
-    // Use the exact same inclusion rules as the UI:
-    // only items that are not excluded and have a non-null/undefined invoice_value.
-    const includedItems = (items || []).filter(
+    const included = items.filter(
       (item) =>
         !item.excluded_this_month &&
         item.invoice_value !== null &&
         item.invoice_value !== undefined
     );
 
-    const totalValue = includedItems.reduce(
-      (sum, item) => sum + (Number(item.invoice_value) || 0),
-      0
-    );
+    const totalValue = included.reduce((sum, item) => {
+      const value = typeof item.invoice_value === "number" ? item.invoice_value : 0;
+      return sum + value;
+    }, 0);
 
-    // Build table rows for the PDF
-    const tableRows = includedItems.map((item) => [
-      item.project_code || "",
-      item.project_name || "",
-      item.client_name || "",
-      item.po_number || "",
-      `£${(Number(item.invoice_value) || 0).toFixed(2)}`,
-      item.description || "",
-      (item as any).accounts_email || "",
-      (item as any).project_reference || "",
-      (item as any).project_owner_name || "",
-      (item as any).payment_terms
-        ? `${(item as any).payment_terms} days`
-        : "",
-    ]);
-
-    const doc = new jsPDF();
-
-    doc.setFontSize(16);
-    doc.text(
-      `Invoice Summary - ${invoiceMonth.year}-${monthPadded}`,
-      14,
-      20
-    );
-
-    doc.setFontSize(11);
-    doc.text(`Status: ${invoiceMonth.status}`, 14, 28);
-    doc.text(
-      `Total (matches UI): £${totalValue.toFixed(2)}`,
-      14,
-      34
-    );
-
-    (doc as any).autoTable({
-      head: [
-        [
-          "Project Code",
-          "Project Name",
-          "Client",
-          "PO Number",
-          "Value",
-          "Description",
-          "Email",
-          "Project Ref",
-          "Owner",
-          "Terms",
-        ],
-      ],
-      body: tableRows,
-      startY: 42,
-      styles: {
-        fontSize: 8,
-        cellPadding: 2,
-      },
-      headStyles: {
-        fillColor: [15, 23, 42],
-        textColor: 255,
+    const { data, error } = await supabase.functions.invoke("generate-invoice-pdf", {
+      body: {
+        invoiceMonthId: invoiceMonth.id,
+        year: invoiceMonth.year,
+        month: invoiceMonth.month,
+        items: included,
+        totalValue,
+        options,
       },
     });
 
-    const pdfBlob = doc.output("blob");
-    const pdfBuffer = await pdfBlob.arrayBuffer();
-
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from(bucket)
-      .upload(fileName, pdfBuffer, {
-        contentType: "application/pdf",
-        upsert: true,
-      });
-
-    if (uploadError) {
-      console.error("Error uploading invoice PDF", uploadError);
-      throw uploadError;
+    if (error || !data || !data.pdfUrl) {
+      throw error || new Error("Failed to generate invoice PDF");
     }
 
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from(bucket).getPublicUrl(uploadData.path);
-
-    return publicUrl;
+    return data.pdfUrl as string;
   },
 
   async createInvoiceArchiveSnapshot(
     invoiceMonth: InvoiceMonth,
-    items: InvoiceItem[]
+    items: InvoicingPdfItem[]
   ): Promise<void> {
     const { data: authData } = await supabase.auth.getUser();
 
@@ -467,6 +411,7 @@ export const invoicingService = {
 
     const pdfUrl = await this.generateAndUploadPdf(invoiceMonth, items, {
       bucket: "invoice-archive",
+      filenameSuffix: nextRevision === 0 ? undefined : `-rev${nextRevision}`,
       revision: nextRevision,
     });
 
