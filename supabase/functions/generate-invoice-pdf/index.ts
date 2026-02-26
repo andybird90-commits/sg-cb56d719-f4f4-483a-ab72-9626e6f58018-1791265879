@@ -1,5 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
-import { PDFDocument, StandardFonts } from "https://esm.sh/pdf-lib@1.17.1";
+import {
+  PDFDocument,
+  StandardFonts,
+  PageSizes,
+} from "https://esm.sh/pdf-lib@1.17.1";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -59,12 +63,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const pdfDoc = await PDFDocument.create({
-      size: "A4",
-      layout: "landscape",
-    });
-    let page = pdfDoc.addPage();
-    const { width, height } = page.getSize();
+    const pdfDoc = await PDFDocument.create();
+    const pageSize: [number, number] = [PageSizes.A4[1], PageSizes.A4[0]];
+    let page = pdfDoc.addPage(pageSize);
+    let { width, height } = page.getSize();
 
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
@@ -106,7 +108,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
           size: 9,
           font,
         });
-        page = pdfDoc.addPage();
+        page = pdfDoc.addPage(pageSize);
+        ({ width, height } = page.getSize());
         y = height - 50;
         page.drawText(header, { x: 50, y, size: 10, font: fontBold });
         y -= 15;
@@ -195,12 +198,31 @@ Deno.serve(async (req: Request): Promise<Response> => {
         size: 9,
         font,
       });
-      page = pdfDoc.addPage();
+      page = pdfDoc.addPage(pageSize);
+      ({ width, height } = page.getSize());
       y = height - 80;
     }
 
     const totalText = `Total Invoiced Value: ${totalValue.toFixed(2)}`;
     page.drawText(totalText, { x: 50, y, size: 12, font: fontBold });
+
+    // Add page numbers to all pages before saving
+    const pages = pdfDoc.getPages();
+    const totalPages = pages.length;
+
+    pages.forEach((p, index) => {
+      const { width: pageWidth } = p.getSize();
+      const pageNumberText = `Page ${index + 1} of ${totalPages}`;
+      const fontSize = 9;
+      const textWidth = font.widthOfTextAtSize(pageNumberText, fontSize);
+
+      p.drawText(pageNumberText, {
+        x: (pageWidth - textWidth) / 2,
+        y: 30,
+        size: fontSize,
+        font,
+      });
+    });
 
     const pdfBytes = await pdfDoc.save();
 

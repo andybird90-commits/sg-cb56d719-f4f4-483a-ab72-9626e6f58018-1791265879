@@ -428,6 +428,26 @@ export default async function handler(
       font: boldFont,
     });
 
+    // Add page numbers to all pages before saving
+    const pages = pdfDoc.getPages();
+    const totalPages = pages.length;
+
+    pages.forEach((p, index) => {
+      const { width: pageWidth } = p.getSize();
+      const pageNumberText = `Page ${index + 1} of ${totalPages}`;
+      const textWidth = regularFont.widthOfTextAtSize(
+        pageNumberText,
+        detailFontSize,
+      );
+
+      p.drawText(pageNumberText, {
+        x: (pageWidth - textWidth) / 2,
+        y: marginBottom / 2,
+        size: detailFontSize,
+        font: regularFont,
+      });
+    });
+
     const pdfBytes = await pdfDoc.save();
 
     const safeYearLabel = safeYear > 0 ? safeYear.toString() : "unknown-year";
