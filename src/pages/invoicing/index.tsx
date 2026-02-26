@@ -216,6 +216,7 @@ export default function InvoicingPage() {
             excluded_this_month,
             project_id,
             project_name,
+            invoice_reference,
             projects (
               id,
               name,
@@ -280,10 +281,17 @@ export default function InvoicingPage() {
           const paymentTerms = company?.payment_terms || 30;
           const dueDate = addDays(issueDate, paymentTerms);
 
+          const rawRef = (item.invoice_reference as string | null) || null;
+          const trimmedRef =
+            rawRef && rawRef.trim().length > 0 ? rawRef.trim() : null;
+          const invoiceNumber =
+            trimmedRef ??
+            `INV-${month.year}-${String(month.month).padStart(2, "0")}`;
+
           const invoiceRecord = {
             id: item.id,
             invoiceMonthId: month.id,
-            invoiceNumber: `INV-${month.year}-${String(month.month).padStart(2, "0")}`,
+            invoiceNumber,
             client: company?.name || "Unknown",
             project: item.projects?.name || item.project_name || "Unknown",
             issueDate,
