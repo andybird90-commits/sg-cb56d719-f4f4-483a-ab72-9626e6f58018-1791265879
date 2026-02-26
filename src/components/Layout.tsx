@@ -10,7 +10,12 @@ import Image from "next/image";
 import { useState } from "react";
 import React from "react";
 
-export function Layout({ children }: { children: React.ReactNode }) {
+interface LayoutProps {
+  children: React.ReactNode;
+  variant?: "default" | "wide";
+}
+
+export function Layout({ children, variant = "default" }: LayoutProps) {
   const { user, profile, loading, signOut, profileError } = useAuth();
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -209,7 +214,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto px-6 md:px-8 lg:px-12 py-8 md:py-12 animate-fade-in">
+      <main
+        className={
+          variant === "wide"
+            ? "max-w-[1600px] mx-auto px-4 md:px-6 lg:px-8 py-8 md:py-12 animate-fade-in"
+            : "max-w-7xl mx-auto px-6 md:px-8 lg:px-12 py-8 md:py-12 animate-fade-in"
+        }
+      >
         {profileError && (
           <Alert variant="destructive" className="mb-6">
             <AlertDescription>

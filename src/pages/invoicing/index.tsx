@@ -976,7 +976,7 @@ export default function InvoicingPage() {
   if (loading) {
     return (
       <RequireAuth>
-        <Layout>
+        <Layout variant="wide">
           <div className="flex items-center justify-center h-64">
             <p className="text-lg">Loading invoice data...</p>
           </div>
@@ -987,7 +987,7 @@ export default function InvoicingPage() {
 
   return (
     <RequireAuth>
-      <Layout>
+      <Layout variant="wide">
         <div className="space-y-6">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Invoicing</h1>
