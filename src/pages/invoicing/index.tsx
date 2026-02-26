@@ -91,6 +91,9 @@ export default function InvoicingPage() {
   // Dialog state for editing description
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [invoiceNumberDialogOpen, setInvoiceNumberDialogOpen] = useState(false);
+  const [editingInvoiceNumberItemId, setEditingInvoiceNumberItemId] = useState<string | null>(null);
+  const [editingInvoiceNumber, setEditingInvoiceNumber] = useState("");
 
   // Cash Flow state
   const [cashFlowLoading, setCashFlowLoading] = useState(false);
@@ -266,7 +269,9 @@ export default function InvoicingPage() {
 
       // Process system-generated invoices
       (lockedMonths || []).forEach((month) => {
-        const issueDate = new Date(month.created_at);
+        const issueDate = month.locked_at
+          ? new Date(month.locked_at as string)
+          : new Date(month.created_at as string);
 
         (month.invoice_items || []).forEach((item: any) => {
           if (!item.invoice_value || item.excluded_this_month) return;
@@ -489,7 +494,7 @@ export default function InvoicingPage() {
 
   async function handleUpdateItem(
     itemId: string,
-    field: "invoice_value" | "description" | "excluded_this_month",
+    field: "invoice_value" | "description" | "excluded_this_month" | "invoice_reference",
     value: number | string | boolean | null,
   ) {
     try {
@@ -500,6 +505,8 @@ export default function InvoicingPage() {
         updates.description = value as string;
       } else if (field === "excluded_this_month") {
         updates.excluded_this_month = value as boolean;
+      } else if (field === "invoice_reference") {
+        updates.invoice_reference = (value as string) || null;
       }
 
       await invoicingService.updateInvoiceItem(itemId, updates);
@@ -543,6 +550,25 @@ export default function InvoicingPage() {
     setEditDialogOpen(false);
     setEditingItemId(null);
     setEditingDescription("");
+  }
+
+  function handleOpenInvoiceNumberDialog(item: InvoiceItem) {
+    setEditingInvoiceNumberItemId(item.id);
+    setEditingInvoiceNumber(item.invoice_reference || "");
+    setInvoiceNumberDialogOpen(true);
+  }
+
+  async function handleSaveInvoiceNumber() {
+    if (!editingInvoiceNumberItemId) return;
+
+    await handleUpdateItem(
+      editingInvoiceNumberItemId,
+      "invoice_reference",
+      editingInvoiceNumber,
+    );
+    setInvoiceNumberDialogOpen(false);
+    setEditingInvoiceNumberItemId(null);
+    setEditingInvoiceNumber("");
   }
 
   const handleDownloadPdf = async () => {
@@ -1094,6 +1120,7 @@ export default function InvoicingPage() {
                                     <TableHead className="w-[50px] px-4 py-3">Include</TableHead>
                                     <TableHead className="min-w-[200px] px-4 py-3">Project</TableHead>
                                     <TableHead className="min-w-[140px] px-4 py-3">Client</TableHead>
+                                    <TableHead className="min-w-[140px] px-4 py-3">Invoice No</TableHead>
                                     <TableHead className="min-w-[140px] px-4 py-3">PO Number</TableHead>
                                     <TableHead className="min-w-[180px] px-4 py-3">
                                       Invoice Value (from Monthly Phasing)
@@ -1149,6 +1176,27 @@ export default function InvoicingPage() {
                                       {/* Client */}
                                       <TableCell className="min-w-[140px] px-4 py-3 text-sm">
                                         {item.client_name}
+                                      </TableCell>
+                                      {/* Invoice No */}
+                                      <TableCell className="min-w-[140px] px-4 py-3 text-sm">
+                                        {isLocked && canEdit ? (
+                                          <Button
+                                            variant={item.invoice_reference ? "outline" : "ghost"}
+                                            size="sm"
+                                            className="w-full justify-start text-left"
+                                            onClick={() => handleOpenInvoiceNumberDialog(item)}
+                                          >
+                                            {item.invoice_reference ? (
+                                              <span>{item.invoice_reference}</span>
+                                            ) : (
+                                              <span className="text-sm text-muted-foreground italic">
+                                                Add invoice number
+                                              </span>
+                                            )}
+                                          </Button>
+                                        ) : (
+                                          <span>{item.invoice_reference || "—"}</span>
+                                        )}
                                       </TableCell>
                                       {/* PO Number */}
                                       <TableCell className="min-w-[140px] px-4 py-3 text-sm">
@@ -1503,6 +1551,44 @@ export default function InvoicingPage() {
                   Cancel
                 </Button>
                 <Button onClick={handleSaveDescription}>Save Description</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Edit Invoice Number Dialog */}
+          <Dialog open={invoiceNumberDialogOpen} onOpenChange={setInvoiceNumberDialogOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Set Invoice Number</DialogTitle>
+                <DialogDescription>
+                  Enter the actual invoice number assigned in QuickBooks for this project.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                <Textarea
+                  value={editingInvoiceNumber}
+                  onChange={(e) => setEditingInvoiceNumber(e.target.value)}
+                  placeholder="e.g. INV-2026-045"
+                  className="min-h-[80px]"
+                />
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setInvoiceNumberDialogOpen(false);
+                    setEditingInvoiceNumberItemId(null);
+                    setEditingInvoiceNumber("");
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSaveInvoiceNumber}
+                  disabled={!editingInvoiceNumber.trim()}
+                >
+                  Save Invoice Number
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>

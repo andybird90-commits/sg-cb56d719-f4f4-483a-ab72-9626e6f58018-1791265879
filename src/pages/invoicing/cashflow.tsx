@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Calendar, CheckCircle2, AlertTriangle, Clock } from "lucide-react";
 import { format, addDays, startOfWeek, endOfWeek, addWeeks, isBefore, isAfter, isWithinInterval } from "date-fns";
+import type { Tables } from "@/integrations/supabase/types";
 
 interface InvoiceWithCollection {
   id: string;
@@ -40,6 +41,29 @@ interface WeekData {
   collected: number;
   outstanding: number;
 }
+
+type CashflowInvoiceSource = "system" | "manual";
+
+interface CashflowInvoiceBase {
+  id: string;
+  source: CashflowInvoiceSource;
+  companyName: string;
+  projectName?: string;
+  invoiceNumber: string;
+  issueDate: Date;
+  dueDate: Date;
+  status: string;
+  net: number;
+  vat: number;
+  gross: number;
+  paid: number;
+  outstanding: number;
+}
+
+type InvoiceItemRow = Tables<"invoice_items"> & {
+  projects: Pick<Tables<"projects">, "name"> | null;
+  companies: Pick<Tables<"companies">, "name"> | null;
+};
 
 function CashFlowContent() {
   const { profile } = useAuth();
@@ -80,6 +104,7 @@ function CashFlowContent() {
             invoice_value,
             description,
             po_number,
+            invoice_reference,
             excluded_this_month,
             created_at,
             projects!invoice_items_project_id_fkey (
@@ -117,7 +142,11 @@ function CashFlowContent() {
           
           // Calculate invoice issue date (first day of the month)
           const issueDate = new Date(month.year, month.month - 1, 1);
-          const invoiceNumber = `${item.project_code || 'INV'}-${month.year}-${String(month.month).padStart(2, '0')}`;
+          const fallbackInvoiceNumber = `${item.project_code || "INV"}-${month.year}-${String(month.month).padStart(2, "0")}`;
+          const invoiceNumber =
+            (item.invoice_reference as string | null) && (item.invoice_reference as string).trim().length > 0
+              ? (item.invoice_reference as string)
+              : fallbackInvoiceNumber;
 
           // Check if collection exists, if not create it
           let collection = item.invoice_collections?.[0];
@@ -145,7 +174,7 @@ function CashFlowContent() {
             invoice_number: invoiceNumber,
             issue_date: format(issueDate, "yyyy-MM-dd"),
             total_amount: Number(item.invoice_value),
-            company_id: item.projects?.client_company_id || '',
+            company_id: item.projects?.client_company_id || "",
             project_id: item.project_id,
             companies: {
               name: company?.name || item.client_name,
