@@ -59,7 +59,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const pdfDoc = await PDFDocument.create();
+    const pdfDoc = await PDFDocument.create({
+      size: "A4",
+      layout: "landscape",
+    });
     let page = pdfDoc.addPage();
     const { width, height } = page.getSize();
 

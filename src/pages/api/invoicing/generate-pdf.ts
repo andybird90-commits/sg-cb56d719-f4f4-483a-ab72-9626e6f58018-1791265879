@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { PDFDocument, StandardFonts, type PDFFont } from "pdf-lib";
+import { PDFDocument, StandardFonts, type PDFFont, PageSizes } from "pdf-lib";
 
 interface InvoiceItemPayload {
   id?: string;
@@ -191,7 +191,7 @@ export default async function handler(
     const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-    let page = pdfDoc.addPage();
+    let page = pdfDoc.addPage([PageSizes.A4[1], PageSizes.A4[0]]);
     let { width, height } = page.getSize();
 
     const marginLeft = 50;
