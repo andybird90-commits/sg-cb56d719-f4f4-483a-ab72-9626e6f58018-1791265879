@@ -262,7 +262,7 @@ export default async function handler(
     const ensureSpace = (linesNeeded: number) => {
       const neededHeight = linesNeeded * detailLineHeight + itemGap;
       if (y - neededHeight < marginBottom) {
-        page = pdfDoc.addPage();
+        page = pdfDoc.addPage([PageSizes.A4[1], PageSizes.A4[0]]);
         ({ width, height } = page.getSize());
         y = height - marginTop;
 
