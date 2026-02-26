@@ -217,7 +217,7 @@ export function Layout({ children, variant = "default" }: LayoutProps) {
       <main
         className={
           variant === "wide"
-            ? "max-w-[1600px] mx-auto px-4 md:px-6 lg:px-8 py-8 md:py-12 animate-fade-in"
+            ? "w-full max-w-[1900px] mx-auto px-4 md:px-6 lg:px-8 py-8 md:py-12 animate-fade-in"
             : "max-w-7xl mx-auto px-6 md:px-8 lg:px-12 py-8 md:py-12 animate-fade-in"
         }
       >
