@@ -87,109 +87,108 @@ function CashFlowContent() {
       setLoading(true);
       setError(null);
 
-      // Fetch locked invoice months with their items
-      const { data: invoiceMonths, error: monthsError } = await supabase
+      const { data: lockedMonths, error: lockedError } = await supabase
         .from("invoice_months")
-        .select(`
-          id,
-          year,
-          month,
-          status,
+        .select(
+          `
+          *,
           invoice_items (
             id,
+            invoice_value,
+            excluded_this_month,
             project_id,
             project_name,
-            project_code,
-            client_name,
-            invoice_value,
-            description,
-            po_number,
             invoice_reference,
-            excluded_this_month,
-            created_at,
-            projects!invoice_items_project_id_fkey (
+            projects (
               id,
               name,
-              client_company_id,
-              companies!projects_client_company_id_fkey (
+              companies (
+                id,
                 name,
                 payment_terms
               )
-            ),
-            invoice_collections (
-              id,
-              due_date,
-              collected_date,
-              collected_by_user_id
             )
           )
-        `)
+        `
+        )
         .eq("status", "locked")
-        .order("year", { ascending: false })
-        .order("month", { ascending: false });
+        .order("created_at", { ascending: false });
 
-      if (monthsError) throw monthsError;
+      if (lockedError) throw lockedError;
 
-      // Flatten invoice items and create collections where needed
       const allInvoices: InvoiceWithCollection[] = [];
-      
-      for (const month of invoiceMonths || []) {
-        for (const item of month.invoice_items || []) {
-          if (item.excluded_this_month || !item.invoice_value) continue;
 
-          const company = item.projects?.companies;
-          const paymentTerms = company?.payment_terms || 30;
-          
-          // Calculate invoice issue date (first day of the month)
-          const issueDate = new Date(month.year, month.month - 1, 1);
-          const fallbackInvoiceNumber = `${item.project_code || "INV"}-${month.year}-${String(month.month).padStart(2, "0")}`;
-          const invoiceNumber =
-            (item.invoice_reference as string | null) && (item.invoice_reference as string).trim().length > 0
-              ? (item.invoice_reference as string)
-              : fallbackInvoiceNumber;
+      if (lockedMonths && Array.isArray(lockedMonths)) {
+        for (const month of lockedMonths as any[]) {
+          const issueDate = month.locked_at
+            ? new Date(month.locked_at as string)
+            : new Date(month.created_at as string);
 
-          // Check if collection exists, if not create it
-          let collection = item.invoice_collections?.[0];
-          
-          if (!collection) {
-            const dueDate = format(addDays(issueDate, paymentTerms), "yyyy-MM-dd");
-            
-            const { data: newCollection, error: collectionError } = await supabase
-              .from("invoice_collections")
-              .insert({
-                invoice_month_id: month.id,
-                invoice_item_id: item.id,
-                due_date: dueDate,
-              })
-              .select()
-              .single();
+          const items = (month.invoice_items || []) as any[];
 
-            if (!collectionError && newCollection) {
-              collection = newCollection;
+          for (const item of items) {
+            if (!item.invoice_value || item.excluded_this_month) {
+              continue;
             }
-          }
 
-          allInvoices.push({
-            id: item.id,
-            invoice_number: invoiceNumber,
-            issue_date: format(issueDate, "yyyy-MM-dd"),
-            total_amount: Number(item.invoice_value),
-            company_id: item.projects?.client_company_id || "",
-            project_id: item.project_id,
-            companies: {
-              name: company?.name || item.client_name,
-              payment_terms: paymentTerms
-            },
-            projects: {
-              project_name: item.project_name
-            },
-            invoice_collections: collection ? [{
-              id: collection.id,
-              due_date: collection.due_date,
-              collected_date: collection.collected_date,
-              collected_by_user_id: collection.collected_by_user_id
-            }] : []
-          });
+            const company = item.projects?.companies;
+            const paymentTerms = company?.payment_terms || 30;
+            const dueDate = addDays(issueDate, paymentTerms);
+
+            const rawRef = (item.invoice_reference as string | null) || null;
+            const trimmedRef =
+              rawRef && rawRef.trim().length > 0 ? rawRef.trim() : null;
+            const invoiceNumber =
+              trimmedRef ??
+              `INV-${month.year}-${String(month.month).padStart(2, "0")}`;
+
+            let collection = item.invoice_collections?.[0];
+
+            if (!collection) {
+              const dueDateString = format(dueDate, "yyyy-MM-dd");
+
+              const { data: newCollection, error: collectionError } =
+                await supabase
+                  .from("invoice_collections")
+                  .insert({
+                    invoice_month_id: month.id,
+                    invoice_item_id: item.id,
+                    due_date: dueDateString,
+                  })
+                  .select()
+                  .single();
+
+              if (!collectionError && newCollection) {
+                collection = newCollection;
+              }
+            }
+
+            allInvoices.push({
+              id: item.id,
+              invoice_number: invoiceNumber,
+              issue_date: format(issueDate, "yyyy-MM-dd"),
+              total_amount: Number(item.invoice_value),
+              company_id: item.projects?.client_company_id || "",
+              project_id: item.project_id,
+              companies: {
+                name: company?.name || item.client_name,
+                payment_terms: paymentTerms,
+              },
+              projects: {
+                project_name: item.project_name,
+              },
+              invoice_collections: collection
+                ? [
+                    {
+                      id: collection.id,
+                      due_date: collection.due_date,
+                      collected_date: collection.collected_date,
+                      collected_by_user_id: collection.collected_by_user_id,
+                    },
+                  ]
+                : [],
+            });
+          }
         }
       }
 
