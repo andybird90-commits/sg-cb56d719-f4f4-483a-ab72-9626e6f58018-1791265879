@@ -4,7 +4,7 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { Layout } from "@/components/Layout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
-import type { WinThemeRow } from "@/services/winThemeService";
+import type { StrategySettings, WinThemeRow } from "@/services/winThemeService";
 import {
   createWinTheme,
   listWinThemesForOpportunity,
@@ -136,6 +136,43 @@ function parsePayload(payload: unknown): WinThemePayload | null {
   return obj as unknown as WinThemePayload;
 }
 
+async function fetchOpportunitySummary(
+  opportunityId: string,
+): Promise<OpportunitySummary | null> {
+  const { data, error } = await supabase
+    .from("opportunities")
+    .select(
+      `
+        id,
+        name,
+        project_reference,
+        companies:companies!opportunities_company_id_fkey(
+          name
+        )
+      `,
+    )
+    .eq("id", opportunityId)
+    .maybeSingle();
+
+  if (error || !data) {
+    console.error("Failed to load opportunity for Win Theme workspace", {
+      opportunityId,
+      error,
+    });
+    return null;
+  }
+
+  const companyName =
+    ((data as any).companies?.name as string | undefined) || null;
+
+  return {
+    id: data.id,
+    name: data.name || "Unknown opportunity",
+    project_reference: (data as any).project_reference ?? null,
+    company_name: companyName,
+  };
+}
+
 function WinThemeWorkspaceContent() {
   const { profile } = useAuth();
   const router = useRouter();
@@ -218,10 +255,19 @@ function WinThemeWorkspaceContent() {
           (item) => item.opportunity_id === opportunityIdFromQuery,
         );
         if (match) {
-          void handleSelectOpportunity(match);
+          await handleSelectOpportunity(match);
+        } else {
+          const summary = await fetchOpportunitySummary(opportunityIdFromQuery);
+          if (summary) {
+            setSelectedOpportunity(summary);
+            setSelectedWinThemes([]);
+            setSelectedWinTheme(null);
+            setEditablePayload(null);
+            setIsEditing(false);
+          }
         }
       } else if (list.length > 0) {
-        void handleSelectOpportunity(list[0]);
+        await handleSelectOpportunity(list[0]);
       }
 
       setLoading(false);
@@ -686,12 +732,24 @@ function WinThemeWorkspaceContent() {
                   </div>
                 )}
 
-                {!loadingDetail && !selectedWinTheme && (
-                  <p className="text-sm text-muted-foreground">
-                    Select an opportunity with a Win Theme on the left to see
-                    the full strategy.
-                  </p>
-                )}
+                {!loadingDetail &&
+                  !selectedWinTheme &&
+                  !selectedOpportunity && (
+                    <p className="text-sm text-muted-foreground">
+                      Select an opportunity with a Win Theme on the left to see
+                      the full strategy.
+                    </p>
+                  )}
+
+                {!loadingDetail &&
+                  !selectedWinTheme &&
+                  selectedOpportunity && (
+                    <p className="text-sm text-muted-foreground">
+                      No Win Theme generated yet for this opportunity. Use the{" "}
+                      <span className="font-medium">Generate</span> button above
+                      to create the first strategy.
+                    </p>
+                  )}
 
                 {!loadingDetail &&
                   selectedWinTheme &&
@@ -1011,9 +1069,7 @@ function WinThemeWorkspaceContent() {
                               <ul className="list-disc pl-4 text-sm space-y-1">
                                 {payloadToDisplay.proposal_architecture.evidence_to_show.map(
                                   (evidence, index) => (
-                                    <li key={`${evidence}-${index}`}>
-                                      {evidence}
-                                    </li>
+                                    <li key={`${evidence}-${index}`}>{evidence}</li>
                                   ),
                                 )}
                               </ul>
@@ -1143,8 +1199,7 @@ function WinThemeWorkspaceContent() {
                               onClick={() =>
                                 void handleCopy(
                                   "email_hook",
-                                  payloadToDisplay
-                                    .talk_tracks_and_openers
+                                  payloadToDisplay.talk_tracks_and_openers
                                     ?.email_hook_paragraph,
                                 )
                               }

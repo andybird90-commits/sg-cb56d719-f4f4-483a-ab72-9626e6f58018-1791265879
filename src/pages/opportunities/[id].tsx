@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowLeft, Edit, AlertTriangle, Trash2, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Edit, AlertTriangle, Trash2, CheckCircle2, Target } from "lucide-react";
 import Link from "next/link";
 import { OpportunityCalendar } from "@/components/OpportunityCalendar";
 import { OpportunityTimeline } from "@/components/OpportunityTimeline";
@@ -385,7 +385,16 @@ function OpportunityDetailContent() {
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push(`/win-theme?opportunity_id=${opportunity.id}`)}
+                  className="gap-2 w-full sm:w-auto"
+                >
+                  <Target className="w-4 h-4" />
+                  Win Theme
+                </Button>
                 {canEdit && !isEditing && (
                   <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="gap-2 w-full sm:w-auto">
                     <Edit className="w-4 h-4" />
