@@ -82,9 +82,16 @@ interface WinThemePayload {
   gaps_and_unknowns: string[];
 }
 
-interface WinThemeWithOpportunity extends WinThemeRow {
-  opportunities?: OpportunitySummary;
-}
+type WinThemeWithJoinedOpportunity = WinThemeRow & {
+  opportunities?: {
+    id: string;
+    name: string;
+    project_reference: string | null;
+    companies?: {
+      name: string | null;
+    } | null;
+  };
+};
 
 type CopyStateKey =
   | "email_hook"
@@ -124,7 +131,7 @@ function WinThemeWorkspaceContent() {
   const [error, setError] = useState<string | null>(null);
 
   const [latestByOpportunity, setLatestByOpportunity] = useState<
-    WinThemeWithOpportunity[]
+    WinThemeWithJoinedOpportunity[]
   >([]);
   const [selectedOpportunity, setSelectedOpportunity] =
     useState<OpportunitySummary | null>(null);
@@ -174,9 +181,9 @@ function WinThemeWorkspaceContent() {
         throw queryError;
       }
 
-      const rows = (data || []) as Array<WinThemeWithOpportunity>;
+      const rows = (data || []) as WinThemeWithJoinedOpportunity[];
 
-      const map = new Map<string, WinThemeWithOpportunity>();
+      const map = new Map<string, WinThemeWithJoinedOpportunity>();
       for (const row of rows) {
         if (!row.opportunity_id) continue;
         if (!map.has(row.opportunity_id)) {
@@ -210,7 +217,7 @@ function WinThemeWorkspaceContent() {
     }
   };
 
-  const handleSelectOpportunity = async (row: WinThemeWithOpportunity) => {
+  const handleSelectOpportunity = async (row: WinThemeWithJoinedOpportunity) => {
     if (!row.opportunity_id) return;
 
     setLoadingDetail(true);
