@@ -71,7 +71,7 @@
     --background: 222 47% 7%;        /* page background - near-black navy */
     --foreground: 210 40% 96%;       /* main text - soft off-white */
     
-    --card: 222 47% 11%;             /* cards / panels */
+    --card: 222 40% 12%;             /* cards / panels, slightly lighter for contrast */
     --card-foreground: 210 40% 96%;
     
     --popover: 222 47% 12%;
@@ -87,7 +87,7 @@
     
     /* Muted text & chips */
     --muted: 222 30% 18%;
-    --muted-foreground: 220 15% 65%;
+    --muted-foreground: 220 15% 75%;  /* lighter for better readability on dark cards */
     
     /* Warm orange accent for highlights/labels */
     --accent: 24 94% 50%;
