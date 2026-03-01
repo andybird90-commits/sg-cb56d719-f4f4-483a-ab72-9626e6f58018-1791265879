@@ -1800,6 +1800,7 @@ export type Database = {
       }
       win_themes: {
         Row: {
+          context_bundle: Json | null
           generated_at: string
           generated_by_user_id: string
           id: string
@@ -1809,6 +1810,7 @@ export type Database = {
           summary: string | null
         }
         Insert: {
+          context_bundle?: Json | null
           generated_at?: string
           generated_by_user_id: string
           id?: string
@@ -1818,6 +1820,7 @@ export type Database = {
           summary?: string | null
         }
         Update: {
+          context_bundle?: Json | null
           generated_at?: string
           generated_by_user_id?: string
           id?: string

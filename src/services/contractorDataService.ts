@@ -269,3 +269,43 @@ export async function correctCompanyNames(
     corrected_list: results,
   };
 }
+
+export async function fetchCompaniesHouseProfile(companyNumber: string) {
+  if (!companyNumber) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_COMPANIES_HOUSE_PROXY_URL}/company/${encodeURIComponent(companyNumber)}`
+    );
+
+    if (!response.ok) {
+      console.error("Companies House error", response.status, await response.text());
+      return {
+        error: true,
+        status: response.status,
+        message: "Failed to fetch Companies House data.",
+      };
+    }
+
+    const data = await response.json();
+
+    return {
+      error: false,
+      status: response.status,
+      company_number: data.company_number ?? null,
+      company_name: data.company_name ?? null,
+      company_status: data.company_status ?? null,
+      registered_office_address: data.registered_office_address ?? null,
+      sic_codes: Array.isArray(data.sic_codes) ? data.sic_codes : null,
+    };
+  } catch (err) {
+    console.error("Companies House fetch exception", err);
+    return {
+      error: true,
+      status: 0,
+      message: "Unexpected error contacting Companies House.",
+    };
+  }
+}

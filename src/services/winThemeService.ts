@@ -1,50 +1,61 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 
-type WinThemeTable = Database["public"]["Tables"]["win_themes"];
+export type WinThemeTable = Database["public"]["Tables"]["win_themes"];
 export type WinThemeRow = WinThemeTable["Row"];
+export type StrategySettings = WinThemeTable["Row"]["strategy_settings"];
 
-export type StrategySettings = Record<string, unknown>;
+type Json = Database["public"]["Enums"]["json"] extends never
+  ? WinThemeTable["Row"]["payload"]
+  : Database["public"]["Enums"]["json"];
 
-export interface CreateWinThemeParams {
-  opportunityId: string;
-  generatedByUserId: string;
-  strategySettings: StrategySettings;
-  payload: unknown;
-  summary: string;
-  contextBundle?: unknown;
+export interface WinThemeContextBundle {
+  opportunity?: unknown;
+  generated_mode?: string | null;
+  base_summary?: string | null;
+  companies_house?: {
+    error?: boolean;
+    status?: number;
+    message?: string;
+    company_number?: string | null;
+    company_name?: string | null;
+    company_status?: string | null;
+    registered_office_address?: unknown;
+    sic_codes?: string[] | null;
+  } | null;
+  brave?: unknown;
+}
+
+export interface CreateWinThemeInput {
+  opportunity_id: string;
+  generated_by_user_id: string;
+  strategy_settings: Json;
+  payload: Json;
+  summary?: string | null;
+  contextBundle?: WinThemeContextBundle | null;
 }
 
 export interface UpdateWinThemeParams {
   id: string;
-  payload: unknown;
-  summary: string;
+  payload: Json;
+  summary?: string | null;
 }
 
-export async function createWinTheme(params: CreateWinThemeParams) {
-  const {
-    opportunityId,
-    generatedByUserId,
-    strategySettings,
-    payload,
-    summary,
-    contextBundle,
-  } = params;
+export async function createWinTheme(input: CreateWinThemeInput) {
+  const { contextBundle, ...rest } = input;
 
-  const insertData: WinThemeTable["Insert"] = {
-    opportunity_id: opportunityId,
-    generated_by_user_id: generatedByUserId,
-    strategy_settings:
-      strategySettings as WinThemeTable["Insert"]["strategy_settings"],
-    payload: payload as WinThemeTable["Insert"]["payload"],
-    summary,
-    context_bundle:
-      (contextBundle ?? null) as WinThemeTable["Insert"]["context_bundle"],
+  const insert: WinThemeTable["Insert"] = {
+    opportunity_id: rest.opportunity_id,
+    generated_by_user_id: rest.generated_by_user_id,
+    strategy_settings: rest.strategy_settings,
+    payload: rest.payload,
+    summary: rest.summary ?? null,
+    context_bundle: (contextBundle ?? null) as WinThemeTable["Insert"]["context_bundle"],
   };
 
   const { data, error } = await supabase
     .from("win_themes")
-    .insert(insertData)
+    .insert(insert)
     .select("*")
     .single();
 
@@ -108,5 +119,5 @@ export async function getLatestWinThemeForOpportunity(opportunityId: string) {
     throw error;
   }
 
-  return data as WinThemeRow | null;
+  return (data ?? null) as WinThemeRow | null;
 }
