@@ -20,6 +20,10 @@ import {
   Briefcase,
   User,
   Radar,
+  Shield,
+  Code2,
+  BarChart3,
+  UserCog,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useState } from "react";
@@ -61,6 +65,10 @@ export function Layout({ children, variant = "default" }: LayoutProps) {
     { href: "/financials", icon: PoundSterling, label: "Financials" },
     { href: "/invoicing", icon: FileText, label: "Invoicing" },
     { href: "/absences/my", icon: CalendarIcon, label: "Absences" },
+    { href: "/health-and-safety", icon: Shield, label: "Health & Safety (Coming Soon)" },
+    { href: "/programming", icon: Code2, label: "Programming (Coming Soon)" },
+    { href: "/reporting", icon: BarChart3, label: "Reporting (Coming Soon)" },
+    { href: "/hr", icon: UserCog, label: "HR (Coming Soon)" },
     { href: "/archive", icon: Archive, label: "Archive" },
   ];
 
