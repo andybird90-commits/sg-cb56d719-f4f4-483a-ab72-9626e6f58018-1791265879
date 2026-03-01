@@ -55,8 +55,8 @@ export default function SignUpPage() {
         <CardHeader className="space-y-4">
           <div className="flex justify-center">
             <Image 
-              src="/RDME_Logo.png" 
-              alt="RD GROUP M&E" 
+              src="/conexaOF_logo.png" 
+              alt="ConexaOF" 
               width={400}
               height={100}
               priority

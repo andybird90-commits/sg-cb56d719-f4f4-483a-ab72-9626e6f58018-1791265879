@@ -32,6 +32,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useState } from "react";
 import React from "react";
+import Image from "next/image";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -120,16 +121,17 @@ export function Layout({ children, variant = "default" }: LayoutProps) {
     <div className="min-h-screen bg-background flex">
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex lg:flex-col w-64 border-r bg-card shadow-professional">
-        <div className="flex items-center justify-center h-20 border-b px-6">
-          <Link
-            href="/dashboard"
-            className="flex items-center justify-center transition-professional hover:opacity-80"
-          >
-            <div className="rounded-md px-3 py-2">
-              <span className="text-2xl font-black tracking-tight">
-                <span className="text-blue-500">D</span>
-                <span className="text-lime-400">T</span>
-              </span>
+        <div className="flex h-14 items-center border-b px-4">
+          <Link href="/dashboard" className="flex items-center gap-2">
+            <div className="relative h-6 w-32">
+              <Image
+                src="/conexaOF_logo.png"
+                alt="ConexaOF"
+                fill
+                sizes="128px"
+                className="object-contain"
+                priority
+              />
             </div>
           </Link>
         </div>
@@ -180,11 +182,15 @@ export function Layout({ children, variant = "default" }: LayoutProps) {
               href="/dashboard"
               className="flex items-center transition-professional hover:opacity-80"
             >
-              <div className="rounded-md px-3 py-1.5">
-                <span className="text-xl font-black tracking-tight">
-                  <span className="text-blue-500">D</span>
-                  <span className="text-lime-400">T</span>
-                </span>
+              <div className="relative h-8 w-32">
+                <Image
+                  src="/conexaOF_logo.png"
+                  alt="ConexaOF"
+                  fill
+                  sizes="128px"
+                  className="object-contain"
+                  priority
+                />
               </div>
             </Link>
 
