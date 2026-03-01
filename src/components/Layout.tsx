@@ -104,14 +104,16 @@ export function Layout({ children, variant = "default" }: LayoutProps) {
             href="/dashboard"
             className="flex items-center justify-center transition-professional hover:opacity-80"
           >
-            <Image
-              src="/RDME_Logo.png"
-              alt="RD GROUP M&E"
-              width={220}
-              height={60}
-              priority
-              className="h-10 w-auto object-contain"
-            />
+            <div className="bg-white rounded-md px-3 py-2 shadow-sm">
+              <Image
+                src="/RDME_Logo.png"
+                alt="RD GROUP M&E"
+                width={220}
+                height={60}
+                priority
+                className="h-8 w-auto object-contain"
+              />
+            </div>
           </Link>
         </div>
 
@@ -161,14 +163,16 @@ export function Layout({ children, variant = "default" }: LayoutProps) {
               href="/dashboard"
               className="flex items-center transition-professional hover:opacity-80"
             >
-              <Image
-                src="/RDME_Logo.png"
-                alt="RD GROUP M&E"
-                width={180}
-                height={45}
-                priority
-                className="h-9 w-auto object-contain"
-              />
+              <div className="bg-white rounded-md px-3 py-1.5 shadow-sm">
+                <Image
+                  src="/RDME_Logo.png"
+                  alt="RD GROUP M&E"
+                  width={180}
+                  height={45}
+                  priority
+                  className="h-7 w-auto object-contain"
+                />
+              </div>
             </Link>
 
             <div className="flex items-center gap-3">
