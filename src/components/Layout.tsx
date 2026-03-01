@@ -121,7 +121,7 @@ export function Layout({ children, variant = "default" }: LayoutProps) {
     <div className="min-h-screen bg-background flex">
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex lg:flex-col w-64 border-r bg-card shadow-professional">
-        <div className="flex h-14 items-center border-b px-4">
+        <div className="flex h-14 items-center justify-center border-b px-4">
           <Link href="/dashboard" className="flex items-center gap-2">
             <div className="relative h-6 w-32">
               <Image
