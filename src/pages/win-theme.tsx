@@ -5,7 +5,11 @@ import { Layout } from "@/components/Layout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import type { WinThemeRow } from "@/services/winThemeService";
-import { listWinThemesForOpportunity, updateWinTheme } from "@/services/winThemeService";
+import {
+  createWinTheme,
+  listWinThemesForOpportunity,
+  updateWinTheme,
+} from "@/services/winThemeService";
 import {
   Card,
   CardContent,
@@ -99,6 +103,15 @@ type CopyStateKey =
   | "executive"
   | "value_narrative";
 
+type GenerateMode = "generate" | "regenerate" | "clone";
+
+interface GenerateWinThemeResponse {
+  payload: WinThemePayload;
+  summary: string;
+  strategy_settings: StrategySettings;
+  context_bundle?: unknown;
+}
+
 function formatDate(dateString: string | null): string {
   if (!dateString) return "Unknown";
   const date = new Date(dateString);
@@ -149,6 +162,7 @@ function WinThemeWorkspaceContent() {
   );
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [generatingMode, setGeneratingMode] = useState<GenerateMode | null>(null);
 
   useEffect(() => {
     if (!profile) return;
@@ -308,6 +322,83 @@ function WinThemeWorkspaceContent() {
       setError("Failed to save changes to this strategy");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleGenerateWinTheme = async (mode: GenerateMode) => {
+    if (!profile?.id) {
+      setError("You must be signed in to generate a Win Theme.");
+      return;
+    }
+    if (!selectedOpportunity) {
+      setError("Select an opportunity first to generate a Win Theme.");
+      return;
+    }
+    if ((mode === "regenerate" || mode === "clone") && !selectedWinTheme) {
+      setError("There is no existing Win Theme to regenerate or clone.");
+      return;
+    }
+
+    try {
+      setGeneratingMode(mode);
+      setError(null);
+
+      const body: Record<string, unknown> = {
+        mode,
+        opportunity: {
+          id: selectedOpportunity.id,
+          name: selectedOpportunity.name,
+          project_reference: selectedOpportunity.project_reference,
+          company_name: selectedOpportunity.company_name,
+        },
+      };
+
+      if (selectedWinTheme && (mode === "regenerate" || mode === "clone")) {
+        (body as Record<string, unknown>).base = {
+          summary: selectedWinTheme.summary,
+          payload: selectedWinTheme.payload,
+        };
+      }
+
+      const response = await fetch("/api/win-theme/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const message = await response.text();
+        setError(message || "Failed to generate Win Theme.");
+        return;
+      }
+
+      const json = (await response.json()) as GenerateWinThemeResponse;
+
+      const created = await createWinTheme({
+        opportunityId: selectedOpportunity.id,
+        generatedByUserId: profile.id,
+        strategySettings: (json.strategy_settings ||
+          {}) as StrategySettings,
+        payload: json.payload,
+        summary: json.summary,
+      });
+
+      const themes = await listWinThemesForOpportunity(selectedOpportunity.id);
+      setSelectedWinThemes(themes);
+
+      const latest = themes[0] ?? created;
+      setSelectedWinTheme(latest);
+      const parsed = parsePayload(latest.payload);
+      setEditablePayload(parsed);
+      setIsEditing(false);
+
+      void loadLatestPerOpportunity();
+    } catch {
+      setError("Failed to generate Win Theme.");
+    } finally {
+      setGeneratingMode(null);
     }
   };
 
@@ -503,13 +594,70 @@ function WinThemeWorkspaceContent() {
                     )}
                   </div>
                   <div className="flex flex-wrap items-center gap-2 justify-end">
+                    {selectedOpportunity && (
+                      <>
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={
+                            !!generatingMode || loadingDetail || loading
+                          }
+                          onClick={() =>
+                            void handleGenerateWinTheme("generate")
+                          }
+                        >
+                          {generatingMode === "generate" && (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          )}
+                          {generatingMode === "generate"
+                            ? "Generating"
+                            : "Generate"}
+                        </Button>
+                        {selectedWinTheme && (
+                          <>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={!!generatingMode}
+                              onClick={() =>
+                                void handleGenerateWinTheme("regenerate")
+                              }
+                            >
+                              {generatingMode === "regenerate" && (
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              )}
+                              {generatingMode === "regenerate"
+                                ? "Regenerating"
+                                : "Regenerate"}
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={!!generatingMode}
+                              onClick={() =>
+                                void handleGenerateWinTheme("clone")
+                              }
+                            >
+                              {generatingMode === "clone" && (
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              )}
+                              {generatingMode === "clone" ? "Cloning" : "Clone"}
+                            </Button>
+                          </>
+                        )}
+                      </>
+                    )}
                     {selectedWinTheme && (
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        disabled={saving}
-                        onClick={isEditing ? handleCancelEditing : handleStartEditing}
+                        disabled={saving || !!generatingMode}
+                        onClick={
+                          isEditing ? handleCancelEditing : handleStartEditing
+                        }
                       >
                         {isEditing ? "Cancel edits" : "Edit strategy"}
                       </Button>
@@ -518,7 +666,7 @@ function WinThemeWorkspaceContent() {
                       <Button
                         type="button"
                         size="sm"
-                        disabled={saving}
+                        disabled={saving || !!generatingMode}
                         onClick={() => void handleSaveEdits()}
                       >
                         {saving && (

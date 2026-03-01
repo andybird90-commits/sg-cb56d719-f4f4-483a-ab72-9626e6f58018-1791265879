@@ -1,0 +1,226 @@
+import type { NextApiRequest, NextApiResponse } from "next";
+
+interface OpportunityInput {
+  id: string;
+  name: string;
+  project_reference?: string | null;
+  company_name?: string | null;
+}
+
+type GenerateMode = "generate" | "regenerate" | "clone";
+
+interface GenerateRequestBody {
+  mode: GenerateMode;
+  opportunity: OpportunityInput;
+  base?: {
+    summary?: string | null;
+    payload?: unknown;
+  } | null;
+}
+
+interface WinThemePayloadKeyMove {
+  title: string;
+  description: string;
+  timeframe?: string;
+  owner_hint?: string;
+}
+
+interface WinThemePayloadRisk {
+  risk: string;
+  likelihood?: string;
+  impact?: string;
+  mitigation_strategy: string;
+}
+
+interface WinThemePayloadProposalArchitecture {
+  recommended_structure: string;
+  must_hit_messages?: string[];
+  evidence_to_show?: string[];
+}
+
+interface WinThemePayloadStakeholderStrategy {
+  key_stakeholder_groups?: string[];
+  engagement_tactics?: string[];
+}
+
+interface WinThemePayloadTalkTracks {
+  meeting_openers?: string[];
+  email_subject_ideas?: string[];
+  email_hook_paragraph?: string;
+}
+
+interface WinThemePayload {
+  executive_win_theme: string;
+  client_context_insight: string;
+  value_narrative: string;
+  key_moves: WinThemePayloadKeyMove[];
+  risks_and_objections: WinThemePayloadRisk[];
+  proposal_architecture: WinThemePayloadProposalArchitecture;
+  stakeholder_strategy?: WinThemePayloadStakeholderStrategy;
+  talk_tracks_and_openers?: WinThemePayloadTalkTracks;
+  gaps_and_unknowns: string[];
+}
+
+interface StrategySettings {
+  mode: GenerateMode;
+  version: number;
+}
+
+interface GenerateWinThemeResponse {
+  payload: WinThemePayload;
+  summary: string;
+  strategy_settings: StrategySettings;
+  context_bundle?: unknown;
+}
+
+async function callOpenAIForWinTheme(
+  body: GenerateRequestBody,
+): Promise<GenerateWinThemeResponse> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY is not configured.");
+  }
+
+  const systemPrompt =
+    "You are a senior bid strategist creating concise, evidence-based win themes for MEP design opportunities. " +
+    "Return ONLY JSON matching the requested schema. Do not include explanations or markdown.";
+
+  const userPrompt = [
+    "Generate a win theme strategy JSON for the following opportunity.",
+    "",
+    "Opportunity context:",
+    JSON.stringify(body.opportunity),
+    "",
+    body.base
+      ? "Previous or base strategy (may be empty): " +
+        JSON.stringify(body.base)
+      : "No previous strategy provided.",
+    "",
+    "Mode: " + body.mode,
+    "",
+    "Return JSON with this exact structure:",
+    `{
+  "executive_win_theme": string,
+  "client_context_insight": string,
+  "value_narrative": string,
+  "key_moves": [
+    {
+      "title": string,
+      "description": string,
+      "timeframe"?: string,
+      "owner_hint"?: string
+    }
+  ],
+  "risks_and_objections": [
+    {
+      "risk": string,
+      "likelihood"?: string,
+      "impact"?: string,
+      "mitigation_strategy": string
+    }
+  ],
+  "proposal_architecture": {
+    "recommended_structure": string,
+    "must_hit_messages"?: string[],
+    "evidence_to_show"?: string[]
+  },
+  "stakeholder_strategy"?: {
+    "key_stakeholder_groups"?: string[],
+    "engagement_tactics"?: string[]
+  },
+  "talk_tracks_and_openers"?: {
+    "meeting_openers"?: string[],
+    "email_subject_ideas"?: string[],
+    "email_hook_paragraph"?: string
+  },
+  "gaps_and_unknowns": string[]
+}`,
+  ].join("\n");
+
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "gpt-4.1-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      response_format: { type: "json_object" },
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(
+      `OpenAI API error: ${response.status} ${response.statusText} - ${text}`,
+    );
+  }
+
+  const json = (await response.json()) as {
+    choices?: { message?: { content?: string } }[];
+  };
+
+  const content = json.choices?.[0]?.message?.content;
+  if (!content) {
+    throw new Error("OpenAI response was empty.");
+  }
+
+  let payload: WinThemePayload;
+  try {
+    payload = JSON.parse(content) as WinThemePayload;
+  } catch (error) {
+    throw new Error("Failed to parse OpenAI JSON response.");
+  }
+
+  const strategy_settings: StrategySettings = {
+    mode: body.mode,
+    version: 1,
+  };
+
+  const summary = payload.executive_win_theme;
+
+  const context_bundle = {
+    opportunity: body.opportunity,
+    base_summary: body.base?.summary ?? null,
+    generated_mode: body.mode,
+  };
+
+  return {
+    payload,
+    summary,
+    strategy_settings,
+    context_bundle,
+  };
+}
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse,
+): Promise<void> {
+  if (req.method !== "POST") {
+    res.setHeader("Allow", "POST");
+    res.status(405).send("Method Not Allowed");
+    return;
+  }
+
+  try {
+    const body = req.body as GenerateRequestBody;
+
+    if (!body || !body.opportunity || !body.mode) {
+      res.status(400).send("Missing required fields: mode and opportunity.");
+      return;
+    }
+
+    const result = await callOpenAIForWinTheme(body);
+
+    res.status(200).json(result);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unknown error generating win theme.";
+    res.status(500).send(message);
+  }
+}
