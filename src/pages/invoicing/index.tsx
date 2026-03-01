@@ -987,7 +987,7 @@ export default function InvoicingPage() {
 
   return (
     <RequireAuth>
-      <Layout variant="wide">
+      <Layout>
         <div className="space-y-6">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Invoicing</h1>

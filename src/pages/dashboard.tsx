@@ -891,7 +891,7 @@ function DashboardContent() {
 
   return (
     <Layout>
-      <div className="space-y-8">
+      <div className="space-y-6">
         <div className="p-8">
           <div className="mb-8">
             <div className="flex items-center justify-between mb-2">
@@ -1591,10 +1591,12 @@ function DashboardContent() {
   );
 }
 
-export default function Dashboard() {
+const DashboardPage = () => {
   return (
     <RequireAuth>
       <DashboardContent />
     </RequireAuth>
   );
-}
+};
+
+export default DashboardPage;
