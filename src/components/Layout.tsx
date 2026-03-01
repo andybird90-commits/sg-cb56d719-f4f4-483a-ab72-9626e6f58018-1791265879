@@ -22,7 +22,6 @@ import {
   Radar,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import Image from "next/image";
 import { useState } from "react";
 import React from "react";
 
@@ -104,15 +103,11 @@ export function Layout({ children, variant = "default" }: LayoutProps) {
             href="/dashboard"
             className="flex items-center justify-center transition-professional hover:opacity-80"
           >
-            <div className="rounded-md px-3 py-2 bg-white">
-              <Image
-                src="/RDME_Logo.png"
-                alt="RD GROUP M&E"
-                width={220}
-                height={60}
-                priority
-                className="h-8 w-auto object-contain"
-              />
+            <div className="rounded-md px-3 py-2">
+              <span className="text-2xl font-black tracking-tight">
+                <span className="text-blue-400">D</span>
+                <span className="text-lime-400">T</span>
+              </span>
             </div>
           </Link>
         </div>
@@ -163,15 +158,11 @@ export function Layout({ children, variant = "default" }: LayoutProps) {
               href="/dashboard"
               className="flex items-center transition-professional hover:opacity-80"
             >
-              <div className="rounded-md px-3 py-1.5 bg-white">
-                <Image
-                  src="/RDME_Logo.png"
-                  alt="RD GROUP M&E"
-                  width={180}
-                  height={45}
-                  priority
-                  className="h-7 w-auto object-contain"
-                />
+              <div className="rounded-md px-3 py-1.5">
+                <span className="text-xl font-black tracking-tight">
+                  <span className="text-blue-400">D</span>
+                  <span className="text-lime-400">T</span>
+                </span>
               </div>
             </Link>
 
