@@ -20,7 +20,7 @@ import {
   Briefcase,
   User,
   Shield,
-  Code2,
+  GanttChart,
   BarChart3,
   UserCog,
 } from "lucide-react";
@@ -64,7 +64,7 @@ export function Layout({ children, variant = "default" }: LayoutProps) {
     { href: "/invoicing", icon: FileText, label: "Invoicing" },
     { href: "/absences/my", icon: CalendarIcon, label: "Absences" },
     { href: "/health-and-safety", icon: Shield, label: "Health & Safety (Coming Soon)" },
-    { href: "/programming", icon: Code2, label: "Programming (Coming Soon)" },
+    { href: "/programming", icon: GanttChart, label: "Programming (Coming Soon)" },
     { href: "/reporting", icon: BarChart3, label: "Reporting (Coming Soon)" },
     { href: "/hr", icon: UserCog, label: "HR (Coming Soon)" },
     { href: "/archive", icon: Archive, label: "Archive" },
@@ -91,9 +91,9 @@ export function Layout({ children, variant = "default" }: LayoutProps) {
         <Button
           variant={isActive ? "default" : "ghost"}
           size="sm"
-          className="w-full justify-start gap-3 btn-professional"
+          className="w-full justify-start gap-3 px-3 py-2 text-sm text-left whitespace-normal btn-professional"
         >
-          <Icon className="w-4 h-4" />
+          <Icon className="w-4 h-4 flex-shrink-0" />
           <span className="font-medium">{label}</span>
         </Button>
       </Link>

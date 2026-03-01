@@ -1,7 +1,7 @@
 import { RequireAuth } from "@/components/RequireAuth";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Code2 } from "lucide-react";
+import { GanttChart } from "lucide-react";
 
 function ProgrammingContent() {
   return (
@@ -10,7 +10,7 @@ function ProgrammingContent() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Code2 className="w-5 h-5 text-sky-500" />
+              <GanttChart className="w-5 h-5 text-sky-500" />
               <span>Programming</span>
             </CardTitle>
           </CardHeader>
