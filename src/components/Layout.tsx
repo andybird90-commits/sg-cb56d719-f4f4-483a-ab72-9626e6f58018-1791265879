@@ -57,6 +57,7 @@ export function Layout({ children, variant = "default" }: LayoutProps) {
     { href: "/companies", icon: Building2, label: "Companies" },
     { href: "/contacts", icon: Users, label: "Contacts" },
     { href: "/opportunities", icon: Target, label: "Opportunities" },
+    { href: "/win-theme", icon: Target, label: "Win Theme (Coming Soon)" },
     { href: "/projects", icon: Briefcase, label: "Projects" },
     { href: "/calendar", icon: CalendarIcon, label: "Calendar" },
     { href: "/timesheets/my", icon: Clock, label: "Timesheets" },
