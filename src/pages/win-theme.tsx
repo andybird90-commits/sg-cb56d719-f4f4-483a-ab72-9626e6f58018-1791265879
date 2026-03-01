@@ -41,6 +41,7 @@ interface OpportunitySummary {
   name: string;
   project_reference: string | null;
   company_name: string | null;
+  company_number: string | null;
 }
 
 interface WinThemePayloadKeyMove {
@@ -84,6 +85,27 @@ interface WinThemePayload {
   stakeholder_strategy?: WinThemePayloadStakeholderStrategy;
   talk_tracks_and_openers?: WinThemePayloadTalkTracks;
   gaps_and_unknowns: string[];
+}
+
+interface CompaniesHouseSource {
+  error?: boolean;
+  message?: string;
+  status?: number;
+  company_number?: string;
+  company_name?: string;
+  company_status?: string;
+  date_of_creation?: string;
+  registered_office_address?:
+    | {
+        [key: string]: unknown;
+      }
+    | null;
+  sic_codes?: string[] | null;
+}
+
+interface WinThemeContextBundle {
+  companies_house?: CompaniesHouseSource | null;
+  [key: string]: unknown;
 }
 
 type WinThemeWithJoinedOpportunity = WinThemeRow & {
@@ -147,7 +169,8 @@ async function fetchOpportunitySummary(
         name,
         project_reference,
         companies:companies!opportunities_company_id_fkey(
-          name
+          name,
+          company_number
         )
       `,
     )
@@ -164,12 +187,15 @@ async function fetchOpportunitySummary(
 
   const companyName =
     ((data as any).companies?.name as string | undefined) || null;
+  const companyNumber =
+    ((data as any).companies?.company_number as string | undefined) || null;
 
   return {
     id: data.id,
     name: data.name || "Unknown opportunity",
     project_reference: (data as any).project_reference ?? null,
     company_name: companyName,
+    company_number: companyNumber,
   };
 }
 
@@ -293,6 +319,14 @@ function WinThemeWorkspaceContent() {
         (row.opportunities as any)?.companies?.name ||
         (row as any)?.opportunities?.companies?.name ||
         null,
+      company_number:
+        ((row.opportunities as any)?.companies?.company_number as
+          | string
+          | undefined) ||
+        ((row as any)?.opportunities?.companies?.company_number as
+          | string
+          | undefined) ||
+        null,
     };
     setSelectedOpportunity(summary);
 
@@ -396,6 +430,7 @@ function WinThemeWorkspaceContent() {
           name: selectedOpportunity.name,
           project_reference: selectedOpportunity.project_reference,
           company_name: selectedOpportunity.company_name,
+          company_number: selectedOpportunity.company_number,
         },
       };
 
@@ -429,6 +464,7 @@ function WinThemeWorkspaceContent() {
           {}) as StrategySettings,
         payload: json.payload,
         summary: json.summary,
+        contextBundle: json.context_bundle,
       });
 
       const themes = await listWinThemesForOpportunity(selectedOpportunity.id);
@@ -486,9 +522,38 @@ function WinThemeWorkspaceContent() {
 
   const payloadToDisplay = isEditing ? editablePayload : currentPayload;
 
-  const contextBundle = selectedWinTheme
-    ? ((selectedWinTheme as any).context_bundle as unknown)
+  const contextBundle: WinThemeContextBundle | null = selectedWinTheme
+    ? ((selectedWinTheme as any)
+        .context_bundle as WinThemeContextBundle | null)
     : null;
+
+  const companiesHouse = contextBundle?.companies_house ?? null;
+
+  const companiesHouseAddressLines: string[] | null =
+    companiesHouse &&
+    companiesHouse.registered_office_address &&
+    typeof companiesHouse.registered_office_address === "object"
+      ? (() => {
+          const addr = companiesHouse
+            .registered_office_address as Record<string, unknown>;
+          const keys = [
+            "address_line_1",
+            "address_line_2",
+            "locality",
+            "region",
+            "postal_code",
+            "country",
+          ];
+          const parts: string[] = [];
+          for (const key of keys) {
+            const value = addr[key];
+            if (typeof value === "string" && value.trim()) {
+              parts.push(value.trim());
+            }
+          }
+          return parts;
+        })()
+      : null;
 
   return (
     <Layout>
@@ -1271,20 +1336,85 @@ function WinThemeWorkspaceContent() {
                         <h3 className="text-sm font-semibold">
                           Sources and context
                         </h3>
-                        {contextBundle ? (
-                          <div className="space-y-2">
-                            <p className="text-xs text-muted-foreground">
-                              Context bundle used when generating this strategy.
-                              This is surfaced for auditability, not for styling.
+                        {companiesHouse ? (
+                          companiesHouse.error ? (
+                            <p className="text-sm text-muted-foreground">
+                              Companies House data could not be loaded{" "}
+                              {companiesHouse.status
+                                ? `(status ${companiesHouse.status})`
+                                : null}
+                              .{" "}
+                              {companiesHouse.message ||
+                                "Try again when the service is available."}
                             </p>
-                            <div className="rounded-md border bg-muted/40 p-2 text-xs font-mono whitespace-pre-wrap max-h-60 overflow-auto">
-                              {JSON.stringify(contextBundle, null, 2)}
+                          ) : (
+                            <div className="space-y-3">
+                              <div>
+                                <p className="text-sm font-medium">
+                                  {companiesHouse.company_name ||
+                                    selectedOpportunity?.company_name ||
+                                    "Company"}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {companiesHouse.company_number
+                                    ? `Company no. ${companiesHouse.company_number}`
+                                    : "Company number not available"}
+                                </p>
+                                {companiesHouse.company_status && (
+                                  <p className="text-xs text-muted-foreground">
+                                    Status: {companiesHouse.company_status}
+                                  </p>
+                                )}
+                                {companiesHouse.date_of_creation && (
+                                  <p className="text-xs text-muted-foreground">
+                                    Incorporated:{" "}
+                                    {formatDate(
+                                      companiesHouse.date_of_creation,
+                                    )}
+                                  </p>
+                                )}
+                              </div>
+
+                              {companiesHouseAddressLines &&
+                                companiesHouseAddressLines.length > 0 && (
+                                  <div>
+                                    <h4 className="text-xs font-medium text-muted-foreground">
+                                      Registered office address
+                                    </h4>
+                                    <p className="text-xs leading-relaxed">
+                                      {companiesHouseAddressLines.join(", ")}
+                                    </p>
+                                  </div>
+                                )}
+
+                              {companiesHouse.sic_codes &&
+                                companiesHouse.sic_codes.length > 0 && (
+                                  <div className="space-y-1">
+                                    <h4 className="text-xs font-medium text-muted-foreground">
+                                      SIC codes
+                                    </h4>
+                                    <div className="flex flex-wrap gap-1">
+                                      {companiesHouse.sic_codes.map(
+                                        (code) => (
+                                          <Badge
+                                            key={code}
+                                            variant="outline"
+                                            className="text-[10px] px-1.5 py-0 h-5"
+                                          >
+                                            {code}
+                                          </Badge>
+                                        ),
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
                             </div>
-                          </div>
+                          )
                         ) : (
                           <p className="text-sm text-muted-foreground">
                             No source data is stored for this Win Theme yet. It
-                            was generated using the information available in Conexa
+                            was generated using the information available in
+                            Conexa
                             for this opportunity.
                           </p>
                         )}

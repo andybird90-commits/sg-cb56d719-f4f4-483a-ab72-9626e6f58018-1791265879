@@ -5,6 +5,7 @@ interface OpportunityInput {
   name: string;
   project_reference?: string | null;
   company_name?: string | null;
+  company_number?: string | null;
 }
 
 type GenerateMode = "generate" | "regenerate" | "clone";
@@ -12,10 +13,12 @@ type GenerateMode = "generate" | "regenerate" | "clone";
 interface GenerateRequestBody {
   mode: GenerateMode;
   opportunity: OpportunityInput;
-  base?: {
-    summary?: string | null;
-    payload?: unknown;
-  } | null;
+  base?:
+    | {
+        summary?: string | null;
+        payload?: unknown;
+      }
+    | null;
 }
 
 interface WinThemePayloadKeyMove {
@@ -66,11 +69,99 @@ interface StrategySettings {
   version: number;
 }
 
+interface CompaniesHouseSource {
+  error?: boolean;
+  message?: string;
+  status?: number;
+  company_number?: string;
+  company_name?: string;
+  company_status?: string;
+  date_of_creation?: string;
+  registered_office_address?:
+    | {
+        [key: string]: unknown;
+      }
+    | null;
+  sic_codes?: string[] | null;
+}
+
 interface GenerateWinThemeResponse {
   payload: WinThemePayload;
   summary: string;
   strategy_settings: StrategySettings;
-  context_bundle?: unknown;
+  context_bundle?: {
+    opportunity: OpportunityInput;
+    base_summary: string | null;
+    generated_mode: GenerateMode;
+    companies_house: CompaniesHouseSource | null;
+  };
+}
+
+async function fetchCompaniesHouseData(
+  companyNumber: string | null | undefined,
+): Promise<CompaniesHouseSource | null> {
+  if (!companyNumber || companyNumber.trim() === "") {
+    return null;
+  }
+
+  const apiKey = process.env.NEXT_PUBLIC_COMPANIES_HOUSE_API_KEY;
+  if (!apiKey) {
+    return {
+      error: true,
+      message: "Companies House API key is not configured.",
+    };
+  }
+
+  const authHeader = Buffer.from(`${apiKey}:`).toString("base64");
+
+  try {
+    const response = await fetch(
+      `https://api.company-information.service.gov.uk/company/${encodeURIComponent(
+        companyNumber,
+      )}`,
+      {
+        headers: {
+          Authorization: `Basic ${authHeader}`,
+        },
+      },
+    );
+
+    if (!response.ok) {
+      return {
+        error: true,
+        status: response.status,
+        message: `Companies House API error ${response.status}`,
+        company_number: companyNumber,
+      };
+    }
+
+    const json = (await response.json()) as Record<string, unknown>;
+    const registeredOffice =
+      (json.registered_office_address as {
+        [key: string]: unknown;
+      } | null) ?? null;
+    const sicCodes = (json.sic_codes as string[] | undefined) ?? null;
+
+    return {
+      company_number:
+        (json.company_number as string | undefined) ?? companyNumber,
+      company_name: (json.company_name as string | undefined) ?? null,
+      company_status: (json.company_status as string | undefined) ?? null,
+      date_of_creation:
+        (json.date_of_creation as string | undefined) ?? null,
+      registered_office_address: registeredOffice,
+      sic_codes: sicCodes,
+    };
+  } catch (error) {
+    return {
+      error: true,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Unexpected error calling Companies House.",
+      company_number: companyNumber,
+    };
+  }
 }
 
 async function callOpenAIForWinTheme(
@@ -80,6 +171,10 @@ async function callOpenAIForWinTheme(
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY is not configured.");
   }
+
+  const companiesHouse = await fetchCompaniesHouseData(
+    body.opportunity.company_number ?? null,
+  );
 
   const systemPrompt =
     "You are a senior bid strategist creating concise, evidence-based win themes for MEP design opportunities. " +
@@ -95,6 +190,13 @@ async function callOpenAIForWinTheme(
       ? "Previous or base strategy (may be empty): " +
         JSON.stringify(body.base)
       : "No previous strategy provided.",
+    "",
+    "Additional context from Companies House (if available):",
+    JSON.stringify(
+      companiesHouse ?? {
+        note: "No Companies House data available for this opportunity.",
+      },
+    ),
     "",
     "Mode: " + body.mode,
     "",
@@ -172,7 +274,7 @@ async function callOpenAIForWinTheme(
   let payload: WinThemePayload;
   try {
     payload = JSON.parse(content) as WinThemePayload;
-  } catch (error) {
+  } catch {
     throw new Error("Failed to parse OpenAI JSON response.");
   }
 
@@ -187,6 +289,7 @@ async function callOpenAIForWinTheme(
     opportunity: body.opportunity,
     base_summary: body.base?.summary ?? null,
     generated_mode: body.mode,
+    companies_house: companiesHouse,
   };
 
   return {
@@ -220,7 +323,9 @@ export default async function handler(
     res.status(200).json(result);
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Unknown error generating win theme.";
+      error instanceof Error
+        ? error.message
+        : "Unknown error generating win theme.";
     res.status(500).send(message);
   }
 }

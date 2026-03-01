@@ -12,6 +12,7 @@ export interface CreateWinThemeParams {
   strategySettings: StrategySettings;
   payload: unknown;
   summary: string;
+  contextBundle?: unknown;
 }
 
 export interface UpdateWinThemeParams {
@@ -21,14 +22,24 @@ export interface UpdateWinThemeParams {
 }
 
 export async function createWinTheme(params: CreateWinThemeParams) {
-  const { opportunityId, generatedByUserId, strategySettings, payload, summary } = params;
+  const {
+    opportunityId,
+    generatedByUserId,
+    strategySettings,
+    payload,
+    summary,
+    contextBundle,
+  } = params;
 
   const insertData: WinThemeTable["Insert"] = {
     opportunity_id: opportunityId,
     generated_by_user_id: generatedByUserId,
-    strategy_settings: strategySettings as WinThemeTable["Insert"]["strategy_settings"],
+    strategy_settings:
+      strategySettings as WinThemeTable["Insert"]["strategy_settings"],
     payload: payload as WinThemeTable["Insert"]["payload"],
     summary,
+    context_bundle:
+      (contextBundle ?? null) as WinThemeTable["Insert"]["context_bundle"],
   };
 
   const { data, error } = await supabase
