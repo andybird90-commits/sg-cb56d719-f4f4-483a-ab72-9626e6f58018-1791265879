@@ -153,7 +153,7 @@ export function Layout({ children, variant = "default" }: LayoutProps) {
 
       {/* Desktop Navigation */}
       <nav className="hidden lg:block border-b bg-card shadow-professional backdrop-blur-sm bg-card/95 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-8">
+        <div className="container">
           <div className="flex justify-between h-20 items-center">
             <div className="flex items-center gap-12">
               <Link href="/dashboard" className="flex items-center transition-professional hover:opacity-80">
@@ -202,14 +202,6 @@ export function Layout({ children, variant = "default" }: LayoutProps) {
                 <span className="font-medium">Sign Out</span>
               </Button>
             </div>
-          </div>
-        </div>
-      </nav>
-
-      {/* Navigation */}
-      <nav className="border-b bg-background">
-        <div className="container mx-auto px-4">
-          <div className="flex h-16 items-center justify-center gap-6">
           </div>
         </div>
       </nav>
