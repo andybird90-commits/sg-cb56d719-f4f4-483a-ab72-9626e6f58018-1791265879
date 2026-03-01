@@ -1798,6 +1798,51 @@ export type Database = {
           },
         ]
       }
+      win_themes: {
+        Row: {
+          generated_at: string
+          generated_by_user_id: string
+          id: string
+          opportunity_id: string
+          payload: Json
+          strategy_settings: Json
+          summary: string | null
+        }
+        Insert: {
+          generated_at?: string
+          generated_by_user_id: string
+          id?: string
+          opportunity_id: string
+          payload: Json
+          strategy_settings: Json
+          summary?: string | null
+        }
+        Update: {
+          generated_at?: string
+          generated_by_user_id?: string
+          id?: string
+          opportunity_id?: string
+          payload?: Json
+          strategy_settings?: Json
+          summary?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "win_themes_generated_by_user_id_fkey"
+            columns: ["generated_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "win_themes_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       me_contractor_radar_view: {

@@ -1,28 +1,1144 @@
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/router";
 import { RequireAuth } from "@/components/RequireAuth";
 import { Layout } from "@/components/Layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Target, ArrowRight } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
+import type { WinThemeRow } from "@/services/winThemeService";
+import { listWinThemesForOpportunity, updateWinTheme } from "@/services/winThemeService";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  ArrowRight,
+  Clipboard,
+  ClipboardCheck,
+  Loader2,
+  Target,
+} from "lucide-react";
 
-function WinThemeContent() {
+interface OpportunitySummary {
+  id: string;
+  name: string;
+  project_reference: string | null;
+  company_name: string | null;
+}
+
+interface WinThemePayloadKeyMove {
+  title: string;
+  description: string;
+  timeframe?: string;
+  owner_hint?: string;
+}
+
+interface WinThemePayloadRisk {
+  risk: string;
+  likelihood?: string;
+  impact?: string;
+  mitigation_strategy: string;
+}
+
+interface WinThemePayloadProposalArchitecture {
+  recommended_structure: string;
+  must_hit_messages?: string[];
+  evidence_to_show?: string[];
+}
+
+interface WinThemePayloadStakeholderStrategy {
+  key_stakeholder_groups?: string[];
+  engagement_tactics?: string[];
+}
+
+interface WinThemePayloadTalkTracks {
+  meeting_openers?: string[];
+  email_subject_ideas?: string[];
+  email_hook_paragraph?: string;
+}
+
+interface WinThemePayload {
+  executive_win_theme: string;
+  client_context_insight: string;
+  value_narrative: string;
+  key_moves: WinThemePayloadKeyMove[];
+  risks_and_objections: WinThemePayloadRisk[];
+  proposal_architecture: WinThemePayloadProposalArchitecture;
+  stakeholder_strategy?: WinThemePayloadStakeholderStrategy;
+  talk_tracks_and_openers?: WinThemePayloadTalkTracks;
+  gaps_and_unknowns: string[];
+}
+
+interface WinThemeWithOpportunity extends WinThemeRow {
+  opportunities?: OpportunitySummary;
+}
+
+type CopyStateKey =
+  | "email_hook"
+  | "talk_tracks"
+  | "executive"
+  | "value_narrative";
+
+function formatDate(dateString: string | null): string {
+  if (!dateString) return "Unknown";
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return "Unknown";
+  return date.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function parsePayload(payload: unknown): WinThemePayload | null {
+  if (!payload || typeof payload !== "object") return null;
+  const obj = payload as Record<string, unknown>;
+  if (
+    typeof obj.executive_win_theme !== "string" ||
+    typeof obj.client_context_insight !== "string" ||
+    typeof obj.value_narrative !== "string"
+  ) {
+    return null;
+  }
+  return obj as unknown as WinThemePayload;
+}
+
+function WinThemeWorkspaceContent() {
+  const { profile } = useAuth();
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [latestByOpportunity, setLatestByOpportunity] = useState<
+    WinThemeWithOpportunity[]
+  >([]);
+  const [selectedOpportunity, setSelectedOpportunity] =
+    useState<OpportunitySummary | null>(null);
+  const [selectedWinThemes, setSelectedWinThemes] = useState<WinThemeRow[]>([]);
+  const [selectedWinTheme, setSelectedWinTheme] =
+    useState<WinThemeRow | null>(null);
+
+  const [editablePayload, setEditablePayload] =
+    useState<WinThemePayload | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const [copyState, setCopyState] = useState<Partial<Record<CopyStateKey, boolean>>>(
+    {},
+  );
+
+  const [searchTerm, setSearchTerm] = useState("");
+
+  useEffect(() => {
+    if (!profile) return;
+    void loadLatestPerOpportunity();
+  }, [profile]);
+
+  const loadLatestPerOpportunity = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const { data, error: queryError } = await supabase
+        .from("win_themes")
+        .select(
+          `
+          *,
+          opportunities:opportunities!win_themes_opportunity_id_fkey(
+            id,
+            name,
+            project_reference,
+            companies:companies!opportunities_company_id_fkey(
+              name
+            )
+          )
+        `,
+        )
+        .order("generated_at", { ascending: false });
+
+      if (queryError) {
+        throw queryError;
+      }
+
+      const rows = (data || []) as Array<WinThemeWithOpportunity>;
+
+      const map = new Map<string, WinThemeWithOpportunity>();
+      for (const row of rows) {
+        if (!row.opportunity_id) continue;
+        if (!map.has(row.opportunity_id)) {
+          map.set(row.opportunity_id, row);
+        }
+      }
+
+      const list = Array.from(map.values());
+      setLatestByOpportunity(list);
+
+      const opportunityIdFromQuery =
+        typeof router.query.opportunity_id === "string"
+          ? router.query.opportunity_id
+          : undefined;
+
+      if (opportunityIdFromQuery) {
+        const match = list.find(
+          (item) => item.opportunity_id === opportunityIdFromQuery,
+        );
+        if (match) {
+          void handleSelectOpportunity(match);
+        }
+      } else if (list.length > 0) {
+        void handleSelectOpportunity(list[0]);
+      }
+
+      setLoading(false);
+    } catch (err) {
+      setError("Failed to load Win Themes");
+      setLoading(false);
+    }
+  };
+
+  const handleSelectOpportunity = async (row: WinThemeWithOpportunity) => {
+    if (!row.opportunity_id) return;
+
+    setLoadingDetail(true);
+    setError(null);
+    setIsEditing(false);
+    setEditablePayload(null);
+
+    const summary: OpportunitySummary = {
+      id: row.opportunity_id,
+      name: row.opportunities?.name || "Unknown opportunity",
+      project_reference: row.opportunities?.project_reference || null,
+      company_name:
+        (row.opportunities as any)?.companies?.name ||
+        (row as any)?.opportunities?.companies?.name ||
+        null,
+    };
+    setSelectedOpportunity(summary);
+
+    try {
+      const themes = await listWinThemesForOpportunity(row.opportunity_id);
+      setSelectedWinThemes(themes);
+
+      if (themes.length > 0) {
+        const latest = themes[0];
+        setSelectedWinTheme(latest);
+        const parsed = parsePayload(latest.payload);
+        setEditablePayload(parsed);
+      } else {
+        setSelectedWinTheme(null);
+        setEditablePayload(null);
+      }
+    } catch (err) {
+      setError("Failed to load strategies for this opportunity");
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
+  const handleSelectWinTheme = (theme: WinThemeRow) => {
+    setSelectedWinTheme(theme);
+    const parsed = parsePayload(theme.payload);
+    setEditablePayload(parsed);
+    setIsEditing(false);
+  };
+
+  const handleStartEditing = () => {
+    if (!selectedWinTheme) return;
+    const parsed = parsePayload(selectedWinTheme.payload);
+    if (!parsed) {
+      setError("Cannot edit this strategy because the payload is invalid");
+      return;
+    }
+    setEditablePayload(parsed);
+    setIsEditing(true);
+  };
+
+  const handleCancelEditing = () => {
+    if (!selectedWinTheme) {
+      setIsEditing(false);
+      setEditablePayload(null);
+      return;
+    }
+    const parsed = parsePayload(selectedWinTheme.payload);
+    setEditablePayload(parsed);
+    setIsEditing(false);
+  };
+
+  const handleSaveEdits = async () => {
+    if (!selectedWinTheme || !editablePayload) return;
+    setSaving(true);
+    setError(null);
+
+    try {
+      const summary = editablePayload.executive_win_theme;
+      const updated = await updateWinTheme({
+        id: selectedWinTheme.id,
+        payload: editablePayload,
+        summary,
+      });
+
+      const newList = selectedWinThemes.map((t) =>
+        t.id === updated.id ? updated : t,
+      );
+      setSelectedWinThemes(newList);
+      setSelectedWinTheme(updated);
+      setIsEditing(false);
+    } catch (err) {
+      setError("Failed to save changes to this strategy");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCopy = async (key: CopyStateKey, text: string | undefined) => {
+    if (!text) return;
+    if (typeof navigator === "undefined" || !navigator.clipboard) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyState((prev) => ({ ...prev, [key]: true }));
+      setTimeout(() => {
+        setCopyState((prev) => ({ ...prev, [key]: false }));
+      }, 1500);
+    } catch {
+      setCopyState((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const filteredLatest = useMemo(() => {
+    if (!searchTerm.trim()) return latestByOpportunity;
+    const term = searchTerm.toLowerCase();
+    return latestByOpportunity.filter((item) => {
+      const oppName = item.opportunities?.name?.toLowerCase() || "";
+      const companyName =
+        ((item as any).opportunities?.companies?.name as string | undefined)?.toLowerCase() ||
+        "";
+      const summary = (item.summary || "").toLowerCase();
+      return (
+        oppName.includes(term) ||
+        companyName.includes(term) ||
+        summary.includes(term)
+      );
+    });
+  }, [latestByOpportunity, searchTerm]);
+
+  const currentPayload = useMemo(
+    () => (selectedWinTheme ? parsePayload(selectedWinTheme.payload) : null),
+    [selectedWinTheme],
+  );
+
+  const payloadToDisplay = isEditing ? editablePayload : currentPayload;
+
+  const contextBundle = selectedWinTheme
+    ? ((selectedWinTheme as any).context_bundle as unknown)
+    : null;
+
   return (
     <Layout>
       <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight flex items-center gap-2">
               <span className="relative inline-flex items-center justify-center">
                 <Target className="w-5 h-5 text-amber-500" />
                 <ArrowRight className="w-3 h-3 text-amber-500 absolute" />
               </span>
-              <span>Win Theme</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              This area is coming soon. Win theme tools, templates, and workflows will appear here.
+              <span>Win Theme workspace</span>
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Evidence-based bid and account strategies, per opportunity. This
+              is the strategy behind the proposal, not the proposal itself.
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)] gap-4 lg:gap-6">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">
+                Opportunities with Win Themes
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Input
+                placeholder="Filter by opportunity, company, or summary"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-9 text-sm"
+              />
+
+              {loading && (
+                <div className="flex items-center justify-center py-6 text-sm text-muted-foreground">
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Loading Win Themes
+                </div>
+              )}
+
+              {!loading && filteredLatest.length === 0 && (
+                <p className="text-xs text-muted-foreground py-4">
+                  No Win Themes found yet. Generate a strategy from an
+                  opportunity to see it here.
+                </p>
+              )}
+
+              {!loading && filteredLatest.length > 0 && (
+                <ScrollArea className="h-[360px] pr-2">
+                  <div className="space-y-2">
+                    {filteredLatest.map((item) => {
+                      const opportunity = item.opportunities;
+                      const isActive =
+                        selectedOpportunity?.id === item.opportunity_id;
+                      const summaryText = item.summary || "";
+                      const dateLabel = formatDate(
+                        (item as any).generated_at || null,
+                      );
+                      const companyName =
+                        ((item as any).opportunities?.companies?.name as
+                          | string
+                          | undefined) || null;
+
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => void handleSelectOpportunity(item)}
+                          className={`w-full text-left rounded-md border px-3 py-2 transition-colors ${
+                            isActive
+                              ? "border-amber-500 bg-amber-500/10"
+                              : "border-border hover:bg-muted"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <div className="font-medium truncate text-sm">
+                                  {opportunity?.name || "Unknown opportunity"}
+                                </div>
+                                {companyName && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] px-1.5 py-0 h-5"
+                                  >
+                                    {companyName}
+                                  </Badge>
+                                )}
+                              </div>
+                              {opportunity?.project_reference && (
+                                <div className="text-[11px] text-muted-foreground font-mono mt-0.5">
+                                  {opportunity.project_reference}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex flex-col items-end gap-1">
+                              <span className="text-[11px] text-muted-foreground">
+                                {dateLabel}
+                              </span>
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] px-1.5 py-0 h-5"
+                              >
+                                Latest
+                              </Badge>
+                            </div>
+                          </div>
+                          {summaryText && (
+                            <p className="mt-1.5 text-xs text-muted-foreground line-clamp-2">
+                              {summaryText}
+                            </p>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <CardTitle className="text-base flex flex-wrap items-center gap-2">
+                      <span>Current Win Theme</span>
+                      {selectedOpportunity && (
+                        <Badge variant="outline" className="text-[11px]">
+                          {selectedOpportunity.name}
+                        </Badge>
+                      )}
+                    </CardTitle>
+                    {selectedWinTheme && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Generated {formatDate(
+                          (selectedWinTheme as any).generated_at || null,
+                        )}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 justify-end">
+                    {selectedWinTheme && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={saving}
+                        onClick={isEditing ? handleCancelEditing : handleStartEditing}
+                      >
+                        {isEditing ? "Cancel edits" : "Edit strategy"}
+                      </Button>
+                    )}
+                    {isEditing && selectedWinTheme && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={saving}
+                        onClick={() => void handleSaveEdits()}
+                      >
+                        {saving && (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        )}
+                        Save changes
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {loadingDetail && (
+                  <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Loading strategy
+                  </div>
+                )}
+
+                {!loadingDetail && !selectedWinTheme && (
+                  <p className="text-sm text-muted-foreground">
+                    Select an opportunity with a Win Theme on the left to see
+                    the full strategy.
+                  </p>
+                )}
+
+                {!loadingDetail &&
+                  selectedWinTheme &&
+                  payloadToDisplay && (
+                    <Tabs defaultValue="overview" className="space-y-4">
+                      <TabsList className="w-full justify-start overflow-x-auto">
+                        <TabsTrigger value="overview" className="text-xs">
+                          Overview
+                        </TabsTrigger>
+                        <TabsTrigger value="moves" className="text-xs">
+                          Key moves
+                        </TabsTrigger>
+                        <TabsTrigger value="risks" className="text-xs">
+                          Risks
+                        </TabsTrigger>
+                        <TabsTrigger value="proposal" className="text-xs">
+                          Proposal
+                        </TabsTrigger>
+                        <TabsTrigger value="stakeholders" className="text-xs">
+                          Stakeholders
+                        </TabsTrigger>
+                        <TabsTrigger value="talk_tracks" className="text-xs">
+                          Talk tracks
+                        </TabsTrigger>
+                        <TabsTrigger value="gaps" className="text-xs">
+                          Gaps
+                        </TabsTrigger>
+                        <TabsTrigger value="sources" className="text-xs">
+                          Sources
+                        </TabsTrigger>
+                      </TabsList>
+
+                      <TabsContent value="overview" className="space-y-4">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <h3 className="text-sm font-semibold">
+                              Executive Win Theme
+                            </h3>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() =>
+                                void handleCopy(
+                                  "executive",
+                                  payloadToDisplay.executive_win_theme,
+                                )
+                              }
+                            >
+                              {copyState.executive ? (
+                                <ClipboardCheck className="w-3.5 h-3.5" />
+                              ) : (
+                                <Clipboard className="w-3.5 h-3.5" />
+                              )}
+                            </Button>
+                          </div>
+                          {isEditing ? (
+                            <Textarea
+                              rows={3}
+                              value={editablePayload?.executive_win_theme || ""}
+                              onChange={(e) =>
+                                setEditablePayload((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        executive_win_theme: e.target.value,
+                                      }
+                                    : prev,
+                                )
+                              }
+                            />
+                          ) : (
+                            <p className="text-sm leading-relaxed">
+                              {payloadToDisplay.executive_win_theme}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <h3 className="text-sm font-semibold">
+                            Client context insight
+                          </h3>
+                          {isEditing ? (
+                            <Textarea
+                              rows={3}
+                              value={editablePayload?.client_context_insight || ""}
+                              onChange={(e) =>
+                                setEditablePayload((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        client_context_insight: e.target.value,
+                                      }
+                                    : prev,
+                                )
+                              }
+                            />
+                          ) : (
+                            <p className="text-sm leading-relaxed">
+                              {payloadToDisplay.client_context_insight}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <h3 className="text-sm font-semibold">
+                              Value narrative
+                            </h3>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() =>
+                                void handleCopy(
+                                  "value_narrative",
+                                  payloadToDisplay.value_narrative,
+                                )
+                              }
+                            >
+                              {copyState.value_narrative ? (
+                                <ClipboardCheck className="w-3.5 h-3.5" />
+                              ) : (
+                                <Clipboard className="w-3.5 h-3.5" />
+                              )}
+                            </Button>
+                          </div>
+                          {isEditing ? (
+                            <Textarea
+                              rows={3}
+                              value={editablePayload?.value_narrative || ""}
+                              onChange={(e) =>
+                                setEditablePayload((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        value_narrative: e.target.value,
+                                      }
+                                    : prev,
+                                )
+                              }
+                            />
+                          ) : (
+                            <p className="text-sm leading-relaxed">
+                              {payloadToDisplay.value_narrative}
+                            </p>
+                          )}
+                        </div>
+                      </TabsContent>
+
+                      <TabsContent value="moves" className="space-y-3">
+                        <h3 className="text-sm font-semibold">
+                          Key moves and actions
+                        </h3>
+                        {payloadToDisplay.key_moves.length === 0 && (
+                          <p className="text-sm text-muted-foreground">
+                            No key moves defined.
+                          </p>
+                        )}
+                        {payloadToDisplay.key_moves.length > 0 && (
+                          <div className="space-y-3">
+                            {payloadToDisplay.key_moves.map((move, index) => (
+                              <div
+                                key={`${move.title}-${index}`}
+                                className="rounded-md border px-3 py-2"
+                              >
+                                <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+                                  <span className="text-sm font-medium">
+                                    {move.title}
+                                  </span>
+                                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                                    {move.timeframe && (
+                                      <Badge
+                                        variant="outline"
+                                        className="text-[10px] px-1.5 py-0 h-5"
+                                      >
+                                        {move.timeframe}
+                                      </Badge>
+                                    )}
+                                    {move.owner_hint && (
+                                      <span>{move.owner_hint}</span>
+                                    )}
+                                  </div>
+                                </div>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                  {move.description}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </TabsContent>
+
+                      <TabsContent value="risks" className="space-y-3">
+                        <h3 className="text-sm font-semibold">
+                          Risks and objections
+                        </h3>
+                        {payloadToDisplay.risks_and_objections.length === 0 && (
+                          <p className="text-sm text-muted-foreground">
+                            No risks captured. Treat this as a gap and challenge
+                            the strategy.
+                          </p>
+                        )}
+                        {payloadToDisplay.risks_and_objections.length > 0 && (
+                          <div className="space-y-3">
+                            {payloadToDisplay.risks_and_objections.map(
+                              (riskItem, index) => (
+                                <div
+                                  key={`${riskItem.risk}-${index}`}
+                                  className="rounded-md border px-3 py-2"
+                                >
+                                  <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+                                    <span className="text-sm font-medium">
+                                      {riskItem.risk}
+                                    </span>
+                                    <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                                      {riskItem.likelihood && (
+                                        <Badge
+                                          variant="outline"
+                                          className="text-[10px] px-1.5 py-0 h-5"
+                                        >
+                                          Likelihood: {riskItem.likelihood}
+                                        </Badge>
+                                      )}
+                                      {riskItem.impact && (
+                                        <Badge
+                                          variant="outline"
+                                          className="text-[10px] px-1.5 py-0 h-5"
+                                        >
+                                          Impact: {riskItem.impact}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mb-1">
+                                    Mitigation:
+                                  </p>
+                                  <p className="text-xs leading-relaxed">
+                                    {riskItem.mitigation_strategy}
+                                  </p>
+                                </div>
+                              ),
+                            )}
+                          </div>
+                        )}
+                      </TabsContent>
+
+                      <TabsContent value="proposal" className="space-y-3">
+                        <h3 className="text-sm font-semibold">
+                          Proposal architecture
+                        </h3>
+                        <div className="space-y-2">
+                          <h4 className="text-xs font-medium text-muted-foreground">
+                            Recommended structure
+                          </h4>
+                          {isEditing ? (
+                            <Textarea
+                              rows={3}
+                              value={
+                                editablePayload?.proposal_architecture
+                                  .recommended_structure || ""
+                              }
+                              onChange={(e) =>
+                                setEditablePayload((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        proposal_architecture: {
+                                          ...prev.proposal_architecture,
+                                          recommended_structure: e.target.value,
+                                        },
+                                      }
+                                    : prev,
+                                )
+                              }
+                            />
+                          ) : (
+                            <p className="text-sm leading-relaxed">
+                              {
+                                payloadToDisplay.proposal_architecture
+                                  .recommended_structure
+                              }
+                            </p>
+                          )}
+                        </div>
+
+                        {payloadToDisplay.proposal_architecture
+                          .must_hit_messages &&
+                          payloadToDisplay.proposal_architecture
+                            .must_hit_messages.length > 0 && (
+                            <div className="space-y-1.5">
+                              <h4 className="text-xs font-medium text-muted-foreground">
+                                Must-hit messages
+                              </h4>
+                              <ul className="list-disc pl-4 text-sm space-y-1">
+                                {payloadToDisplay.proposal_architecture.must_hit_messages.map(
+                                  (message, index) => (
+                                    <li key={`${message}-${index}`}>
+                                      {message}
+                                    </li>
+                                  ),
+                                )}
+                              </ul>
+                            </div>
+                          )}
+
+                        {payloadToDisplay.proposal_architecture
+                          .evidence_to_show &&
+                          payloadToDisplay.proposal_architecture
+                            .evidence_to_show.length > 0 && (
+                            <div className="space-y-1.5">
+                              <h4 className="text-xs font-medium text-muted-foreground">
+                                Evidence to show
+                              </h4>
+                              <ul className="list-disc pl-4 text-sm space-y-1">
+                                {payloadToDisplay.proposal_architecture.evidence_to_show.map(
+                                  (evidence, index) => (
+                                    <li key={`${evidence}-${index}`}>
+                                      {evidence}
+                                    </li>
+                                  ),
+                                )}
+                              </ul>
+                            </div>
+                          )}
+                      </TabsContent>
+
+                      <TabsContent value="stakeholders" className="space-y-3">
+                        <h3 className="text-sm font-semibold">
+                          Stakeholder strategy
+                        </h3>
+                        {payloadToDisplay.stakeholder_strategy?.key_stakeholder_groups &&
+                          payloadToDisplay.stakeholder_strategy
+                            .key_stakeholder_groups.length > 0 && (
+                            <div className="space-y-1.5">
+                              <h4 className="text-xs font-medium text-muted-foreground">
+                                Key stakeholder groups
+                              </h4>
+                              <ul className="list-disc pl-4 text-sm space-y-1">
+                                {payloadToDisplay.stakeholder_strategy.key_stakeholder_groups.map(
+                                  (group, index) => (
+                                    <li key={`${group}-${index}`}>{group}</li>
+                                  ),
+                                )}
+                              </ul>
+                            </div>
+                          )}
+
+                        {payloadToDisplay.stakeholder_strategy?.engagement_tactics &&
+                          payloadToDisplay.stakeholder_strategy
+                            .engagement_tactics.length > 0 && (
+                            <div className="space-y-1.5">
+                              <h4 className="text-xs font-medium text-muted-foreground">
+                                Engagement tactics
+                              </h4>
+                              <ul className="list-disc pl-4 text-sm space-y-1">
+                                {payloadToDisplay.stakeholder_strategy.engagement_tactics.map(
+                                  (tactic, index) => (
+                                    <li key={`${tactic}-${index}`}>{tactic}</li>
+                                  ),
+                                )}
+                              </ul>
+                            </div>
+                          )}
+
+                        {!payloadToDisplay.stakeholder_strategy && (
+                          <p className="text-sm text-muted-foreground">
+                            No explicit stakeholder strategy captured. Treat
+                            this as a gap for refinement.
+                          </p>
+                        )}
+                      </TabsContent>
+
+                      <TabsContent value="talk_tracks" className="space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <h3 className="text-sm font-semibold">
+                            Talk tracks and openers
+                          </h3>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() =>
+                              void handleCopy(
+                                "talk_tracks",
+                                payloadToDisplay.talk_tracks_and_openers
+                                  ?.meeting_openers?.join("\n") ||
+                                  payloadToDisplay.talk_tracks_and_openers?.email_hook_paragraph,
+                              )
+                            }
+                          >
+                            {copyState.talk_tracks ? (
+                              <ClipboardCheck className="w-3.5 h-3.5" />
+                            ) : (
+                              <Clipboard className="w-3.5 h-3.5" />
+                            )}
+                          </Button>
+                        </div>
+
+                        {payloadToDisplay.talk_tracks_and_openers
+                          ?.meeting_openers &&
+                          payloadToDisplay.talk_tracks_and_openers
+                            .meeting_openers.length > 0 && (
+                            <div className="space-y-1.5">
+                              <h4 className="text-xs font-medium text-muted-foreground">
+                                Meeting openers
+                              </h4>
+                              <ul className="list-disc pl-4 text-sm space-y-1">
+                                {payloadToDisplay.talk_tracks_and_openers.meeting_openers.map(
+                                  (opener, index) => (
+                                    <li key={`${opener}-${index}`}>{opener}</li>
+                                  ),
+                                )}
+                              </ul>
+                            </div>
+                          )}
+
+                        {payloadToDisplay.talk_tracks_and_openers
+                          ?.email_subject_ideas &&
+                          payloadToDisplay.talk_tracks_and_openers
+                            .email_subject_ideas.length > 0 && (
+                            <div className="space-y-1.5">
+                              <h4 className="text-xs font-medium text-muted-foreground">
+                                Email subject ideas
+                              </h4>
+                              <ul className="list-disc pl-4 text-sm space-y-1">
+                                {payloadToDisplay.talk_tracks_and_openers.email_subject_ideas.map(
+                                  (subject, index) => (
+                                    <li key={`${subject}-${index}`}>{subject}</li>
+                                  ),
+                                )}
+                              </ul>
+                            </div>
+                          )}
+
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <h4 className="text-xs font-medium text-muted-foreground">
+                              Email hook paragraph
+                            </h4>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() =>
+                                void handleCopy(
+                                  "email_hook",
+                                  payloadToDisplay
+                                    .talk_tracks_and_openers
+                                    ?.email_hook_paragraph,
+                                )
+                              }
+                            >
+                              {copyState.email_hook ? (
+                                <ClipboardCheck className="w-3.5 h-3.5" />
+                              ) : (
+                                <Clipboard className="w-3.5 h-3.5" />
+                              )}
+                            </Button>
+                          </div>
+                          {isEditing ? (
+                            <Textarea
+                              rows={3}
+                              value={
+                                editablePayload?.talk_tracks_and_openers
+                                  ?.email_hook_paragraph || ""
+                              }
+                              onChange={(e) =>
+                                setEditablePayload((prev) => {
+                                  if (!prev) return prev;
+                                  const currentTalkTracks =
+                                    prev.talk_tracks_and_openers || {};
+                                  return {
+                                    ...prev,
+                                    talk_tracks_and_openers: {
+                                      ...currentTalkTracks,
+                                      email_hook_paragraph: e.target.value,
+                                    },
+                                  };
+                                })
+                              }
+                            />
+                          ) : (
+                            <p className="text-sm leading-relaxed">
+                              {payloadToDisplay.talk_tracks_and_openers
+                                ?.email_hook_paragraph || (
+                                <span className="text-muted-foreground">
+                                  No email hook paragraph captured.
+                                </span>
+                              )}
+                            </p>
+                          )}
+                        </div>
+                      </TabsContent>
+
+                      <TabsContent value="gaps" className="space-y-3">
+                        <h3 className="text-sm font-semibold">
+                          Gaps and unknowns
+                        </h3>
+                        {payloadToDisplay.gaps_and_unknowns.length === 0 && (
+                          <p className="text-sm text-muted-foreground">
+                            No explicit gaps captured. Assume this is
+                            incomplete, not perfect, and challenge it.
+                          </p>
+                        )}
+                        {payloadToDisplay.gaps_and_unknowns.length > 0 && (
+                          <ul className="list-disc pl-4 text-sm space-y-1">
+                            {payloadToDisplay.gaps_and_unknowns.map(
+                              (gap, index) => (
+                                <li key={`${gap}-${index}`}>{gap}</li>
+                              ),
+                            )}
+                          </ul>
+                        )}
+                      </TabsContent>
+
+                      <TabsContent value="sources" className="space-y-3">
+                        <h3 className="text-sm font-semibold">
+                          Sources and context
+                        </h3>
+                        {contextBundle ? (
+                          <div className="space-y-2">
+                            <p className="text-xs text-muted-foreground">
+                              Context bundle used when generating this strategy.
+                              This is surfaced for auditability, not for styling.
+                            </p>
+                            <div className="rounded-md border bg-muted/40 p-2 text-xs font-mono whitespace-pre-wrap max-h-60 overflow-auto">
+                              {JSON.stringify(contextBundle, null, 2)}
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">
+                            Source context is not available for this strategy.
+                            Future generations should store Companies House and
+                            article context here.
+                          </p>
+                        )}
+                      </TabsContent>
+                    </Tabs>
+                  )}
+
+                {!loadingDetail &&
+                  selectedWinTheme &&
+                  !payloadToDisplay && (
+                    <p className="text-sm text-destructive">
+                      The stored strategy payload is not in the expected
+                      structure. Regenerate this Win Theme when the engine is
+                      available.
+                    </p>
+                  )}
+              </CardContent>
+            </Card>
+
+            {selectedWinThemes.length > 1 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm">
+                    Strategy history for this opportunity
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ScrollArea className="h-[160px] pr-2">
+                    <div className="space-y-2">
+                      {selectedWinThemes.map((theme) => {
+                        const isActive = selectedWinTheme?.id === theme.id;
+                        const dateLabel = formatDate(
+                          (theme as any).generated_at || null,
+                        );
+                        return (
+                          <button
+                            key={theme.id}
+                            type="button"
+                            onClick={() => handleSelectWinTheme(theme)}
+                            className={`w-full text-left rounded-md border px-3 py-2 text-xs transition-colors ${
+                              isActive
+                                ? "border-amber-500 bg-amber-500/10"
+                                : "border-border hover:bg-muted"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span>
+                                {theme.summary ||
+                                  "Strategy without explicit summary"}
+                              </span>
+                              <span className="text-[11px] text-muted-foreground">
+                                {dateLabel}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
       </div>
     </Layout>
   );
@@ -31,7 +1147,7 @@ function WinThemeContent() {
 export default function WinThemePage() {
   return (
     <RequireAuth>
-      <WinThemeContent />
+      <WinThemeWorkspaceContent />
     </RequireAuth>
   );
 }
