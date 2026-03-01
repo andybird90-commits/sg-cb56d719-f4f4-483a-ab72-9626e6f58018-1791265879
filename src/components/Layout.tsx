@@ -207,7 +207,7 @@ export function Layout({ children, variant = "default" }: LayoutProps) {
       </nav>
 
       {/* Navigation */}
-      <nav className="border-b bg-white dark:bg-gray-900">
+      <nav className="border-b bg-background">
         <div className="container mx-auto px-4">
           <div className="flex h-16 items-center justify-center gap-6">
           </div>
