@@ -23,6 +23,7 @@ import {
   GanttChart,
   BarChart3,
   UserCog,
+  ArrowRight,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useState } from "react";
@@ -32,6 +33,13 @@ interface LayoutProps {
   children: React.ReactNode;
   variant?: "default" | "wide";
 }
+
+const WinThemeIcon = ({ className }: { className?: string }) => (
+  <span className={`relative inline-flex items-center justify-center ${className ?? ""}`}>
+    <Target className="w-4 h-4 text-amber-500" />
+    <ArrowRight className="w-3 h-3 text-amber-500 absolute" />
+  </span>
+);
 
 export function Layout({ children, variant = "default" }: LayoutProps) {
   const { user, profile, loading, signOut, profileError } = useAuth();
@@ -57,7 +65,7 @@ export function Layout({ children, variant = "default" }: LayoutProps) {
     { href: "/companies", icon: Building2, label: "Companies" },
     { href: "/contacts", icon: Users, label: "Contacts" },
     { href: "/opportunities", icon: Target, label: "Opportunities" },
-    { href: "/win-theme", icon: Target, label: "Win Theme (Coming Soon)" },
+    { href: "/win-theme", icon: WinThemeIcon, label: "Win Theme (Coming Soon)" },
     { href: "/projects", icon: Briefcase, label: "Projects" },
     { href: "/calendar", icon: CalendarIcon, label: "Calendar" },
     { href: "/timesheets/my", icon: Clock, label: "Timesheets" },
