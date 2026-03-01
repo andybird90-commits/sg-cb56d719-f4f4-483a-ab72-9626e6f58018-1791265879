@@ -4,11 +4,7 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { Layout } from "@/components/Layout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
-import type {
-  StrategySettings,
-  WinThemeRow,
-  WinThemeContextBundle,
-} from "@/services/winThemeService";
+import type { StrategySettings, WinThemeRow } from "@/services/winThemeService";
 import {
   createWinTheme,
   listWinThemesForOpportunity,
@@ -91,36 +87,42 @@ interface WinThemePayload {
   gaps_and_unknowns: string[];
 }
 
+// Local types for payload and Companies House data used in the page only
 interface CompaniesHouseSource {
   error?: boolean;
-  message?: string;
   status?: number;
-  company_number?: string;
-  company_name?: string;
-  company_status?: string;
-  date_of_creation?: string;
-  registered_office_address?:
-    | {
-        [key: string]: unknown;
-      }
-    | null;
+  message?: string;
+  company_number?: string | null;
+  company_name?: string | null;
+  company_status?: string | null;
+  date_of_creation?: string | null;
+  registered_office_address?: {
+    address_line_1?: string;
+    address_line_2?: string;
+    locality?: string;
+    region?: string;
+    postal_code?: string;
+    country?: string;
+  };
   sic_codes?: string[] | null;
 }
 
+interface WinThemePayload {
+  opportunity?: OpportunitySummary;
+  strategy_settings?: StrategySettings | null;
+  companies_house?: CompaniesHouseSource | null;
+  [key: string]: unknown;
+}
+
+// Use a local context bundle type only within this page
 interface WinThemeContextBundle {
   companies_house?: CompaniesHouseSource | null;
   [key: string]: unknown;
 }
 
+// Type that includes joined opportunity for display
 type WinThemeWithJoinedOpportunity = WinThemeRow & {
-  opportunities?: {
-    id: string;
-    name: string;
-    project_reference: string | null;
-    companies?: {
-      name: string | null;
-    } | null;
-  };
+  opportunity?: OpportunitySummary | null;
 };
 
 type CopyStateKey =
@@ -135,7 +137,7 @@ interface GenerateWinThemeResponse {
   payload: WinThemePayload;
   summary: string;
   strategy_settings: StrategySettings;
-  context_bundle?: unknown;
+  context_bundle?: WinThemeContextBundle | null;
 }
 
 function formatDate(dateString: string | null): string {
@@ -317,20 +319,12 @@ function WinThemeWorkspaceContent() {
 
     const summary: OpportunitySummary = {
       id: row.opportunity_id,
-      name: row.opportunities?.name || "Unknown opportunity",
-      project_reference: row.opportunities?.project_reference || null,
+      name: row.opportunity?.name || "Unknown opportunity",
+      project_reference: row.opportunity?.project_reference || null,
       company_name:
-        (row.opportunities as any)?.companies?.name ||
-        (row as any)?.opportunities?.companies?.name ||
-        null,
+        ((item as any).opportunity?.companies?.name as string | undefined) || null,
       company_number:
-        ((row.opportunities as any)?.companies?.company_number as
-          | string
-          | undefined) ||
-        ((row as any)?.opportunities?.companies?.company_number as
-          | string
-          | undefined) ||
-        null,
+        ((item as any).opportunity?.companies?.company_number as string | undefined) || null,
     };
     setSelectedOpportunity(summary);
 
@@ -465,9 +459,10 @@ function WinThemeWorkspaceContent() {
         opportunity_id: selectedOpportunity.id,
         generated_by_user_id: profile.id,
         strategy_settings: (json.strategy_settings || {}) as unknown as any,
+        // Relax payload typing to satisfy Supabase Json while keeping structure at runtime
         payload: json.payload as unknown as any,
         summary: json.summary,
-        context_bundle: json.context_bundle as WinThemeContextBundle | null,
+        contextBundle: (json.context_bundle || null) as WinThemeContextBundle | null,
       });
 
       const themes = await listWinThemesForOpportunity(selectedOpportunity.id);
@@ -505,15 +500,22 @@ function WinThemeWorkspaceContent() {
     if (!searchTerm.trim()) return latestByOpportunity;
     const term = searchTerm.toLowerCase();
     return latestByOpportunity.filter((item) => {
-      const oppName = item.opportunities?.name?.toLowerCase() || "";
+      const opportunity = item.opportunity;
+      const isActive =
+        selectedOpportunity?.id === item.opportunity_id;
+      const summaryText = item.summary || "";
+      const dateLabel = formatDate(
+        (item as any).generated_at || null,
+      );
       const companyName =
-        ((item as any).opportunities?.companies?.name as string | undefined)?.toLowerCase() ||
-        "";
-      const summary = (item.summary || "").toLowerCase();
+        ((item as any).opportunity?.companies?.name as
+          | string
+          | undefined) || null;
+
       return (
-        oppName.includes(term) ||
-        companyName.includes(term) ||
-        summary.includes(term)
+        opportunity?.name?.toLowerCase().includes(term) ||
+        companyName?.toLowerCase().includes(term) ||
+        summaryText.toLowerCase().includes(term)
       );
     });
   }, [latestByOpportunity, searchTerm]);
@@ -616,7 +618,7 @@ function WinThemeWorkspaceContent() {
                 <ScrollArea className="h-[360px] pr-2">
                   <div className="space-y-2">
                     {filteredLatest.map((item) => {
-                      const opportunity = item.opportunities;
+                      const opportunity = item.opportunity;
                       const isActive =
                         selectedOpportunity?.id === item.opportunity_id;
                       const summaryText = item.summary || "";
@@ -624,7 +626,7 @@ function WinThemeWorkspaceContent() {
                         (item as any).generated_at || null,
                       );
                       const companyName =
-                        ((item as any).opportunities?.companies?.name as
+                        ((item as any).opportunity?.companies?.name as
                           | string
                           | undefined) || null;
 
@@ -1356,8 +1358,12 @@ function WinThemeWorkspaceContent() {
                                 )}
                                 {companiesHouse.date_of_creation && (
                                   <p className="text-xs text-muted-foreground">
-                                    Incorporated:{" "}
-                                    {formatDate(companiesHouse.date_of_creation)}
+                                    Incorporated on{" "}
+                                    {new Date(companiesHouse.date_of_creation).toLocaleDateString("en-GB", {
+                                      day: "numeric",
+                                      month: "short",
+                                      year: "numeric",
+                                    })}
                                   </p>
                                 )}
                               </div>
