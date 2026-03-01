@@ -104,7 +104,7 @@ export function Layout({ children, variant = "default" }: LayoutProps) {
             href="/dashboard"
             className="flex items-center justify-center transition-professional hover:opacity-80"
           >
-            <div className="bg-white rounded-md px-3 py-2 shadow-sm">
+            <div className="rounded-md px-3 py-2 bg-white">
               <Image
                 src="/RDME_Logo.png"
                 alt="RD GROUP M&E"
@@ -163,7 +163,7 @@ export function Layout({ children, variant = "default" }: LayoutProps) {
               href="/dashboard"
               className="flex items-center transition-professional hover:opacity-80"
             >
-              <div className="bg-white rounded-md px-3 py-1.5 shadow-sm">
+              <div className="rounded-md px-3 py-1.5 bg-white">
                 <Image
                   src="/RDME_Logo.png"
                   alt="RD GROUP M&E"
