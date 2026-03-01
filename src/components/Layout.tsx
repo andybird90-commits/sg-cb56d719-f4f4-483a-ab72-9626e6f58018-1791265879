@@ -105,7 +105,7 @@ export function Layout({ children, variant = "default" }: LayoutProps) {
           >
             <div className="rounded-md px-3 py-2">
               <span className="text-2xl font-black tracking-tight">
-                <span className="text-blue-400">D</span>
+                <span className="text-blue-500">D</span>
                 <span className="text-lime-400">T</span>
               </span>
             </div>
@@ -160,7 +160,7 @@ export function Layout({ children, variant = "default" }: LayoutProps) {
             >
               <div className="rounded-md px-3 py-1.5">
                 <span className="text-xl font-black tracking-tight">
-                  <span className="text-blue-400">D</span>
+                  <span className="text-blue-500">D</span>
                   <span className="text-lime-400">T</span>
                 </span>
               </div>
