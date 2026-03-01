@@ -24,6 +24,10 @@ import {
   BarChart3,
   UserCog,
   ArrowRight,
+  Activity,
+  Construction,
+  Database,
+  Gauge,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useState } from "react";
@@ -67,6 +71,7 @@ export function Layout({ children, variant = "default" }: LayoutProps) {
     { href: "/opportunities", icon: Target, label: "Opportunities" },
     { href: "/win-theme", icon: WinThemeIcon, label: "Win Theme (Coming Soon)" },
     { href: "/projects", icon: Briefcase, label: "Projects" },
+    { href: "/pipeline", icon: Gauge, label: "Pipeline" },
     { href: "/calendar", icon: CalendarIcon, label: "Calendar" },
     { href: "/timesheets/my", icon: Clock, label: "Timesheets" },
     { href: "/financials", icon: PoundSterling, label: "Financials" },
