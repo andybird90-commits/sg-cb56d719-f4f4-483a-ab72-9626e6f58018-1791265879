@@ -107,13 +107,6 @@ interface CompaniesHouseSource {
   sic_codes?: string[] | null;
 }
 
-interface WinThemePayload {
-  opportunity?: OpportunitySummary;
-  strategy_settings?: StrategySettings | null;
-  companies_house?: CompaniesHouseSource | null;
-  [key: string]: unknown;
-}
-
 // Use a local context bundle type only within this page
 interface WinThemeContextBundle {
   companies_house?: CompaniesHouseSource | null;
@@ -322,9 +315,9 @@ function WinThemeWorkspaceContent() {
       name: row.opportunity?.name || "Unknown opportunity",
       project_reference: row.opportunity?.project_reference || null,
       company_name:
-        ((item as any).opportunity?.companies?.name as string | undefined) || null,
+        ((row as any).opportunity?.companies?.name as string | undefined) || null,
       company_number:
-        ((item as any).opportunity?.companies?.company_number as string | undefined) || null,
+        ((row as any).opportunity?.companies?.company_number as string | undefined) || null,
     };
     setSelectedOpportunity(summary);
 

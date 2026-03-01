@@ -27,15 +27,16 @@ export interface WinThemeContextBundle {
 export interface CreateWinThemeInput {
   opportunity_id: string;
   generated_by_user_id: string;
-  strategy_settings: Json;
-  payload: Json;
-  summary?: string | null;
+  strategy_settings: StrategySettings | null;
+  payload: any;
+  summary: string | null;
   contextBundle?: WinThemeContextBundle | null;
 }
 
 export interface UpdateWinThemeParams {
   id: string;
-  payload: Json;
+  // Accept arbitrary structured payloads from the UI; they will be cast to the table's Json type when updating.
+  payload: any;
   summary?: string | null;
 }
 
