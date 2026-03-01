@@ -4,7 +4,11 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { Layout } from "@/components/Layout";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
-import type { StrategySettings, WinThemeRow } from "@/services/winThemeService";
+import type {
+  StrategySettings,
+  WinThemeRow,
+  WinThemeContextBundle,
+} from "@/services/winThemeService";
 import {
   createWinTheme,
   listWinThemesForOpportunity,
@@ -458,12 +462,12 @@ function WinThemeWorkspaceContent() {
       const json = (await response.json()) as GenerateWinThemeResponse;
 
       const created = await createWinTheme({
-        opportunityId: selectedOpportunity.id,
-        generatedByUserId: profile.id,
-        strategySettings: (json.strategy_settings || {}) as StrategySettings,
-        payload: json.payload as unknown as Record<string, unknown>,
+        opportunity_id: selectedOpportunity.id,
+        generated_by_user_id: profile.id,
+        strategy_settings: (json.strategy_settings || {}) as unknown as any,
+        payload: json.payload as unknown as any,
         summary: json.summary,
-        contextBundle: json.context_bundle,
+        context_bundle: json.context_bundle as WinThemeContextBundle | null,
       });
 
       const themes = await listWinThemesForOpportunity(selectedOpportunity.id);
@@ -522,8 +526,8 @@ function WinThemeWorkspaceContent() {
   const payloadToDisplay = isEditing ? editablePayload : currentPayload;
 
   const contextBundle: WinThemeContextBundle | null = selectedWinTheme
-    ? ((selectedWinTheme as any)
-        .context_bundle as WinThemeContextBundle | null)
+    ? (((selectedWinTheme as any).context_bundle ||
+        null) as WinThemeContextBundle | null)
     : null;
 
   const companiesHouse = contextBundle?.companies_house ?? null;
@@ -1333,58 +1337,48 @@ function WinThemeWorkspaceContent() {
 
                       <TabsContent value="sources" className="space-y-3">
                         <h3 className="text-sm font-semibold">Sources and context</h3>
-                        {selectedWinTheme?.context_bundle?.companies_house &&
-                        !selectedWinTheme.context_bundle.companies_house.error ? (
+                        {companiesHouse && !companiesHouse.error ? (
                           <div className="space-y-2 rounded-md border border-border bg-muted/40 p-3 text-sm">
                             <div className="flex items-center justify-between gap-2">
                               <div>
                                 <p className="font-medium">
-                                  {selectedWinTheme.context_bundle.companies_house.company_name ??
-                                    "Companies House profile"}
+                                  {companiesHouse.company_name ?? "Companies House profile"}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
-                                  {selectedWinTheme.context_bundle.companies_house.company_number
-                                    ? `Company no. ${selectedWinTheme.context_bundle.companies_house.company_number}`
-                                    : "Company number not available"}
+                                  {companiesHouse.company_number && (
+                                    <span>Company no. {companiesHouse.company_number}</span>
+                                  )}
                                 </p>
-                                {selectedWinTheme.context_bundle.companies_house.company_status && (
+                                {companiesHouse.company_status && (
                                   <p className="text-xs text-muted-foreground">
-                                    Status: {selectedWinTheme.context_bundle.companies_house.company_status}
+                                    Status: {companiesHouse.company_status}
                                   </p>
                                 )}
-                                {selectedWinTheme.context_bundle.companies_house.date_of_creation && (
+                                {companiesHouse.date_of_creation && (
                                   <p className="text-xs text-muted-foreground">
                                     Incorporated:{" "}
-                                    {formatDate(
-                                      selectedWinTheme.context_bundle.companies_house.date_of_creation,
-                                    )}
+                                    {formatDate(companiesHouse.date_of_creation)}
                                   </p>
                                 )}
                               </div>
-                              {selectedWinTheme.context_bundle.companies_house.company_status && (
+                              {companiesHouse.company_status && (
                                 <span className="rounded-full bg-emerald-900/40 px-2 py-0.5 text-xs text-emerald-200">
-                                  {selectedWinTheme.context_bundle.companies_house.company_status}
+                                  {companiesHouse.company_status}
                                 </span>
                               )}
                             </div>
 
-                            {selectedWinTheme.context_bundle.companies_house.registered_office_address && (
+                            {companiesHouse.registered_office_address && (
                               <div className="text-xs text-muted-foreground">
                                 <p className="font-semibold">Registered office</p>
                                 <p>
                                   {[
-                                    selectedWinTheme.context_bundle.companies_house
-                                      .registered_office_address.address_line_1,
-                                    selectedWinTheme.context_bundle.companies_house
-                                      .registered_office_address.address_line_2,
-                                    selectedWinTheme.context_bundle.companies_house
-                                      .registered_office_address.locality,
-                                    selectedWinTheme.context_bundle.companies_house
-                                      .registered_office_address.region,
-                                    selectedWinTheme.context_bundle.companies_house
-                                      .registered_office_address.postal_code,
-                                    selectedWinTheme.context_bundle.companies_house
-                                      .registered_office_address.country,
+                                    companiesHouse.registered_office_address.address_line_1,
+                                    companiesHouse.registered_office_address.address_line_2,
+                                    companiesHouse.registered_office_address.locality,
+                                    companiesHouse.registered_office_address.region,
+                                    companiesHouse.registered_office_address.postal_code,
+                                    companiesHouse.registered_office_address.country,
                                   ]
                                     .filter(Boolean)
                                     .join(", ")}
@@ -1392,10 +1386,10 @@ function WinThemeWorkspaceContent() {
                               </div>
                             )}
 
-                            {selectedWinTheme.context_bundle.companies_house.sic_codes &&
-                              selectedWinTheme.context_bundle.companies_house.sic_codes.length > 0 && (
+                            {companiesHouse.sic_codes &&
+                              companiesHouse.sic_codes.length > 0 && (
                                 <div className="flex flex-wrap gap-1 text-[11px] text-muted-foreground">
-                                  {selectedWinTheme.context_bundle.companies_house.sic_codes.map((code) => (
+                                  {companiesHouse.sic_codes.map((code) => (
                                     <span
                                       key={code}
                                       className="rounded-full bg-background/60 px-1.5 py-0.5"
@@ -1406,11 +1400,11 @@ function WinThemeWorkspaceContent() {
                                 </div>
                               )}
                           </div>
-                        ) : selectedWinTheme?.context_bundle?.companies_house?.error ? (
+                        ) : companiesHouse?.error ? (
                           <p className="text-sm text-muted-foreground">
                             Companies House data could not be loaded for this Win Theme
-                            {selectedWinTheme.context_bundle.companies_house.status
-                              ? ` (status ${selectedWinTheme.context_bundle.companies_house.status}).`
+                            {companiesHouse.status
+                              ? ` (status ${companiesHouse.status}).`
                               : "."}{" "}
                             It was generated using the information available in Conexa for this opportunity.
                           </p>

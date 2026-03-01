@@ -5,9 +5,7 @@ export type WinThemeTable = Database["public"]["Tables"]["win_themes"];
 export type WinThemeRow = WinThemeTable["Row"];
 export type StrategySettings = WinThemeTable["Row"]["strategy_settings"];
 
-type Json = Database["public"]["Enums"]["json"] extends never
-  ? WinThemeTable["Row"]["payload"]
-  : Database["public"]["Enums"]["json"];
+type Json = WinThemeTable["Row"]["payload"];
 
 export interface WinThemeContextBundle {
   opportunity?: unknown;
