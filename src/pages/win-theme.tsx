@@ -1283,9 +1283,9 @@ function WinThemeWorkspaceContent() {
                           </div>
                         ) : (
                           <p className="text-sm text-muted-foreground">
-                            Source context is not available for this strategy.
-                            Future generations should store Companies House and
-                            article context here.
+                            No source data is stored for this Win Theme yet. It
+                            was generated using the information available in Conexa
+                            for this opportunity.
                           </p>
                         )}
                       </TabsContent>
