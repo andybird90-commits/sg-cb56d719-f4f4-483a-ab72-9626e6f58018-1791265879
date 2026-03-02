@@ -108,9 +108,21 @@ interface CompaniesHouseSource {
   sic_codes?: string[] | null;
 }
 
+interface BraveSearchSnippet {
+  title: string;
+  url: string;
+  description: string;
+}
+
+interface BraveContext {
+  query: string;
+  results: BraveSearchSnippet[];
+}
+
 // Use a local context bundle type only within this page
 interface WinThemeContextBundle {
   companies_house?: CompaniesHouseSource | null;
+  brave?: BraveContext | null;
   [key: string]: unknown;
 }
 
@@ -528,6 +540,11 @@ function WinThemePage() {
     : null;
 
   const companiesHouse = contextBundle?.companies_house ?? null;
+  const braveContext = (contextBundle?.brave ?? null) as BraveContext | null;
+  const hasBraveResults =
+    !!braveContext &&
+    Array.isArray(braveContext.results) &&
+    braveContext.results.length > 0;
 
   const companiesHouseAddressLines: string[] | null =
     companiesHouse &&
@@ -1381,7 +1398,8 @@ function WinThemePage() {
 
                       <TabsContent value="sources" className="space-y-3">
                         <h3 className="text-sm font-semibold">Sources and context</h3>
-                        {companiesHouse && !companiesHouse.error ? (
+
+                        {companiesHouse && !companiesHouse.error && (
                           <div className="space-y-2 rounded-md border border-border bg-muted/40 p-3 text-sm">
                             <div className="flex items-center justify-between gap-2">
                               <div>
@@ -1401,11 +1419,14 @@ function WinThemePage() {
                                 {companiesHouse.date_of_creation && (
                                   <p className="text-xs text-muted-foreground">
                                     Incorporated on{" "}
-                                    {new Date(companiesHouse.date_of_creation).toLocaleDateString("en-GB", {
-                                      day: "numeric",
-                                      month: "short",
-                                      year: "numeric",
-                                    })}
+                                    {new Date(companiesHouse.date_of_creation).toLocaleDateString(
+                                      "en-GB",
+                                      {
+                                        day: "numeric",
+                                        month: "short",
+                                        year: "numeric",
+                                      }
+                                    )}
                                   </p>
                                 )}
                               </div>
@@ -1416,21 +1437,10 @@ function WinThemePage() {
                               )}
                             </div>
 
-                            {companiesHouse.registered_office_address && (
+                            {companiesHouseAddressLines && (
                               <div className="text-xs text-muted-foreground">
                                 <p className="font-semibold">Registered office</p>
-                                <p>
-                                  {[
-                                    companiesHouse.registered_office_address.address_line_1,
-                                    companiesHouse.registered_office_address.address_line_2,
-                                    companiesHouse.registered_office_address.locality,
-                                    companiesHouse.registered_office_address.region,
-                                    companiesHouse.registered_office_address.postal_code,
-                                    companiesHouse.registered_office_address.country,
-                                  ]
-                                    .filter(Boolean)
-                                    .join(", ")}
-                                </p>
+                                <p>{companiesHouseAddressLines.join(", ")}</p>
                               </div>
                             )}
 
@@ -1448,7 +1458,9 @@ function WinThemePage() {
                                 </div>
                               )}
                           </div>
-                        ) : companiesHouse?.error ? (
+                        )}
+
+                        {companiesHouse?.error && (
                           <p className="text-sm text-muted-foreground">
                             Companies House data could not be loaded for this Win Theme
                             {companiesHouse.status
@@ -1456,10 +1468,47 @@ function WinThemePage() {
                               : "."}{" "}
                             It was generated using the information available in Conexa for this opportunity.
                           </p>
-                        ) : (
+                        )}
+
+                        {hasBraveResults && (
+                          <div className="space-y-2 rounded-md border border-border bg-muted/40 p-3 text-sm">
+                            <div className="flex items-center justify-between gap-2">
+                              <div>
+                                <p className="font-medium">Web context (Brave search)</p>
+                                <p className="text-xs text-muted-foreground">
+                                  Query used:{" "}
+                                  <span className="font-mono">
+                                    {braveContext?.query ?? "n/a"}
+                                  </span>
+                                </p>
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              {braveContext?.results.slice(0, 5).map((item) => (
+                                <div key={item.url} className="space-y-1">
+                                  <a
+                                    href={item.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-xs font-medium text-primary underline-offset-2 hover:underline break-all"
+                                  >
+                                    {item.title || item.url}
+                                  </a>
+                                  {item.description && (
+                                    <p className="text-xs text-muted-foreground">
+                                      {item.description}
+                                    </p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {!companiesHouse && !hasBraveResults && (
                           <p className="text-sm text-muted-foreground">
-                            No Companies House data is stored for this Win Theme yet. It was generated
-                            using the information available in Conexa for this opportunity.
+                            No external data (Companies House or web search) is stored for this Win Theme yet.
+                            It was generated using the information available in Conexa for this opportunity.
                           </p>
                         )}
                       </TabsContent>
