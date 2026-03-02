@@ -100,8 +100,7 @@ function OpportunitiesContent() {
       const pipelineOpps = allOpps.filter(
         (opp) =>
           opp.stage === "bid" ||
-          opp.stage === "high_potential" ||
-          opp.stage === "in_bid"
+          opp.stage === "high_potential"
       );
 
       setOpportunities(pipelineOpps);
@@ -187,8 +186,7 @@ function OpportunitiesContent() {
     (opp) =>
       !opp.archived &&
       (opp.stage === "bid" ||
-        opp.stage === "high_potential" ||
-        opp.stage === "in_bid")
+        opp.stage === "high_potential")
   );
 
   // Sort that list by created_at desc and then by expected_fee_value desc as a reasonable default
