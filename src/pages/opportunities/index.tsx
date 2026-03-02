@@ -172,6 +172,19 @@ function OpportunitiesContent() {
     }).format(value);
   };
 
+  // Derive live + high_potential opportunities for the top table
+  const liveAndHighPotential = opportunities.filter(
+    (opp) => !opp.archived && (opp.stage === "bid" || opp.stage === "high_potential" || opp.stage === "secured")
+  );
+
+  // Sort that list by created_at desc and then by expected_fee_value desc as a reasonable default
+  const sortedLiveAndHighPotential = [...liveAndHighPotential].sort((a, b) => {
+    const dateDiff =
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    if (dateDiff !== 0) return dateDiff;
+    return (b.expected_fee_value || 0) - (a.expected_fee_value || 0);
+  });
+
   const OpportunityCard = ({ opportunity }: { opportunity: Opportunity }) => {
     const router = useRouter();
     const [isUpdating, setIsUpdating] = useState(false);
@@ -538,6 +551,81 @@ function OpportunitiesContent() {
   return (
     <Layout>
       <div className="space-y-8">
+        {/* Live Opportunities & High Potentials table at top */}
+        {!loading && !error && sortedLiveAndHighPotential.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-amber-900/40 text-amber-300">
+                  Ⓦ
+                </span>
+                <span>Live Opportunities &amp; High Potentials</span>
+              </CardTitle>
+              <p className="text-sm text-slate-400">
+                Active pipeline opportunities – click column headers to sort
+              </p>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="border-b border-slate-800 text-xs uppercase tracking-wide text-slate-400">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Reference</th>
+                    <th className="px-3 py-2 text-left">Opportunity name</th>
+                    <th className="px-3 py-2 text-left">Company</th>
+                    <th className="px-3 py-2 text-left">Stage</th>
+                    <th className="px-3 py-2 text-right">Value</th>
+                    <th className="px-3 py-2 text-left">Due date</th>
+                    <th className="px-3 py-2 text-left">Start date</th>
+                    <th className="px-3 py-2 text-left">Finish date</th>
+                    <th className="px-3 py-2 text-right">Probability</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedLiveAndHighPotential.map((opp) => (
+                    <tr
+                      key={opp.id}
+                      className="border-b border-slate-900/60 hover:bg-slate-900/40 cursor-pointer"
+                      onClick={() => router.push(`/opportunities/${opp.id}`)}
+                    >
+                      <td className="px-3 py-2 font-mono text-xs text-slate-300">
+                        {opp.project_reference || "—"}
+                      </td>
+                      <td className="px-3 py-2 text-slate-100">
+                        {opp.name}
+                      </td>
+                      <td className="px-3 py-2 text-slate-300">
+                        {opp.companies?.name || "—"}
+                      </td>
+                      <td className="px-3 py-2">
+                        <Badge className={getStageColor(opp.stage)}>
+                          {opp.stage.replace("_", " ")}
+                        </Badge>
+                      </td>
+                      <td className="px-3 py-2 text-right text-slate-100">
+                        {formatCurrency(opp.expected_fee_value)}
+                      </td>
+                      <td className="px-3 py-2 text-slate-300">
+                        {formatDate(opp.tender_due_date)}
+                      </td>
+                      <td className="px-3 py-2 text-slate-300">
+                        {formatDate(opp.expected_start_date)}
+                      </td>
+                      <td className="px-3 py-2 text-slate-300">
+                        {formatDate(opp.expected_end_date)}
+                      </td>
+                      <td className="px-3 py-2 text-right text-slate-100">
+                        {opp.probability_percent != null
+                          ? `${opp.probability_percent}%`
+                          : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="space-y-2">
