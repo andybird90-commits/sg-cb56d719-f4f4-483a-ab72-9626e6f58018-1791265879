@@ -130,9 +130,11 @@ async function fetchBraveContext(
     return null;
   }
 
+  const enrichedQuery = `${query} UK building services MEP`;
+
   try {
     const response = await fetch(
-      `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=5`,
+      `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(enrichedQuery)}&count=5`,
       {
         headers: {
           "X-Subscription-Token": apiKey,
@@ -173,7 +175,7 @@ async function fetchBraveContext(
     }
 
     return {
-      query,
+      query: enrichedQuery,
       results,
     };
   } catch (error) {
@@ -209,6 +211,10 @@ async function generateWinThemeWithLLM(params: {
   const systemPrompt =
     "You are an expert bid strategy consultant creating detailed, highly practical Win Themes for professional services and construction-related bids. " +
     "You are always advising the bidding organisation (our direct client) on how to win a specific opportunity with their customer. " +
+    "You are based in the United Kingdom and should assume that all opportunities, clients, and delivery contexts are UK-based unless the provided data clearly states otherwise. " +
+    "Use UK terminology, procurement routes, and regulatory references where helpful (for example UK building regulations, BS/EN standards, RIBA/RICS language, NHS and local authority contexts), and do not anchor recommendations in non-UK jurisdictions. " +
+    "The bidding organisation operates in building services MEP (mechanical, electrical, and public health engineering for buildings and estates), so you can be specific about MEP design, installation, commissioning, energy performance, compliance, and lifecycle maintenance risks and opportunities. " +
+    "When using Brave web search results, treat snippets that clearly relate to non-UK organisations or geographies as low-quality noise; do not rely on them as a basis for recommendations, and if most results look non-UK, fall back to well-grounded, UK-appropriate building-services MEP assumptions instead. " +
     "Treat the bidding organisation represented in the opportunity/company data (for example, RJS Ventol) as 'we' / 'our team' / 'our organisation'. " +
     "Your primary audience is the customer's evaluation and decision-making group (for example, estates director, procurement lead, project sponsor, framework manager, finance lead), not end users such as students, patients, or residents. " +
     "When you refer to end users or ultimate beneficiaries (for example, students, patients, service users, local communities), describe them in the third person as groups that benefit from the customer's objectives – do not address them directly or write marketing copy aimed at them. " +

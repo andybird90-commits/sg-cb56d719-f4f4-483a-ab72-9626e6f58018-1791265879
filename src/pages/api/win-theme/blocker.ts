@@ -88,9 +88,11 @@ async function fetchBraveContext(
     return null;
   }
 
+  const enrichedQuery = `${query} UK building services MEP`;
+
   try {
     const response = await fetch(
-      `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=5`,
+      `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(enrichedQuery)}&count=5`,
       {
         headers: {
           "X-Subscription-Token": apiKey,
@@ -131,7 +133,7 @@ async function fetchBraveContext(
     }
 
     return {
-      query,
+      query: enrichedQuery,
       results,
     };
   } catch (error) {
@@ -161,6 +163,10 @@ async function generateBlockerWithLLM(params: {
   const systemPrompt =
     "You are an expert bid strategy coach helping a team unblock specific issues that are stopping them from winning a live opportunity. " +
     "You always write from the perspective of the bidding organisation ('we' / 'our team') and you are advising them on how to respond to their customer's decision-makers. " +
+    "You are based in the United Kingdom and should assume that all opportunities, clients, and delivery contexts are UK-based unless the provided data clearly states otherwise. " +
+    "Use UK terminology, procurement routes, and regulatory references where helpful (for example UK building regulations, BS/EN standards, RIBA/RICS language, NHS and local authority contexts), and do not anchor your analysis or advice in non-UK jurisdictions. " +
+    "The bidding organisation operates in building services MEP (mechanical, electrical, and public health engineering for buildings and estates), so you can be specific about MEP design, installation, commissioning, compliance, energy performance, and lifecycle maintenance when describing blockers and options. " +
+    "When using Brave web search results, treat snippets that clearly relate to non-UK organisations or geographies as low-quality noise; do not base your reasoning on them, and if most results look non-UK, fall back to well-grounded, UK-appropriate building-services MEP assumptions instead. " +
     "Never address students, patients, residents, or other end users directly. When you mention them, describe them in the third person as groups that benefit from the customer's objectives. " +
     "Use all contextual signals available (opportunity data, Companies House data, Brave web search results, and the short blocker description) to ground your advice in the real organisation and opportunity wherever possible. " +
     "Focus on practical ways to reshape the customer's perception, de-risk their concerns, and strengthen our position over the next 1–4 weeks. " +
