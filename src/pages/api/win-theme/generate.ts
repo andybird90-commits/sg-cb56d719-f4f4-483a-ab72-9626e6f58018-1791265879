@@ -186,13 +186,6 @@ async function generateWinThemeWithLLM(params: {
   braveContext: BraveContext | null;
   strategySettings: Record<string, unknown> | null | undefined;
 }): Promise<GeneratedWinThemeResult | null> {
-  if (process.env.NODE_ENV === "development") {
-    console.warn(
-      "[win-theme] Skipping LLM Win Theme generation in development; using placeholder payload instead."
-    );
-    return null;
-  }
-
   const apiKey = process.env.OPENAI_API_KEY;
 
   if (!apiKey) {
