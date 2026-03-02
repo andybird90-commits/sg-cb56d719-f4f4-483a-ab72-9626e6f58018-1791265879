@@ -78,6 +78,63 @@ interface LatestWinThemeSummary {
   id: string;
   summary: string | null;
   generated_at: string | null;
+  payload: WinThemePayload | null;
+}
+
+interface WinThemePayloadKeyMove {
+  title: string;
+  description: string;
+  timeframe?: string;
+  owner_hint?: string;
+}
+
+interface WinThemePayloadRisk {
+  risk: string;
+  likelihood?: string;
+  impact?: string;
+  mitigation_strategy: string;
+}
+
+interface WinThemePayloadProposalArchitecture {
+  recommended_structure: string;
+  must_hit_messages?: string[];
+  evidence_to_show?: string[];
+}
+
+interface WinThemePayloadStakeholderStrategy {
+  key_stakeholder_groups?: string[];
+  engagement_tactics?: string[];
+}
+
+interface WinThemePayloadTalkTracks {
+  meeting_openers?: string[];
+  email_subject_ideas?: string[];
+  email_hook_paragraph?: string;
+}
+
+interface WinThemePayload {
+  executive_win_theme: string;
+  client_context_insight: string;
+  value_narrative: string;
+  key_moves: WinThemePayloadKeyMove[];
+  risks_and_objections: WinThemePayloadRisk[];
+  proposal_architecture: WinThemePayloadProposalArchitecture;
+  stakeholder_strategy?: WinThemePayloadStakeholderStrategy;
+  talk_tracks_and_openers?: WinThemePayloadTalkTracks;
+  gaps_and_unknowns: string[];
+}
+
+function parseWinThemePayload(payload: unknown): WinThemePayload | null {
+  if (!payload || typeof payload !== "object") return null;
+  const obj = payload as Record<string, unknown>;
+  if (
+    typeof obj.executive_win_theme !== "string" ||
+    typeof obj.client_context_insight !== "string" ||
+    typeof obj.value_narrative !== "string"
+  ) {
+    return null;
+  }
+  return obj as unknown as WinThemePayload;
 }
 
 function OpportunityDetailContent() {
@@ -153,14 +210,14 @@ function OpportunityDetailContent() {
     try {
       const { data, error } = await supabase
         .from("win_themes")
-        .select("id, summary, generated_at")
+        .select("id, summary, generated_at, payload")
         .eq("opportunity_id", oppId)
         .order("generated_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 
       if (error) {
-        console.error("Failed to load latest Win Theme for opportunity", { oppId, error });
+        console.error("Failed to load latest Win Theme summary for opportunity", { oppId, error });
         setLatestWinTheme(null);
         return;
       }
@@ -170,13 +227,16 @@ function OpportunityDetailContent() {
         return;
       }
 
+      const parsedPayload = parseWinThemePayload((data as any).payload);
+
       setLatestWinTheme({
         id: data.id as string,
         summary: (data as any).summary ?? null,
         generated_at: (data as any).generated_at ?? null,
+        payload: parsedPayload,
       });
     } catch (err) {
-      console.error("Unexpected error fetching latest Win Theme", err);
+      console.error("Unexpected error fetching latest Win Theme summary", err);
       setLatestWinTheme(null);
     }
   };
@@ -766,7 +826,7 @@ function OpportunityDetailContent() {
           </Card>
         )}
 
-        {/* Latest Win Theme summary */}
+        {/* Win Theme - full strategy view */}
         {!loading && opportunity && latestWinTheme && (
           <Card>
             <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
@@ -786,11 +846,253 @@ function OpportunityDetailContent() {
                 View full workspace
               </Button>
             </CardHeader>
-            <CardContent>
-              {latestWinTheme.summary ? (
-                <p className="text-sm text-slate-100">
-                  {latestWinTheme.summary}
-                </p>
+            <CardContent className="space-y-4">
+              {latestWinTheme.payload ? (
+                <>
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold">Executive Win Theme</h3>
+                    <p className="text-sm text-slate-100 leading-relaxed">
+                      {latestWinTheme.payload.executive_win_theme}
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold">Client context insight</h3>
+                    <p className="text-sm text-slate-100 leading-relaxed">
+                      {latestWinTheme.payload.client_context_insight}
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold">Value narrative</h3>
+                    <p className="text-sm text-slate-100 leading-relaxed">
+                      {latestWinTheme.payload.value_narrative}
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold">Key moves and actions</h3>
+                    {latestWinTheme.payload.key_moves.length === 0 ? (
+                      <p className="text-sm text-slate-400">
+                        No key moves captured for this strategy.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {latestWinTheme.payload.key_moves.map((move, index) => (
+                          <div
+                            key={`${move.title}-${index}`}
+                            className="rounded-md border border-slate-700 px-3 py-2"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+                              <span className="text-sm font-medium text-slate-100">
+                                {move.title}
+                              </span>
+                              <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+                                {move.timeframe && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] px-1.5 py-0 h-5"
+                                  >
+                                    {move.timeframe}
+                                  </Badge>
+                                )}
+                                {move.owner_hint && <span>{move.owner_hint}</span>}
+                              </div>
+                            </div>
+                            <p className="text-xs text-slate-300 leading-relaxed">
+                              {move.description}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold">Risks and objections</h3>
+                    {latestWinTheme.payload.risks_and_objections.length === 0 ? (
+                      <p className="text-sm text-slate-400">
+                        No risks captured for this strategy. Treat that as a gap and challenge the plan.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {latestWinTheme.payload.risks_and_objections.map((riskItem, index) => (
+                          <div
+                            key={`${riskItem.risk}-${index}`}
+                            className="rounded-md border border-slate-700 px-3 py-2"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+                              <span className="text-sm font-medium text-slate-100">
+                                {riskItem.risk}
+                              </span>
+                              <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+                                {riskItem.likelihood && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] px-1.5 py-0 h-5"
+                                  >
+                                    Likelihood: {riskItem.likelihood}
+                                  </Badge>
+                                )}
+                                {riskItem.impact && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] px-1.5 py-0 h-5"
+                                  >
+                                    Impact: {riskItem.impact}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                            <p className="text-xs text-slate-300 leading-relaxed">
+                              Mitigation: {riskItem.mitigation_strategy}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold">Proposal architecture</h3>
+                    <p className="text-sm text-slate-100 leading-relaxed">
+                      {latestWinTheme.payload.proposal_architecture.recommended_structure}
+                    </p>
+
+                    {latestWinTheme.payload.proposal_architecture.must_hit_messages &&
+                      latestWinTheme.payload.proposal_architecture.must_hit_messages.length > 0 && (
+                        <div className="space-y-1.5">
+                          <h4 className="text-xs font-medium text-slate-300">
+                            Must-hit messages
+                          </h4>
+                          <ul className="list-disc pl-4 text-sm text-slate-100 space-y-1">
+                            {latestWinTheme.payload.proposal_architecture.must_hit_messages.map(
+                              (message, index) => (
+                                <li key={`${message}-${index}`}>{message}</li>
+                              ),
+                            )}
+                          </ul>
+                        </div>
+                      )}
+
+                    {latestWinTheme.payload.proposal_architecture.evidence_to_show &&
+                      latestWinTheme.payload.proposal_architecture.evidence_to_show.length > 0 && (
+                        <div className="space-y-1.5">
+                          <h4 className="text-xs font-medium text-slate-300">
+                            Evidence to show
+                          </h4>
+                          <ul className="list-disc pl-4 text-sm text-slate-100 space-y-1">
+                            {latestWinTheme.payload.proposal_architecture.evidence_to_show.map(
+                              (evidence, index) => (
+                                <li key={`${evidence}-${index}`}>{evidence}</li>
+                              ),
+                            )}
+                          </ul>
+                        </div>
+                      )}
+                  </div>
+
+                  {latestWinTheme.payload.stakeholder_strategy && (
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-semibold">Stakeholder strategy</h3>
+                      {latestWinTheme.payload.stakeholder_strategy.key_stakeholder_groups &&
+                        latestWinTheme.payload.stakeholder_strategy.key_stakeholder_groups.length > 0 && (
+                          <div className="space-y-1.5">
+                            <h4 className="text-xs font-medium text-slate-300">
+                              Key stakeholder groups
+                            </h4>
+                            <ul className="list-disc pl-4 text-sm text-slate-100 space-y-1">
+                              {latestWinTheme.payload.stakeholder_strategy.key_stakeholder_groups.map(
+                                (group, index) => (
+                                  <li key={`${group}-${index}`}>{group}</li>
+                                ),
+                              )}
+                            </ul>
+                          </div>
+                        )}
+
+                      {latestWinTheme.payload.stakeholder_strategy.engagement_tactics &&
+                        latestWinTheme.payload.stakeholder_strategy.engagement_tactics.length > 0 && (
+                          <div className="space-y-1.5">
+                            <h4 className="text-xs font-medium text-slate-300">
+                              Engagement tactics
+                            </h4>
+                            <ul className="list-disc pl-4 text-sm text-slate-100 space-y-1">
+                              {latestWinTheme.payload.stakeholder_strategy.engagement_tactics.map(
+                                (tactic, index) => (
+                                  <li key={`${tactic}-${index}`}>{tactic}</li>
+                                ),
+                              )}
+                            </ul>
+                          </div>
+                        )}
+                    </div>
+                  )}
+
+                  {latestWinTheme.payload.talk_tracks_and_openers && (
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-semibold">Talk tracks and openers</h3>
+
+                      {latestWinTheme.payload.talk_tracks_and_openers.meeting_openers &&
+                        latestWinTheme.payload.talk_tracks_and_openers.meeting_openers.length > 0 && (
+                          <div className="space-y-1.5">
+                            <h4 className="text-xs font-medium text-slate-300">
+                              Meeting openers
+                            </h4>
+                            <ul className="list-disc pl-4 text-sm text-slate-100 space-y-1">
+                              {latestWinTheme.payload.talk_tracks_and_openers.meeting_openers.map(
+                                (opener, index) => (
+                                  <li key={`${opener}-${index}`}>{opener}</li>
+                                ),
+                              )}
+                            </ul>
+                          </div>
+                        )}
+
+                      {latestWinTheme.payload.talk_tracks_and_openers.email_subject_ideas &&
+                        latestWinTheme.payload.talk_tracks_and_openers.email_subject_ideas.length > 0 && (
+                          <div className="space-y-1.5">
+                            <h4 className="text-xs font-medium text-slate-300">
+                              Email subject ideas
+                            </h4>
+                            <ul className="list-disc pl-4 text-sm text-slate-100 space-y-1">
+                              {latestWinTheme.payload.talk_tracks_and_openers.email_subject_ideas.map(
+                                (subject, index) => (
+                                  <li key={`${subject}-${index}`}>{subject}</li>
+                                ),
+                              )}
+                            </ul>
+                          </div>
+                        )}
+
+                      {latestWinTheme.payload.talk_tracks_and_openers.email_hook_paragraph && (
+                        <div className="space-y-1.5">
+                          <h4 className="text-xs font-medium text-slate-300">
+                            Email hook paragraph
+                          </h4>
+                          <p className="text-sm text-slate-100 leading-relaxed">
+                            {latestWinTheme.payload.talk_tracks_and_openers.email_hook_paragraph}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold">Gaps and unknowns</h3>
+                    {latestWinTheme.payload.gaps_and_unknowns.length === 0 ? (
+                      <p className="text-sm text-slate-400">
+                        No explicit gaps captured. Treat this as incomplete and challenge it.
+                      </p>
+                    ) : (
+                      <ul className="list-disc pl-4 text-sm text-slate-100 space-y-1">
+                        {latestWinTheme.payload.gaps_and_unknowns.map((gap, index) => (
+                          <li key={`${gap}-${index}`}>{gap}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </>
               ) : (
                 <p className="text-sm text-slate-500">
                   A Win Theme has been generated for this opportunity. Open the workspace to see the full strategy.
