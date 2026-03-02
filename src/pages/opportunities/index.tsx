@@ -94,8 +94,18 @@ function OpportunitiesContent() {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setOpportunities((data as any) || []);
-      setFilteredOpportunities((data as any) || []);
+
+      const allOpps = ((data as any) || []) as Opportunity[];
+
+      const pipelineOpps = allOpps.filter(
+        (opp) =>
+          opp.stage === "bid" ||
+          opp.stage === "high_potential" ||
+          opp.stage === "in_bid"
+      );
+
+      setOpportunities(pipelineOpps);
+      setFilteredOpportunities(pipelineOpps);
     } catch (err) {
       console.error("Failed to load opportunities", err);
       setError("Failed to load opportunities");
@@ -174,7 +184,11 @@ function OpportunitiesContent() {
 
   // Derive live + high_potential opportunities for the top table
   const liveAndHighPotential = opportunities.filter(
-    (opp) => !opp.archived && (opp.stage === "bid" || opp.stage === "high_potential" || opp.stage === "secured")
+    (opp) =>
+      !opp.archived &&
+      (opp.stage === "bid" ||
+        opp.stage === "high_potential" ||
+        opp.stage === "in_bid")
   );
 
   // Sort that list by created_at desc and then by expected_fee_value desc as a reasonable default
