@@ -859,7 +859,7 @@ function WinThemePage() {
           </Alert>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)] gap-4 lg:gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)] gap-4 lg:gap-6">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">
@@ -890,7 +890,7 @@ function WinThemePage() {
 
               {!loading && filteredLatest.length > 0 && (
                 <ScrollArea className="h-[360px] pr-1">
-                  <div className="space-y-3 px-2">
+                  <div className="space-y-3 pl-2 pr-4">
                     {filteredLatest.map((item) => {
                       const opportunity = item.opportunity;
                       const isActive =
