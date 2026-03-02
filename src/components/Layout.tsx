@@ -28,6 +28,8 @@ import {
   Construction,
   Database,
   Gauge,
+  ShoppingCart,
+  Receipt,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useState } from "react";
@@ -73,8 +75,8 @@ export function Layout({ children, variant = "default" }: LayoutProps) {
     { href: "/opportunities", icon: Target, label: "Opportunities" },
     { href: "/win-theme", icon: WinThemeIcon, label: "Win Theme" },
     { href: "/projects", icon: Briefcase, label: "Projects" },
+    { href: "/procurement", icon: ShoppingCart, label: "Procurement (Coming Soon)" },
     { href: "/designr-lite", icon: Activity, label: "DesignR™ Lite (Coming Soon)" },
-    { href: "/pipeline", icon: Gauge, label: "Pipeline" },
     { href: "/calendar", icon: CalendarIcon, label: "Calendar" },
     { href: "/timesheets/my", icon: Clock, label: "Timesheets" },
     { href: "/financials", icon: PoundSterling, label: "Financials" },

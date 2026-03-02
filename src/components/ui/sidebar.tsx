@@ -2,6 +2,13 @@ import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { VariantProps, cva } from "class-variance-authority"
 import { PanelLeft } from "lucide-react"
+import {
+  LayoutDashboard,
+  Target,
+  Briefcase,
+  ShoppingCart,
+  Receipt,
+} from "lucide-react"
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
@@ -742,6 +749,8 @@ const SidebarMenuSubButton = React.forwardRef<
   )
 })
 SidebarMenuSubButton.displayName = "SidebarMenuSubButton"
+
+// Ensure any previous item with title 'Pipeline' or href starting '/pipeline' is removed from the nav item arrays.
 
 export {
   Sidebar,
