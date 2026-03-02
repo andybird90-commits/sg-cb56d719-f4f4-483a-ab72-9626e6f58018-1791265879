@@ -81,7 +81,11 @@ async function generateWinThemeWithLLM(params: {
   const { opportunity, mode, baseSummary, companiesHouse, strategySettings } = params;
 
   const systemPrompt =
-    "You are an expert bid strategy consultant creating highly practical, concise Win Themes for professional services proposals. " +
+    "You are an expert bid strategy consultant creating detailed, highly practical Win Themes for professional services proposals. " +
+    "You are advising a bidding organisation (our client) on how to win a specific opportunity with their customer. " +
+    "Always frame the Win Theme from the perspective of helping our direct client (the bidding organisation, typically opportunity.company_name) win the project. " +
+    "End users or ultimate beneficiaries are secondary context, not the primary client, unless the data explicitly states that our client is also the end user. " +
+    "Use all contextual signals available (opportunity data, company data, Companies House data, strategy settings) to ground your recommendations. " +
     "You MUST respond with STRICT JSON that matches the WinThemePayload TypeScript structure provided. " +
     "Do not include any explanations, markdown, or extra keys. Only return JSON.";
 
@@ -95,6 +99,9 @@ async function generateWinThemeWithLLM(params: {
 
   const userPrompt =
     "Using the following context from a bid management system, create a complete Win Theme.\n\n" +
+    "The Win Theme MUST be written from the point of view of our direct client (the bidding organisation) winning this opportunity with their customer. " +
+    "Assume the primary client is the organisation represented by the opportunity and company data (for example, RJS Ventol). " +
+    "Focus on how we help this client win the project and the evaluation, not on generic messaging about how they serve their own end users, except where this clearly strengthens the case for winning the bid.\n\n" +
     "CONTEXT (JSON):\n" +
     JSON.stringify(context, null, 2) +
     "\n\n" +
@@ -133,12 +140,17 @@ async function generateWinThemeWithLLM(params: {
 }
 ` +
     "Guidelines:\n" +
-    "- Be specific and grounded in the opportunity/company context provided.\n" +
-    "- Executive win theme should be 1–3 punchy sentences, not a paragraph of fluff.\n" +
-    "- Key moves should be concrete actions the team can take.\n" +
-    "- Risks must be realistic objections or delivery risks, each with a mitigation.\n" +
-    "- Proposal architecture should read like a recommended section outline.\n" +
-    "- If some sections are not relevant, still return them but keep arrays short.\n";
+    "- Treat the bidding organisation (for example, RJS Ventol) as \"we\" / \"our team\". Write to the customer's decision-makers who are evaluating the bid.\n" +
+    "- Use Companies House data (status, SIC codes, etc.) and any strategy_settings when present to sharpen insight and risks.\n" +
+    "- Executive win theme: 2–3 punchy sentences that clearly state why choosing our client for THIS opportunity is the safest, highest-value choice.\n" +
+    "- Client context insight: 1–2 short paragraphs summarising the situation, drivers, constraints and what matters most to the customer for this project.\n" +
+    "- Value narrative: several sentences (or 2–3 short paragraphs) that link our client's specific strengths to the customer's success criteria for this opportunity.\n" +
+    "- Key moves: at least 3–5 concrete, actionable moves the team can take to strengthen their position and win. Each move should be 2–3 sentences of detail, not just a label.\n" +
+    "- Risks and objections: at least 3 realistic evaluation or delivery risks in the context of this bid, each with a specific, credible mitigation strategy.\n" +
+    "- Proposal architecture: a clear recommended structure for the proposal or pitch (1–2 paragraphs plus specific must-hit messages and evidence where possible).\n" +
+    "- Stakeholder strategy: where relevant, identify key stakeholder groups and practical engagement tactics tailored to this opportunity.\n" +
+    "- Talk tracks and openers: provide concrete meeting openers and email subject ideas that feel specific to this client and opportunity, plus a short, compelling email hook paragraph.\n" +
+    "- If some sections are genuinely not relevant based on the context, keep them brief but still return them; do not omit any keys.\n";
 
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
