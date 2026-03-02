@@ -74,6 +74,12 @@ interface User {
   email: string;
 }
 
+interface LatestWinThemeSummary {
+  id: string;
+  summary: string | null;
+  generated_at: string | null;
+}
+
 function OpportunityDetailContent() {
   const { profile } = useAuth();
   const router = useRouter();
@@ -84,6 +90,7 @@ function OpportunityDetailContent() {
   const [error, setError] = useState<string | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [contacts, setContacts] = useState<Array<{ id: string; name: string; email?: string; phone?: string }>>([]);
+  const [latestWinTheme, setLatestWinTheme] = useState<LatestWinThemeSummary | null>(null);
   const [editFormData, setEditFormData] = useState({
     name: "",
     stage: "",
@@ -142,6 +149,38 @@ function OpportunityDetailContent() {
     }
   };
 
+  const fetchLatestWinTheme = async (oppId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("win_themes")
+        .select("id, summary, generated_at")
+        .eq("opportunity_id", oppId)
+        .order("generated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Failed to load latest Win Theme for opportunity", { oppId, error });
+        setLatestWinTheme(null);
+        return;
+      }
+
+      if (!data) {
+        setLatestWinTheme(null);
+        return;
+      }
+
+      setLatestWinTheme({
+        id: data.id as string,
+        summary: (data as any).summary ?? null,
+        generated_at: (data as any).generated_at ?? null,
+      });
+    } catch (err) {
+      console.error("Unexpected error fetching latest Win Theme", err);
+      setLatestWinTheme(null);
+    }
+  };
+
   const fetchOpportunity = async (oppId: string) => {
     try {
       const { data, error } = await supabase
@@ -173,6 +212,9 @@ function OpportunityDetailContent() {
       if (opportunityData.company_id) {
         fetchContacts(opportunityData.company_id);
       }
+
+      // Fetch latest Win Theme for this opportunity
+      void fetchLatestWinTheme(oppId);
       
       setEditFormData({
         name: opportunityData.name,
@@ -721,6 +763,40 @@ function OpportunityDetailContent() {
                 </div>
               </div>
             )}
+          </Card>
+        )}
+
+        {/* Latest Win Theme summary */}
+        {!loading && opportunity && latestWinTheme && (
+          <Card>
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
+              <div>
+                <CardTitle className="text-base sm:text-lg">Win Theme</CardTitle>
+                {latestWinTheme.generated_at && (
+                  <p className="text-xs text-slate-500">
+                    Generated {formatDate(latestWinTheme.generated_at)}
+                  </p>
+                )}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push(`/win-theme?opportunity_id=${opportunity.id}`)}
+              >
+                View full workspace
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {latestWinTheme.summary ? (
+                <p className="text-sm text-slate-100">
+                  {latestWinTheme.summary}
+                </p>
+              ) : (
+                <p className="text-sm text-slate-500">
+                  A Win Theme has been generated for this opportunity. Open the workspace to see the full strategy.
+                </p>
+              )}
+            </CardContent>
           </Card>
         )}
 

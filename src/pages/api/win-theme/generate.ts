@@ -101,13 +101,31 @@ async function fetchBraveContext(
     queryParts.push(String(opportunity.project_reference));
   }
 
-  let query = queryParts.join(" ");
+  let query = queryParts.join(" ").trim();
+
+  // Treat obviously placeholder / meaningless names as missing, so we don't
+  // query Brave for things like "Unknown opportunity" and get irrelevant noise back.
   if (!query) {
     if (opportunity.company_number) {
       query = `company ${opportunity.company_number}`;
     } else {
-      query = "tender opportunity construction professional services";
+      query = "";
     }
+  }
+
+  const lowerQuery = query.toLowerCase();
+  const meaninglessQueries = [
+    "unknown opportunity",
+    "unknown opportunities",
+    "opportunity unknown",
+    "tbc",
+    "tba",
+    "untitled opportunity",
+    "new opportunity",
+  ];
+
+  if (!query || meaninglessQueries.includes(lowerQuery)) {
+    return null;
   }
 
   try {
