@@ -255,7 +255,7 @@ function WinThemePage() {
         .select(
           `
           *,
-          opportunities:opportunities!win_themes_opportunity_id_fkey(
+          opportunity:opportunities!win_themes_opportunity_id_fkey(
             id,
             name,
             project_reference,
@@ -455,8 +455,31 @@ function WinThemePage() {
       });
 
       if (!response.ok) {
-        const message = await response.text();
-        setError(message || "Failed to generate Win Theme.");
+        let message: string | null = null;
+
+        try {
+          const contentType = response.headers.get("content-type") ?? "";
+
+          if (contentType.includes("application/json")) {
+            const json = (await response.json()) as {
+              error?: string;
+              message?: string;
+            };
+            message = json.error ?? json.message ?? null;
+          } else {
+            const text = await response.text();
+            if (text && !text.trim().startsWith("<")) {
+              message = text;
+            }
+          }
+        } catch {
+          // ignore parsing errors and fall back to a generic message
+        }
+
+        setError(
+          message ||
+            "The Win Theme engine is currently unavailable or returned an unexpected response. Please try again in a few minutes.",
+        );
         return;
       }
 
