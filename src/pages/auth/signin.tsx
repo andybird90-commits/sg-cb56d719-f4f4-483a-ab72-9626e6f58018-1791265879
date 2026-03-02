@@ -70,7 +70,7 @@ export default function SignInPage() {
         <CardHeader className="space-y-4">
           <div className="flex justify-center">
             <Image 
-              src="/conexaOF_logo.png" 
+              src="/conexa_of_new_logo.png" 
               alt="ConexaOF" 
               width={400}
               height={100}

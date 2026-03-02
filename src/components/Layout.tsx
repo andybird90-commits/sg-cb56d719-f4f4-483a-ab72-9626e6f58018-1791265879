@@ -121,19 +121,17 @@ export function Layout({ children, variant = "default" }: LayoutProps) {
     <div className="min-h-screen bg-background flex">
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex lg:flex-col w-64 border-r bg-card shadow-professional">
-        <div className="flex h-14 items-center justify-center border-b px-4">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="relative h-6 w-32">
-              <Image
-                src="/conexaOF_logo.png"
-                alt="ConexaOF"
-                fill
-                sizes="128px"
-                className="object-contain"
-                priority
-              />
-            </div>
-          </Link>
+        <div className="flex h-16 shrink-0 items-center border-b px-4">
+          <div className="relative w-40 h-10">
+            <Image
+              src="/conexa_of_new_logo.png"
+              alt="ConexaOF"
+              fill
+              sizes="160px"
+              className="object-contain"
+              priority
+            />
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-4">
@@ -184,7 +182,7 @@ export function Layout({ children, variant = "default" }: LayoutProps) {
             >
               <div className="relative h-8 w-32">
                 <Image
-                  src="/conexaOF_logo.png"
+                  src="/conexa_of_new_logo.png"
                   alt="ConexaOF"
                   fill
                   sizes="128px"
