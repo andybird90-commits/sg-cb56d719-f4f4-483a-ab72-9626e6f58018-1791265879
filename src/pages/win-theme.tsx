@@ -889,7 +889,7 @@ function WinThemePage() {
               )}
 
               {!loading && filteredLatest.length > 0 && (
-                <ScrollArea className="h-[360px] pr-2">
+                <ScrollArea className="h-[360px] pr-2 overflow-x-hidden">
                   <div className="space-y-3">
                     {filteredLatest.map((item) => {
                       const opportunity = item.opportunity;
@@ -909,20 +909,20 @@ function WinThemePage() {
                           key={item.id}
                           type="button"
                           onClick={() => void handleSelectOpportunity(item)}
-                          className={`w-full rounded-xl border px-3 py-3 text-left transition-colors ${
+                          className={`w-full max-w-full overflow-hidden rounded-xl border px-3 py-3 text-left transition-colors ${
                             isActive
                               ? "border-amber-400 bg-accent/70"
                               : "border-transparent hover:bg-accent/60"
                           }`}
                         >
-                          <div className="flex items-start justify-between gap-2">
+                          <div className="flex min-w-0 items-start justify-between gap-2">
                             <div className="min-w-0 flex-1 space-y-0.5">
-                              <div className="flex items-center gap-2">
+                              <div className="flex min-w-0 items-center gap-2">
                                 <h3 className="truncate text-sm font-semibold text-foreground">
                                   {opportunity?.name || "Unknown opportunity"}
                                 </h3>
                                 {companyName && (
-                                  <span className="truncate rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                                  <span className="max-w-[45%] shrink-0 truncate rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
                                     {companyName}
                                   </span>
                                 )}
@@ -946,7 +946,7 @@ function WinThemePage() {
                           </div>
 
                           {summaryText && (
-                            <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">
+                            <p className="mt-2 line-clamp-2 break-words text-xs text-muted-foreground">
                               {summaryText}
                             </p>
                           )}
