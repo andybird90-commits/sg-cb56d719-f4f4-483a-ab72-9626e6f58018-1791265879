@@ -889,6 +889,8 @@ function DashboardContent() {
       }))
     : pipelineData;
 
+  const showLiveOpportunitiesTableOnDashboard = false;
+
   return (
     <Layout>
       <div className="space-y-6">
@@ -1371,6 +1373,7 @@ function DashboardContent() {
         </div>
 
         {/* Live Opportunities & High Potentials Table */}
+        {showLiveOpportunitiesTableOnDashboard && (
         <Card className="card-professional">
           <CardHeader className="pb-6">
             <div className="flex items-center gap-3 mb-2">
@@ -1479,6 +1482,7 @@ function DashboardContent() {
             }
           </CardContent>
         </Card>
+        )}
 
         {/* Quick Add Event Dialog */}
         <Dialog open={showQuickAddEvent} onOpenChange={setShowQuickAddEvent}>
