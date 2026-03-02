@@ -36,6 +36,7 @@ import {
   Loader2,
   Target,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface OpportunitySummary {
   id: string;
@@ -131,12 +132,6 @@ type WinThemeWithJoinedOpportunity = WinThemeRow & {
   opportunity?: OpportunitySummary | null;
 };
 
-type CopyStateKey =
-  | "email_hook"
-  | "talk_tracks"
-  | "executive"
-  | "value_narrative";
-
 type GenerateMode = "generate" | "regenerate" | "clone";
 
 interface GenerateWinThemeResponse {
@@ -146,15 +141,161 @@ interface GenerateWinThemeResponse {
   context_bundle?: WinThemeContextBundle | null;
 }
 
+type CopyStateKey =
+  | "email_hook"
+  | "talk_tracks"
+  | "executive"
+  | "value_narrative";
+
 interface BlockerChatMessage {
   role: "user" | "assistant";
   content: string;
+}
+
+interface BlockerContextForWinTheme {
+  latest_description: string;
+  history: BlockerChatMessage[];
 }
 
 interface BlockerApiResponse {
   analysis: string;
   suggestions: string[];
   questions: string[];
+}
+
+interface GenerateDeps {
+  profile: { id?: string | null } | null;
+  selectedOpportunity: OpportunitySummary | null;
+  selectedWinTheme: WinThemeRow | null;
+  setError: (val: string | null) => void;
+  setGeneratingMode: (mode: GenerateMode | null) => void;
+  setSelectedWinThemes: (themes: WinThemeRow[]) => void;
+  setSelectedWinTheme: (theme: WinThemeRow | null) => void;
+  setEditablePayload: (payload: WinThemePayload | null) => void;
+  setIsEditing: (val: boolean) => void;
+  loadLatestPerOpportunity: () => Promise<void>;
+}
+
+async function handleGenerateWinTheme(
+  mode: GenerateMode,
+  deps: GenerateDeps,
+  options?: { blockerContext?: BlockerContextForWinTheme },
+) {
+  const {
+    profile,
+    selectedOpportunity,
+    selectedWinTheme,
+    setError,
+    setGeneratingMode,
+    setSelectedWinThemes,
+    setSelectedWinTheme,
+    setEditablePayload,
+    setIsEditing,
+    loadLatestPerOpportunity,
+  } = deps;
+
+  if (!profile?.id) {
+    setError("You must be signed in to generate a Win Theme.");
+    return;
+  }
+  if (!selectedOpportunity) {
+    setError("Select an opportunity first to generate a Win Theme.");
+    return;
+  }
+  if ((mode === "regenerate" || mode === "clone") && !selectedWinTheme) {
+    setError("There is no existing Win Theme to regenerate or clone.");
+    return;
+  }
+
+  try {
+    setGeneratingMode(mode);
+    setError(null);
+
+    const body: Record<string, unknown> = {
+      mode,
+      opportunity: {
+        id: selectedOpportunity.id,
+        name: selectedOpportunity.name,
+        project_reference: selectedOpportunity.project_reference,
+        company_name: selectedOpportunity.company_name,
+        company_number: selectedOpportunity.company_number,
+      },
+    };
+
+    if (selectedWinTheme && (mode === "regenerate" || mode === "clone")) {
+      (body as Record<string, unknown>).base = {
+        summary: selectedWinTheme.summary,
+        payload: selectedWinTheme.payload,
+      };
+    }
+
+    if (options?.blockerContext) {
+      (body as Record<string, unknown>).blocker_context = options.blockerContext;
+    }
+
+    const response = await fetch("/api/win-theme/generate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      let message: string | null = null;
+
+      try {
+        const contentType = response.headers.get("content-type") ?? "";
+
+        if (contentType.includes("application/json")) {
+          const json = (await response.json()) as {
+            error?: string;
+            message?: string;
+          };
+          message = json.error ?? json.message ?? null;
+        } else {
+          const text = await response.text();
+          if (text && !text.trim().startsWith("<")) {
+            message = text;
+          }
+        }
+      } catch {
+        // ignore parsing errors and fall back to a generic message
+      }
+
+      setError(
+        message ||
+          "The Win Theme engine is currently unavailable or returned an unexpected response. Please try again in a few minutes.",
+      );
+      return;
+    }
+
+    const json = (await response.json()) as GenerateWinThemeResponse;
+
+    const created = await createWinTheme({
+      opportunity_id: selectedOpportunity.id,
+      generated_by_user_id: profile.id as string,
+      strategy_settings: (json.strategy_settings || {}) as unknown as any,
+      payload: json.payload as unknown as any,
+      summary: json.summary,
+      contextBundle: (json.context_bundle || null) as WinThemeContextBundle | null,
+    });
+
+    const themes = await listWinThemesForOpportunity(selectedOpportunity.id);
+    setSelectedWinThemes(themes);
+
+    const latest = themes[0] ?? created;
+    setSelectedWinTheme(latest);
+    const parsed = parsePayload(latest.payload);
+    setEditablePayload(parsed);
+    setIsEditing(false);
+
+    void loadLatestPerOpportunity();
+  } catch {
+    setError("Failed to generate Win Theme.");
+  } finally {
+    setGeneratingMode(null);
+  }
 }
 
 function formatDate(dateString: string | null): string {
@@ -255,6 +396,19 @@ function WinThemePage() {
   const [blockerInput, setBlockerInput] = useState("");
   const [blockerLoading, setBlockerLoading] = useState(false);
   const [blockerError, setBlockerError] = useState<string | null>(null);
+
+  const buildGenerateDeps = (): GenerateDeps => ({
+    profile,
+    selectedOpportunity,
+    selectedWinTheme,
+    setError,
+    setGeneratingMode,
+    setSelectedWinThemes,
+    setSelectedWinTheme,
+    setEditablePayload,
+    setIsEditing,
+    loadLatestPerOpportunity,
+  });
 
   useEffect(() => {
     if (!profile) return;
@@ -426,108 +580,6 @@ function WinThemePage() {
     }
   };
 
-  const handleGenerateWinTheme = async (mode: GenerateMode) => {
-    if (!profile?.id) {
-      setError("You must be signed in to generate a Win Theme.");
-      return;
-    }
-    if (!selectedOpportunity) {
-      setError("Select an opportunity first to generate a Win Theme.");
-      return;
-    }
-    if ((mode === "regenerate" || mode === "clone") && !selectedWinTheme) {
-      setError("There is no existing Win Theme to regenerate or clone.");
-      return;
-    }
-
-    try {
-      setGeneratingMode(mode);
-      setError(null);
-
-      const body: Record<string, unknown> = {
-        mode,
-        opportunity: {
-          id: selectedOpportunity.id,
-          name: selectedOpportunity.name,
-          project_reference: selectedOpportunity.project_reference,
-          company_name: selectedOpportunity.company_name,
-          company_number: selectedOpportunity.company_number,
-        },
-      };
-
-      if (selectedWinTheme && (mode === "regenerate" || mode === "clone")) {
-        (body as Record<string, unknown>).base = {
-          summary: selectedWinTheme.summary,
-          payload: selectedWinTheme.payload,
-        };
-      }
-
-      const response = await fetch("/api/win-theme/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        let message: string | null = null;
-
-        try {
-          const contentType = response.headers.get("content-type") ?? "";
-
-          if (contentType.includes("application/json")) {
-            const json = (await response.json()) as {
-              error?: string;
-              message?: string;
-            };
-            message = json.error ?? json.message ?? null;
-          } else {
-            const text = await response.text();
-            if (text && !text.trim().startsWith("<")) {
-              message = text;
-            }
-          }
-        } catch {
-          // ignore parsing errors and fall back to a generic message
-        }
-
-        setError(
-          message ||
-            "The Win Theme engine is currently unavailable or returned an unexpected response. Please try again in a few minutes.",
-        );
-        return;
-      }
-
-      const json = (await response.json()) as GenerateWinThemeResponse;
-
-      const created = await createWinTheme({
-        opportunity_id: selectedOpportunity.id,
-        generated_by_user_id: profile.id,
-        strategy_settings: (json.strategy_settings || {}) as unknown as any,
-        // Relax payload typing to satisfy Supabase Json while keeping structure at runtime
-        payload: json.payload as unknown as any,
-        summary: json.summary,
-        contextBundle: (json.context_bundle || null) as WinThemeContextBundle | null,
-      });
-
-      const themes = await listWinThemesForOpportunity(selectedOpportunity.id);
-      setSelectedWinThemes(themes);
-
-      const latest = themes[0] ?? created;
-      setSelectedWinTheme(latest);
-      const parsed = parsePayload(latest.payload);
-      setEditablePayload(parsed);
-      setIsEditing(false);
-
-      void loadLatestPerOpportunity();
-    } catch {
-      setError("Failed to generate Win Theme.");
-    } finally {
-      setGeneratingMode(null);
-    }
-  };
-
   const handleCopy = async (key: CopyStateKey, text: string | undefined) => {
     if (!text) return;
     if (typeof navigator === "undefined" || !navigator.clipboard) return;
@@ -597,7 +649,7 @@ function WinThemePage() {
             }
           }
         } catch {
-          // ignore parse errors
+          // ignore parsing errors and fall back to a generic message
         }
 
         setBlockerError(
@@ -640,6 +692,44 @@ function WinThemePage() {
     } finally {
       setBlockerLoading(false);
     }
+  };
+
+  const handleRegenerateFromBlocker = async () => {
+    if (!selectedOpportunity) {
+      setBlockerError(
+        "Select an opportunity before regenerating the Win Theme.",
+      );
+      return;
+    }
+    if (!selectedWinTheme) {
+      setBlockerError(
+        "Generate an initial Win Theme first, then you can regenerate it from the blocker context.",
+      );
+      return;
+    }
+
+    const latestTyped = blockerInput.trim();
+    const lastUserFromHistory =
+      [...blockerMessages]
+        .reverse()
+        .find((m) => m.role === "user")?.content ?? "";
+
+    const description = latestTyped || lastUserFromHistory;
+
+    if (!description) {
+      setBlockerError(
+        "Add a short description of the blocker before regenerating the Win Theme.",
+      );
+      return;
+    }
+
+    setBlockerError(null);
+    await handleGenerateWinTheme("regenerate", buildGenerateDeps(), {
+      blockerContext: {
+        latest_description: description,
+        history: blockerMessages,
+      },
+    });
   };
 
   const filteredLatest = useMemo(() => {
@@ -800,7 +890,7 @@ function WinThemePage() {
 
               {!loading && filteredLatest.length > 0 && (
                 <ScrollArea className="h-[360px] pr-2">
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {filteredLatest.map((item) => {
                       const opportunity = item.opportunity;
                       const isActive =
@@ -819,47 +909,44 @@ function WinThemePage() {
                           key={item.id}
                           type="button"
                           onClick={() => void handleSelectOpportunity(item)}
-                          className={`w-full text-left rounded-md border px-3 py-2 transition-colors ${
+                          className={`w-full rounded-xl border px-3 py-3 text-left transition-colors ${
                             isActive
-                              ? "border-amber-500 bg-amber-500/10"
-                              : "border-border hover:bg-muted"
+                              ? "border-amber-400 bg-accent/70"
+                              : "border-transparent hover:bg-accent/60"
                           }`}
                         >
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1 space-y-0.5">
                               <div className="flex items-center gap-2">
-                                <div className="font-medium truncate text-sm">
+                                <h3 className="truncate text-sm font-semibold text-foreground">
                                   {opportunity?.name || "Unknown opportunity"}
-                                </div>
+                                </h3>
                                 {companyName && (
-                                  <Badge
-                                    variant="outline"
-                                    className="text-[10px] px-1.5 py-0 h-5"
-                                  >
+                                  <span className="truncate rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
                                     {companyName}
-                                  </Badge>
+                                  </span>
                                 )}
                               </div>
                               {opportunity?.project_reference && (
-                                <div className="text-[11px] text-muted-foreground font-mono mt-0.5">
+                                <p className="truncate text-xs text-muted-foreground">
                                   {opportunity.project_reference}
-                                </div>
+                                </p>
                               )}
                             </div>
-                            <div className="flex flex-col items-end gap-1">
-                              <span className="text-[11px] text-muted-foreground">
+                            <div className="flex shrink-0 flex-col items-end gap-1">
+                              <span className="whitespace-nowrap text-[11px] text-muted-foreground">
                                 {dateLabel}
                               </span>
-                              <Badge
-                                variant="outline"
-                                className="text-[10px] px-1.5 py-0 h-5"
-                              >
-                                Latest
-                              </Badge>
+                              {isActive && (
+                                <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-300">
+                                  Latest
+                                </span>
+                              )}
                             </div>
                           </div>
+
                           {summaryText && (
-                            <p className="mt-1.5 text-xs text-muted-foreground line-clamp-2">
+                            <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">
                               {summaryText}
                             </p>
                           )}
@@ -903,7 +990,10 @@ function WinThemePage() {
                             !!generatingMode || loadingDetail || loading
                           }
                           onClick={() =>
-                            void handleGenerateWinTheme("generate")
+                            void handleGenerateWinTheme(
+                              "generate",
+                              buildGenerateDeps(),
+                            )
                           }
                         >
                           {generatingMode === "generate" && (
@@ -921,7 +1011,10 @@ function WinThemePage() {
                               variant="outline"
                               disabled={!!generatingMode}
                               onClick={() =>
-                                void handleGenerateWinTheme("regenerate")
+                                void handleGenerateWinTheme(
+                                  "regenerate",
+                                  buildGenerateDeps(),
+                                )
                               }
                             >
                               {generatingMode === "regenerate" && (
@@ -937,7 +1030,10 @@ function WinThemePage() {
                               variant="outline"
                               disabled={!!generatingMode}
                               onClick={() =>
-                                void handleGenerateWinTheme("clone")
+                                void handleGenerateWinTheme(
+                                  "clone",
+                                  buildGenerateDeps(),
+                                )
                               }
                             >
                               {generatingMode === "clone" && (
@@ -1610,21 +1706,37 @@ function WinThemePage() {
                                   Your description and the assistant’s replies are not
                                   stored as part of the Win Theme.
                                 </p>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  disabled={
-                                    blockerLoading ||
-                                    !selectedOpportunity ||
-                                    !blockerInput.trim()
-                                  }
-                                  onClick={() => void handleBlockerSubmit()}
-                                >
-                                  {blockerLoading && (
-                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                  )}
-                                  Get suggestions
-                                </Button>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={
+                                      blockerLoading ||
+                                      !selectedOpportunity ||
+                                      (!blockerInput.trim() && blockerMessages.length === 0) ||
+                                      !!generatingMode
+                                    }
+                                    onClick={() => void handleRegenerateFromBlocker()}
+                                  >
+                                    Use to regenerate Win Theme
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    disabled={
+                                      blockerLoading ||
+                                      !selectedOpportunity ||
+                                      !blockerInput.trim()
+                                    }
+                                    onClick={() => void handleBlockerSubmit()}
+                                  >
+                                    {blockerLoading && (
+                                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    )}
+                                    Get suggestions
+                                  </Button>
+                                </div>
                               </div>
                             </div>
                           </div>
