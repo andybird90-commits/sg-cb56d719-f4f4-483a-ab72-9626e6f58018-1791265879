@@ -271,7 +271,7 @@ function WinThemePage() {
         throw queryError;
       }
 
-      const rows = (data || []) as WinThemeWithJoinedOpportunity[];
+      const rows = (data || []) as unknown as WinThemeWithJoinedOpportunity[];
 
       const map = new Map<string, WinThemeWithJoinedOpportunity>();
       for (const row of rows) {
