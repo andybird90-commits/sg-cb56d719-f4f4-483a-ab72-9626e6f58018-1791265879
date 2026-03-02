@@ -146,6 +146,17 @@ interface GenerateWinThemeResponse {
   context_bundle?: WinThemeContextBundle | null;
 }
 
+interface BlockerChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+interface BlockerApiResponse {
+  analysis: string;
+  suggestions: string[];
+  questions: string[];
+}
+
 function formatDate(dateString: string | null): string {
   if (!dateString) return "Unknown";
   const date = new Date(dateString);
@@ -239,6 +250,11 @@ function WinThemePage() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [generatingMode, setGeneratingMode] = useState<GenerateMode | null>(null);
+
+  const [blockerMessages, setBlockerMessages] = useState<BlockerChatMessage[]>([]);
+  const [blockerInput, setBlockerInput] = useState("");
+  const [blockerLoading, setBlockerLoading] = useState(false);
+  const [blockerError, setBlockerError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!profile) return;
@@ -523,6 +539,106 @@ function WinThemePage() {
       }, 1500);
     } catch {
       setCopyState((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const handleBlockerSubmit = async () => {
+    if (!selectedOpportunity || !blockerInput.trim()) {
+      return;
+    }
+
+    const trimmed = blockerInput.trim();
+    const newHistory: BlockerChatMessage[] = [
+      ...blockerMessages,
+      { role: "user", content: trimmed },
+    ];
+
+    setBlockerMessages(newHistory);
+    setBlockerLoading(true);
+    setBlockerError(null);
+
+    try {
+      const body = {
+        opportunity: {
+          id: selectedOpportunity.id,
+          name: selectedOpportunity.name,
+          project_reference: selectedOpportunity.project_reference,
+          company_name: selectedOpportunity.company_name,
+          company_number: selectedOpportunity.company_number,
+        },
+        blocker_description: trimmed,
+        history: newHistory,
+      };
+
+      const response = await fetch("/api/win-theme/blocker", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        let message: string | null = null;
+
+        try {
+          const contentType = response.headers.get("content-type") ?? "";
+
+          if (contentType.includes("application/json")) {
+            const json = (await response.json()) as {
+              error?: string;
+              message?: string;
+            };
+            message = json.error ?? json.message ?? null;
+          } else {
+            const text = await response.text();
+            if (text && !text.trim().startsWith("<")) {
+              message = text;
+            }
+          }
+        } catch {
+          // ignore parse errors
+        }
+
+        setBlockerError(
+          message ||
+            "The blocker assistant is currently unavailable or returned an unexpected response. Please try again in a few minutes.",
+        );
+        return;
+      }
+
+      const json = (await response.json()) as BlockerApiResponse;
+
+      const parts: string[] = [];
+      if (json.analysis) {
+        parts.push(json.analysis);
+      }
+      if (Array.isArray(json.suggestions) && json.suggestions.length > 0) {
+        parts.push(
+          "Suggestions:\n" + json.suggestions.map((s) => `- ${s}`).join("\n"),
+        );
+      }
+      if (Array.isArray(json.questions) && json.questions.length > 0) {
+        parts.push(
+          "Questions to explore:\n" + json.questions.map((q) => `- ${q}`).join("\n"),
+        );
+      }
+
+      const assistantText =
+        parts.join("\n\n") ||
+        "I was not able to generate specific suggestions this time. Try reframing the blocker or adding more detail.";
+
+      setBlockerMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: assistantText },
+      ]);
+      setBlockerInput("");
+    } catch {
+      setBlockerError(
+        "Failed to get suggestions from the blocker assistant. Please try again.",
+      );
+    } finally {
+      setBlockerLoading(false);
     }
   };
 
@@ -928,6 +1044,9 @@ function WinThemePage() {
                         </TabsTrigger>
                         <TabsTrigger value="gaps" className="text-xs">
                           Gaps
+                        </TabsTrigger>
+                        <TabsTrigger value="blocker" className="text-xs">
+                          Blocker
                         </TabsTrigger>
                         <TabsTrigger value="sources" className="text-xs">
                           Sources
@@ -1416,6 +1535,99 @@ function WinThemePage() {
                               ),
                             )}
                           </ul>
+                        )}
+                      </TabsContent>
+
+                      <TabsContent value="blocker" className="space-y-3">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <h3 className="text-sm font-semibold">Blocker assistant</h3>
+                            <p className="text-xs text-muted-foreground">
+                              Describe what seems to be blocking this win. The assistant
+                              will suggest ways to respond, using web context where
+                              available.
+                            </p>
+                          </div>
+                        </div>
+
+                        {!selectedOpportunity && (
+                          <p className="text-sm text-muted-foreground">
+                            Select an opportunity to discuss a blocker.
+                          </p>
+                        )}
+
+                        {selectedOpportunity && (
+                          <div className="space-y-3">
+                            {blockerError && (
+                              <Alert variant="destructive">
+                                <AlertDescription>{blockerError}</AlertDescription>
+                              </Alert>
+                            )}
+
+                            <div className="h-40 md:h-52 border rounded-md bg-muted/40 px-3 py-2 overflow-y-auto text-xs space-y-2">
+                              {blockerMessages.length === 0 && (
+                                <p className="text-muted-foreground">
+                                  Start by describing the blocker in your own words. For
+                                  example: &quot;Client is fixated on price despite
+                                  framework quality weightings&quot; or &quot;We have a
+                                  perceived capability gap against the incumbent&quot;.
+                                </p>
+                              )}
+
+                              {blockerMessages.map((msg, index) => (
+                                <div
+                                  key={`${msg.role}-${index}`}
+                                  className={
+                                    msg.role === "assistant"
+                                      ? "text-foreground"
+                                      : "text-muted-foreground"
+                                  }
+                                >
+                                  <p className="font-medium">
+                                    {msg.role === "assistant" ? "Assistant" : "You"}
+                                  </p>
+                                  <p className="whitespace-pre-wrap">{msg.content}</p>
+                                </div>
+                              ))}
+
+                              {blockerLoading && (
+                                <p className="text-muted-foreground">
+                                  Thinking about this blocker...
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="space-y-2">
+                              <Textarea
+                                rows={3}
+                                placeholder="Describe the blocker or concern that is making this opportunity hard to win."
+                                value={blockerInput}
+                                onChange={(e) => setBlockerInput(e.target.value)}
+                                disabled={blockerLoading || !selectedOpportunity}
+                              />
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-[11px] text-muted-foreground">
+                                  Your description and the assistant’s replies are not
+                                  stored as part of the Win Theme.
+                                </p>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  disabled={
+                                    blockerLoading ||
+                                    !selectedOpportunity ||
+                                    !blockerInput.trim()
+                                  }
+                                  onClick={() => void handleBlockerSubmit()}
+                                >
+                                  {blockerLoading && (
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                  )}
+                                  Get suggestions
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
                         )}
                       </TabsContent>
 
