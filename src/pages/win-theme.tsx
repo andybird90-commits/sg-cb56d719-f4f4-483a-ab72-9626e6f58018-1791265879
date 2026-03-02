@@ -859,7 +859,7 @@ function WinThemePage() {
           </Alert>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)] gap-4 lg:gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] xl:grid-cols-[minmax(0,460px)_minmax(0,1fr)] gap-4 lg:gap-6">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">
