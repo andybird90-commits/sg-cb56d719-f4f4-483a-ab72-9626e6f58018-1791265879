@@ -9,6 +9,7 @@ import {
   createWinTheme,
   listWinThemesForOpportunity,
   updateWinTheme,
+  deleteWinTheme,
 } from "@/services/winThemeService";
 import {
   Card,
@@ -198,7 +199,7 @@ async function fetchOpportunitySummary(
   };
 }
 
-function WinThemeWorkspaceContent() {
+function WinThemePage() {
   const { profile } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -218,6 +219,7 @@ function WinThemeWorkspaceContent() {
     useState<WinThemePayload | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const [copyState, setCopyState] = useState<Partial<Record<CopyStateKey, boolean>>>(
     {},
@@ -553,6 +555,39 @@ function WinThemeWorkspaceContent() {
         })()
       : null;
 
+  const handleDeleteCurrentWinTheme = async (): Promise<void> => {
+    if (!selectedWinTheme) return;
+
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm("Delete this Win Theme? This cannot be undone.")
+    ) {
+      return;
+    }
+
+    try {
+      setDeleting(true);
+      await deleteWinTheme(selectedWinTheme.id);
+
+      const remaining = selectedWinThemes.filter(
+        (wt) => wt.id !== selectedWinTheme.id,
+      );
+      setSelectedWinThemes(remaining);
+
+      const next = remaining[0] ?? null;
+      setSelectedWinTheme(next);
+      setEditablePayload(next ? parsePayload(next.payload) : null);
+      setIsEditing(false);
+
+      void loadLatestPerOpportunity();
+    } catch (err) {
+      console.error("Error deleting Win Theme", err);
+      setError("Failed to delete this Win Theme.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <Layout>
       <div className="space-y-6">
@@ -782,6 +817,20 @@ function WinThemeWorkspaceContent() {
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                         )}
                         Save changes
+                      </Button>
+                    )}
+                    {selectedWinTheme && (
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        disabled={deleting || !!generatingMode || saving}
+                        onClick={() => void handleDeleteCurrentWinTheme()}
+                      >
+                        {deleting && (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        )}
+                        {deleting ? "Deleting" : "Delete"}
                       </Button>
                     )}
                   </div>
@@ -1479,10 +1528,4 @@ function WinThemeWorkspaceContent() {
   );
 }
 
-export default function WinThemePage() {
-  return (
-    <RequireAuth>
-      <WinThemeWorkspaceContent />
-    </RequireAuth>
-  );
-}
+export default WinThemePage;

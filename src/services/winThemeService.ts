@@ -120,3 +120,15 @@ export async function getLatestWinThemeForOpportunity(opportunityId: string) {
 
   return (data ?? null) as WinThemeRow | null;
 }
+
+export async function deleteWinTheme(id: string) {
+  const { error } = await supabase
+    .from("win_themes")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    console.error("Error deleting win theme", { id, error });
+    throw error;
+  }
+}
