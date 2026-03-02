@@ -103,8 +103,6 @@ async function fetchBraveContext(
 
   let query = queryParts.join(" ").trim();
 
-  // Treat obviously placeholder / meaningless names as missing, so we don't
-  // query Brave for things like "Unknown opportunity" and get irrelevant noise back.
   if (!query) {
     if (opportunity.company_number) {
       query = `company ${opportunity.company_number}`;
@@ -188,6 +186,13 @@ async function generateWinThemeWithLLM(params: {
   braveContext: BraveContext | null;
   strategySettings: Record<string, unknown> | null | undefined;
 }): Promise<GeneratedWinThemeResult | null> {
+  if (process.env.NODE_ENV === "development") {
+    console.warn(
+      "[win-theme] Skipping LLM Win Theme generation in development; using placeholder payload instead."
+    );
+    return null;
+  }
+
   const apiKey = process.env.OPENAI_API_KEY;
 
   if (!apiKey) {
@@ -197,7 +202,8 @@ async function generateWinThemeWithLLM(params: {
     return null;
   }
 
-  const { opportunity, mode, baseSummary, companiesHouse, braveContext, strategySettings } = params;
+  const { opportunity, mode, baseSummary, companiesHouse, braveContext, strategySettings } =
+    params;
 
   const systemPrompt =
     "You are an expert bid strategy consultant creating detailed, highly practical Win Themes for professional services and construction-related bids. " +
