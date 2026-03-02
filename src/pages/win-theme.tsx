@@ -889,8 +889,8 @@ function WinThemePage() {
               )}
 
               {!loading && filteredLatest.length > 0 && (
-                <ScrollArea className="h-[360px] pr-2 overflow-x-hidden">
-                  <div className="space-y-3">
+                <ScrollArea className="h-[360px] pr-1">
+                  <div className="space-y-3 px-2">
                     {filteredLatest.map((item) => {
                       const opportunity = item.opportunity;
                       const isActive =
@@ -909,7 +909,7 @@ function WinThemePage() {
                           key={item.id}
                           type="button"
                           onClick={() => void handleSelectOpportunity(item)}
-                          className={`w-full max-w-full overflow-hidden rounded-xl border px-3 py-3 text-left transition-colors ${
+                          className={`relative w-full overflow-hidden rounded-xl border px-3 py-3 text-left transition-colors ${
                             isActive
                               ? "border-amber-400 bg-accent/70"
                               : "border-transparent hover:bg-accent/60"
@@ -1699,7 +1699,6 @@ function WinThemePage() {
                                 placeholder="Describe the blocker or concern that is making this opportunity hard to win."
                                 value={blockerInput}
                                 onChange={(e) => setBlockerInput(e.target.value)}
-                                disabled={blockerLoading}
                               />
                               <div className="flex items-center justify-between gap-2">
                                 <p className="text-[11px] text-muted-foreground">
