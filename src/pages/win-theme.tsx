@@ -1699,7 +1699,7 @@ function WinThemePage() {
                                 placeholder="Describe the blocker or concern that is making this opportunity hard to win."
                                 value={blockerInput}
                                 onChange={(e) => setBlockerInput(e.target.value)}
-                                disabled={blockerLoading || !selectedOpportunity}
+                                disabled={blockerLoading}
                               />
                               <div className="flex items-center justify-between gap-2">
                                 <p className="text-[11px] text-muted-foreground">
