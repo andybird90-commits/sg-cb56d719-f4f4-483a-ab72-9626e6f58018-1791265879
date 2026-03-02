@@ -294,139 +294,82 @@ export function PaymentAlerts({ userRole, onViewProject }: PaymentAlertsProps) {
   const upcomingAlerts = alerts.filter((a) => !a.isOverdue);
 
   return (
-    <Card className="mb-6">
+    <Card className="mt-8">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5" />
-            Payment Alerts
-          </CardTitle>
-          <Link href="/invoicing/cashflow">
-            
-
-
-            
-          </Link>
-        </div>
+        <CardTitle className="flex items-center gap-2">
+          <Clock className="w-4 h-4" />
+          Payment Alerts
+        </CardTitle>
+        {overdueAlerts.length > 0 && (
+          <p className="text-sm text-red-400 flex items-center gap-1">
+            <AlertTriangle className="w-3 h-3" />
+            Overdue Payments ({overdueAlerts.length})
+          </p>
+        )}
       </CardHeader>
-      <CardContent className="space-y-3">
-        {/* Overdue Payments */}
-        {overdueAlerts.length > 0 &&
-        <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-red-600 flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4" />
-              Overdue Payments ({overdueAlerts.length})
-            </h3>
-            {overdueAlerts.map((alert) =>
-          <Card
-            key={alert.id}
-            className={cn(
-              "flex items-stretch justify-between gap-4 rounded-xl border px-5 py-4 md:px-6 md:py-4 bg-card/90 hover:bg-card transition-professional",
-              severityStyles[alert.severity]
-            )}
-          >
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="font-semibold text-red-900">
-                  {alert.invoiceNumber}
-                </span>
-                <Badge variant="destructive" className="text-xs">
-                  {Math.abs(alert.daysUntilDue)} days overdue
-                </Badge>
-                {alert.source === "manual" &&
-                <Badge variant="outline" className="text-xs">
-                        Manual
-                      </Badge>
-                }
-              </div>
-              <p className="text-sm text-red-800">
-                <span className="font-medium">{alert.clientName}</span> - {alert.projectName}
-              </p>
-              <p className="text-xs text-red-700 mt-1">
-                Project Owner: {alert.projectOwnerName} | Due: {format(alert.dueDate, "dd MMM yyyy")}
-              </p>
-            </div>
-            <div className="flex flex-col items-end justify-between gap-3 text-right">
-              <div className="space-y-1">
-                <div className="text-lg font-semibold text-foreground">
-                  {formatCurrency(alert.amount)}
-                </div>
-                <button
-                  type="button"
-                  className="text-sm font-medium text-accent hover:text-accent-foreground underline-offset-4 hover:underline"
-                  onClick={() => onViewProject?.(alert.projectId)}
-                >
-                  View Project
-                </button>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
-                <span>{alert.daysOverdue} days overdue</span>
-              </div>
-            </div>
-          </Card>
-          )}
-          </div>
-        }
+      <CardContent>
+        {loading && (
+          <div className="text-sm text-slate-400">Loading payment alerts...</div>
+        )}
 
-        {/* Upcoming Payments */}
-        {upcomingAlerts.length > 0 &&
-        <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-orange-600 flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              Due Within 7 Days ({upcomingAlerts.length})
-            </h3>
-            {upcomingAlerts.map((alert) =>
-          <Card
-            key={alert.id}
-            className={cn(
-              "flex items-stretch justify-between gap-4 rounded-xl border px-5 py-4 md:px-6 md:py-4 bg-card/90 hover:bg-card transition-professional",
-              severityStyles[alert.severity]
-            )}
-          >
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="font-semibold text-orange-900">
-                  {alert.invoiceNumber}
-                </span>
-                <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800">
-                  {alert.daysUntilDue} {alert.daysUntilDue === 1 ? "day" : "days"} until due
-                </Badge>
-                {alert.source === "manual" &&
-                <Badge variant="outline" className="text-xs">
-                        Manual
-                      </Badge>
-                }
-              </div>
-              <p className="text-sm text-orange-800">
-                <span className="font-medium">{alert.clientName}</span> - {alert.projectName}
-              </p>
-              <p className="text-xs text-orange-700 mt-1">
-                Project Owner: {alert.projectOwnerName} | Due: {format(alert.dueDate, "dd MMM yyyy")}
-              </p>
-            </div>
-            <div className="flex flex-col items-end justify-between gap-3 text-right">
-              <div className="space-y-1">
-                <div className="text-lg font-semibold text-foreground">
-                  {formatCurrency(alert.amount)}
-                </div>
-                <button
-                  type="button"
-                  className="text-sm font-medium text-accent hover:text-accent-foreground underline-offset-4 hover:underline"
-                  onClick={() => onViewProject?.(alert.projectId)}
-                >
-                  View Project
-                </button>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
-                <span>{alert.daysOverdue} days overdue</span>
-              </div>
-            </div>
-          </Card>
-          )}
+        {!loading && overdueAlerts.length === 0 && (
+          <div className="text-sm text-slate-400">
+            No overdue payments at the moment.
           </div>
-        }
+        )}
+
+        {!loading && overdueAlerts.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {overdueAlerts.map((alert) => (
+              <div key={alert.id} className="h-full">
+                <div className="relative flex flex-col justify-between rounded-lg border border-red-500/60 bg-slate-950/60 px-4 py-3 shadow-sm">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs text-red-300">
+                        {alert.invoiceNumber}
+                      </span>
+                      <span className="rounded-full bg-red-900/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-100">
+                        {alert.daysOverdue} days overdue
+                      </span>
+                      <span className="rounded-full border border-red-500/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-200">
+                        {alert.source === "manual" ? "Manual" : "System"}
+                      </span>
+                    </div>
+                    <div className="text-right font-semibold text-red-100">
+                      {formatCurrency(alert.amount)}
+                    </div>
+                  </div>
+
+                  <div className="mb-3">
+                    <div className="text-sm font-semibold text-slate-100">
+                      {alert.clientName}
+                      {alert.projectName && ` - ${alert.projectName}`}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-400">
+                      Project Owner: {alert.projectOwnerName || "Unknown"}
+                      {alert.dueDate && ` | Due: ${format(alert.dueDate, "d MMM yyyy")}`}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <div className="flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3 text-red-400" />
+                      <span>{alert.daysOverdue} days overdue</span>
+                    </div>
+                    {alert.projectId && (
+                      <Link
+                        href={`/projects/${alert.projectId}`}
+                        className="text-xs font-semibold text-red-200 hover:text-red-100 underline-offset-2 hover:underline"
+                      >
+                        View Project
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>);
 
