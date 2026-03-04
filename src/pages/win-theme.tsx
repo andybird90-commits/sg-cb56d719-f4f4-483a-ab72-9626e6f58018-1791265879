@@ -866,7 +866,7 @@ function WinThemePage() {
                 Opportunities with Win Themes
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 px-2">
+            <CardContent className="space-y-3 px-0">
               <Input
                 placeholder="Filter by opportunity, company, or summary"
                 value={searchTerm}
@@ -890,7 +890,7 @@ function WinThemePage() {
 
               {!loading && filteredLatest.length > 0 && (
                 <ScrollArea className="h-[360px]">
-                  <div className="space-y-3">
+                  <div className="space-y-3 px-1">
                     {filteredLatest.map((item) => {
                       const opportunity = item.opportunity;
                       const isActive =
