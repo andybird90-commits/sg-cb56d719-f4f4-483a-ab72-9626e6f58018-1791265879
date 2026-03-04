@@ -889,8 +889,8 @@ function WinThemePage() {
               )}
 
               {!loading && filteredLatest.length > 0 && (
-                <ScrollArea className="h-[360px] pr-1">
-                  <div className="space-y-3 px-2">
+                <ScrollArea className="h-[360px]">
+                  <div className="space-y-3">
                     {filteredLatest.map((item) => {
                       const opportunity = item.opportunity;
                       const isActive =
