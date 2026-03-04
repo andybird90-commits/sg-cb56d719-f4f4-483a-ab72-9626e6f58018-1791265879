@@ -866,7 +866,7 @@ function WinThemePage() {
                 Opportunities with Win Themes
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-3 px-2">
               <Input
                 placeholder="Filter by opportunity, company, or summary"
                 value={searchTerm}
