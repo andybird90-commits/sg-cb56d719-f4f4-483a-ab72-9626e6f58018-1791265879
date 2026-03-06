@@ -1,14 +1,16 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { Database } from "@/integrations/supabase/types";
 
-type Tables<T extends keyof Database["public"]["Tables"]> =
-  Database["public"]["Tables"][T]["Row"];
-
-// Local row types for new Bid Builder tables to avoid depending on regenerated Database types
+type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
 
 export interface OpportunityBidFileRow {
   id: string;
-  opportunity_id: string;
+  opportunity_id: string | null;
   storage_bucket: string;
   storage_object_path: string;
   filename: string;
@@ -18,9 +20,13 @@ export interface OpportunityBidFileRow {
   tags: string[] | null;
   parsed_text: string | null;
   ai_summary: unknown | null;
+  upload_status: string;
+  parsed_summary_json: Json | null;
   uploaded_by_user_id: string;
-  uploaded_at: string;
-  updated_at: string;
+  created_at: string;
+  processed_at: string | null;
+  purged_at: string | null;
+  purge_reason: string | null;
 }
 
 export interface MeValueRuleRow {
@@ -133,8 +139,8 @@ export interface OpportunityFeeScenarioRow {
   fee_high: number | null;
   selected_fee: number | null;
   selected_fee_label: string | null;
-  applied_rule_ids: unknown | null;
-  calculation_basis: unknown | null;
+  applied_rule_ids: Json | null;
+  calculation_basis: Json | null;
   is_active: boolean;
   converted_to_estimate_id: string | null;
   created_by_user_id: string;
@@ -186,6 +192,13 @@ export type QuickFeeResult = {
   basis: Record<string, unknown>;
 };
 
+type OrganisationSettingsRow = {
+  id: string;
+  auto_delete_bid_files_after_estimate: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 function safeNumber(value: unknown): number | null {
   if (typeof value === "number" && !Number.isNaN(value)) return value;
   if (typeof value === "string" && value.trim() !== "") {
@@ -197,6 +210,34 @@ function safeNumber(value: unknown): number | null {
 
 // Use an untyped Supabase handle inside this service to avoid deep generic instantiation issues
 const sb: any = supabase;
+
+async function getOrganisationSettings(): Promise<OrganisationSettingsRow | null> {
+  const { data, error } = await sb
+    .from("organisation_settings")
+    .select("*")
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Failed to load organisation settings", error);
+    return null;
+  }
+
+  return (data as OrganisationSettingsRow) || null;
+}
+
+async function shouldAutoDeleteBidFiles(): Promise<boolean> {
+  const settings = await getOrganisationSettings();
+  if (!settings) {
+    return true;
+  }
+  if (
+    typeof settings.auto_delete_bid_files_after_estimate === "boolean"
+  ) {
+    return settings.auto_delete_bid_files_after_estimate;
+  }
+  return true;
+}
 
 export const bidBuilderService = {
   async listOpportunities(search?: string): Promise<OpportunityLite[]> {
@@ -239,13 +280,14 @@ export const bidBuilderService = {
     opportunityId: string
   ): Promise<OpportunityBidFileRow[]> {
     const { data, error } = await sb
-      .from("opportunity_bid_files")
+      .from("opportunity_bid_intake_files")
       .select("*")
       .eq("opportunity_id", opportunityId)
-      .order("uploaded_at", { ascending: false });
+      .neq("upload_status", "purged")
+      .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("Failed to load bid files", error);
+      console.error("Failed to load bid intake files", error);
       return [];
     }
 
@@ -292,6 +334,11 @@ export const bidBuilderService = {
         content_type: file.type || null,
         size_bytes: file.size,
         is_bid_builder_input: markAsInput,
+        tags: null,
+        parsed_text: null,
+        ai_summary: null,
+        upload_status: "temporary_uploaded",
+        parsed_summary_json: null,
         uploaded_by_user_id: userId,
       } as Partial<OpportunityBidFileRow>);
     }
@@ -299,11 +346,14 @@ export const bidBuilderService = {
     if (rowsToInsert.length === 0) return;
 
     const { error: insertError } = await sb
-      .from("opportunity_bid_files")
+      .from("opportunity_bid_intake_files")
       .insert(rowsToInsert as any[]);
 
     if (insertError) {
-      console.error("Failed to insert bid file metadata", insertError);
+      console.error(
+        "Failed to insert bid intake file metadata",
+        insertError
+      );
     }
   },
 
@@ -312,15 +362,15 @@ export const bidBuilderService = {
     isInput: boolean
   ): Promise<void> {
     const { error } = await sb
-      .from("opportunity_bid_files")
+      .from("opportunity_bid_intake_files")
       .update({
         is_bid_builder_input: isInput,
-        updated_at: new Date().toISOString(),
+        // keep created_at as original; processed_at is reserved for estimate processing
       })
       .eq("id", fileId);
 
     if (error) {
-      console.error("Failed to update bid file input flag", error);
+      console.error("Failed to update bid intake file input flag", error);
       throw error;
     }
   },
@@ -655,7 +705,7 @@ export const bidBuilderService = {
       calculation_basis: {
         ...result.basis,
         assumptions: result.assumptions,
-      } as any,
+      } as Json,
       is_active: true,
       created_by_user_id: userId,
     };
@@ -716,7 +766,8 @@ export const bidBuilderService = {
         .insert({
           estimate_id: createdEstimate.id,
           sort_order: 0,
-          description: "Lump sum fee (derived from quick percentage estimate)",
+          description:
+            "Lump sum fee (derived from quick percentage estimate)",
           quantity: 1,
           unit: "sum",
           rate: selectedFee,
@@ -745,6 +796,111 @@ export const bidBuilderService = {
       console.error(
         "Failed to link scenario to new estimate",
         updateScenarioError
+      );
+    }
+
+    try {
+      const autoDelete = await shouldAutoDeleteBidFiles();
+      if (autoDelete) {
+        const nowIso = new Date().toISOString();
+
+        const { data: intakeRows, error: intakeError } = await sb
+          .from("opportunity_bid_intake_files")
+          .select("*")
+          .eq("opportunity_id", scenario.opportunity_id)
+          .eq("uploaded_by_user_id", userId)
+          .neq("upload_status", "purged");
+
+        if (intakeError) {
+          console.error(
+            "Failed to load intake files for purge after estimate creation",
+            intakeError
+          );
+          return createdEstimate;
+        }
+
+        const files = (intakeRows || []) as OpportunityBidFileRow[];
+
+        if (files.length > 0) {
+          const { error: markConvertedError } = await sb
+            .from("opportunity_bid_intake_files")
+            .update({
+              upload_status: "converted_to_estimate",
+              processed_at: nowIso,
+            })
+            .eq("opportunity_id", scenario.opportunity_id)
+            .eq("uploaded_by_user_id", userId)
+            .neq("upload_status", "purged");
+
+          if (markConvertedError) {
+            console.error(
+              "Failed to mark intake files as converted_to_estimate",
+              markConvertedError
+            );
+          }
+
+          for (const file of files) {
+            const bucket = file.storage_bucket || "opportunity-bid-files";
+            const path = file.storage_object_path;
+
+            if (!bucket || !path) {
+              continue;
+            }
+
+            const { error: deleteError } = await sb.storage
+              .from(bucket)
+              .remove([path]);
+
+            if (deleteError) {
+              console.error(
+                "Failed to delete intake file from storage (marked pending purge)",
+                {
+                  fileId: file.id,
+                  bucket,
+                  path,
+                  deleteError,
+                }
+              );
+              const { error: markPendingError } = await sb
+                .from("opportunity_bid_intake_files")
+                .update({
+                  upload_status: "processed_pending_purge",
+                  purge_reason: `auto_delete_failed: ${
+                    deleteError.message || "unknown"
+                  }`,
+                })
+                .eq("id", file.id);
+
+              if (markPendingError) {
+                console.error(
+                  "Failed to mark intake file as processed_pending_purge",
+                  markPendingError
+                );
+              }
+            } else {
+              const { error: markPurgedError } = await sb
+                .from("opportunity_bid_intake_files")
+                .update({
+                  upload_status: "purged",
+                  purged_at: nowIso,
+                  purge_reason: "auto_delete_after_estimate",
+                })
+                .eq("id", file.id);
+
+              if (markPurgedError) {
+                console.error(
+                  "Failed to mark intake file as purged after deletion",
+                  markPurgedError
+                );
+              }
+            }
+          }
+        }
+      }
+    } catch (purgeError) {
+      console.error(
+        "Failed during auto-delete of bid intake files after estimate creation",
+        purgeError
       );
     }
 

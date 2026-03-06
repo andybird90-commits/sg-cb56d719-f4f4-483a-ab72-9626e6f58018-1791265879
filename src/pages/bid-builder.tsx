@@ -501,6 +501,13 @@ function BidBuilderContent() {
                 />
               </div>
 
+              <p className="text-[11px] text-muted-foreground">
+                Files added here are temporary working files used to assist
+                estimate creation. Once the estimate is saved, uploaded files
+                are automatically removed from ConexaOF storage. Only light
+                structured data and calculation assumptions are retained.
+              </p>
+
               {uploading && (
                 <div className="text-xs text-muted-foreground">
                   Uploading files&hellip;
