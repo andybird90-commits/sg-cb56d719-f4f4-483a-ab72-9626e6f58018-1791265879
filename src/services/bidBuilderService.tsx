@@ -4,6 +4,144 @@ import type { Database } from "@/integrations/supabase/types";
 type Tables<T extends keyof Database["public"]["Tables"]> =
   Database["public"]["Tables"][T]["Row"];
 
+// Local row types for new Bid Builder tables to avoid depending on regenerated Database types
+
+export interface OpportunityBidFileRow {
+  id: string;
+  opportunity_id: string;
+  storage_bucket: string;
+  storage_object_path: string;
+  filename: string;
+  content_type: string | null;
+  size_bytes: number | null;
+  is_bid_builder_input: boolean;
+  tags: string[] | null;
+  parsed_text: string | null;
+  ai_summary: unknown | null;
+  uploaded_by_user_id: string;
+  uploaded_at: string;
+  updated_at: string;
+}
+
+export interface MeValueRuleRow {
+  id: string;
+  name: string;
+  sector: string | null;
+  building_type: string | null;
+  project_status: string | null;
+  min_total_build_value: number | null;
+  max_total_build_value: number | null;
+  me_ratio: number;
+  status: string;
+  notes: string | null;
+  created_by_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FeePercentageRuleRow {
+  id: string;
+  name: string;
+  sector: string | null;
+  building_type: string | null;
+  project_status: string | null;
+  min_me_value: number | null;
+  max_me_value: number | null;
+  min_total_build_value: number | null;
+  max_total_build_value: number | null;
+  base_low_pct: number;
+  base_target_pct: number;
+  base_high_pct: number;
+  stages: string[] | null;
+  disciplines: string[] | null;
+  status: string;
+  notes: string | null;
+  created_by_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ComplexityMultiplierRow {
+  id: string;
+  code: string;
+  label: string;
+  applies_to: "complexity" | "condition" | "programme" | string;
+  complexity_level: string | null;
+  condition: string | null;
+  programme_pressure: string | null;
+  multiplier: number;
+  status: string;
+  notes: string | null;
+  created_by_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OpportunityEstimateRow {
+  id: string;
+  opportunity_id: string;
+  name: string;
+  status: string;
+  total_fee: number | null;
+  currency: string;
+  source: string | null;
+  assumptions: string | null;
+  calculation_basis: unknown | null;
+  created_by_user_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OpportunityEstimateLineItemRow {
+  id: string;
+  estimate_id: string;
+  sort_order: number;
+  description: string;
+  quantity: number;
+  unit: string | null;
+  rate: number | null;
+  total: number | null;
+  stage: string | null;
+  discipline: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OpportunityFeeScenarioRow {
+  id: string;
+  opportunity_id: string;
+  name: string;
+  scenario_type: string;
+  calculation_mode: "me_value" | "total_build" | string;
+  total_build_value: number | null;
+  me_value: number | null;
+  derived_me_value: number | null;
+  sector: string | null;
+  building_type: string | null;
+  project_status: string | null;
+  listed_building: boolean | null;
+  occupied_site: boolean | null;
+  complexity_level: string | null;
+  programme_pressure: string | null;
+  stages_required: string[] | null;
+  disciplines_required: string[] | null;
+  base_low_pct: number | null;
+  base_target_pct: number | null;
+  base_high_pct: number | null;
+  fee_low: number | null;
+  fee_target: number | null;
+  fee_high: number | null;
+  selected_fee: number | null;
+  selected_fee_label: string | null;
+  applied_rule_ids: unknown | null;
+  calculation_basis: unknown | null;
+  is_active: boolean;
+  converted_to_estimate_id: string | null;
+  created_by_user_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export type OpportunityLite = {
   id: string;
   name: string;
@@ -57,10 +195,13 @@ function safeNumber(value: unknown): number | null {
   return null;
 }
 
+// Use an untyped Supabase handle inside this service to avoid deep generic instantiation issues
+const sb: any = supabase;
+
 export const bidBuilderService = {
   async listOpportunities(search?: string): Promise<OpportunityLite[]> {
-    let query = supabase
-      .from("opportunities" as any)
+    let query = sb
+      .from("opportunities")
       .select(
         `
         id,
@@ -96,8 +237,8 @@ export const bidBuilderService = {
 
   async fetchBidFiles(
     opportunityId: string
-  ): Promise<Tables<"opportunity_bid_files">[]> {
-    const { data, error } = await supabase
+  ): Promise<OpportunityBidFileRow[]> {
+    const { data, error } = await sb
       .from("opportunity_bid_files")
       .select("*")
       .eq("opportunity_id", opportunityId)
@@ -108,7 +249,7 @@ export const bidBuilderService = {
       return [];
     }
 
-    return data || [];
+    return (data || []) as OpportunityBidFileRow[];
   },
 
   async uploadBidFiles(
@@ -122,13 +263,13 @@ export const bidBuilderService = {
     const markAsInput = options?.markAsInput ?? true;
     const bucket = "opportunity-bid-files";
 
-    const rowsToInsert: Partial<Tables<"opportunity_bid_files">>[] = [];
+    const rowsToInsert: Partial<OpportunityBidFileRow>[] = [];
 
     for (const file of files) {
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
       const path = `opportunity/${opportunityId}/${timestamp}-${file.name}`;
 
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError } = await sb.storage
         .from(bucket)
         .upload(path, file, {
           upsert: false,
@@ -152,12 +293,12 @@ export const bidBuilderService = {
         size_bytes: file.size,
         is_bid_builder_input: markAsInput,
         uploaded_by_user_id: userId,
-      } as Partial<Tables<"opportunity_bid_files">>);
+      } as Partial<OpportunityBidFileRow>);
     }
 
     if (rowsToInsert.length === 0) return;
 
-    const { error: insertError } = await supabase
+    const { error: insertError } = await sb
       .from("opportunity_bid_files")
       .insert(rowsToInsert as any[]);
 
@@ -170,9 +311,12 @@ export const bidBuilderService = {
     fileId: string,
     isInput: boolean
   ): Promise<void> {
-    const { error } = await supabase
+    const { error } = await sb
       .from("opportunity_bid_files")
-      .update({ is_bid_builder_input: isInput, updated_at: new Date().toISOString() })
+      .update({
+        is_bid_builder_input: isInput,
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", fileId);
 
     if (error) {
@@ -195,7 +339,7 @@ export const bidBuilderService = {
     }
 
     if (!meValue && totalBuildValue) {
-      const { data: rawRules, error: meRulesError } = await supabase
+      const { data: rawRules, error: meRulesError } = await sb
         .from("me_value_rules")
         .select("*")
         .eq("status", "active");
@@ -204,7 +348,7 @@ export const bidBuilderService = {
         console.error("Failed to load M&E value rules", meRulesError);
       }
 
-      const rules = (rawRules || []) as Tables<"me_value_rules">[];
+      const rules = (rawRules || []) as MeValueRuleRow[];
 
       const matchingRules = rules.filter((rule) => {
         if (rule.sector && input.sector && rule.sector !== input.sector) {
@@ -240,8 +384,7 @@ export const bidBuilderService = {
       });
 
       const chosenRule =
-        matchingRules[0] ??
-        (rules.length > 0 ? rules[0] : null);
+        matchingRules[0] ?? (rules.length > 0 ? rules[0] : null);
 
       if (chosenRule) {
         const ratio = Number(chosenRule.me_ratio);
@@ -269,7 +412,7 @@ export const bidBuilderService = {
       );
     }
 
-    const { data: rawFeeRules, error: feeRulesError } = await supabase
+    const { data: rawFeeRules, error: feeRulesError } = await sb
       .from("fee_percentage_rules")
       .select("*")
       .eq("status", "active");
@@ -278,7 +421,7 @@ export const bidBuilderService = {
       console.error("Failed to load fee percentage rules", feeRulesError);
     }
 
-    const feeRules = (rawFeeRules || []) as Tables<"fee_percentage_rules">[];
+    const feeRules = (rawFeeRules || []) as FeePercentageRuleRow[];
 
     const matchingFeeRules = feeRules.filter((rule) => {
       if (rule.sector && input.sector && rule.sector !== input.sector) {
@@ -341,8 +484,7 @@ export const bidBuilderService = {
     });
 
     const chosenFeeRule =
-      matchingFeeRules[0] ??
-      (feeRules.length > 0 ? feeRules[0] : null);
+      matchingFeeRules[0] ?? (feeRules.length > 0 ? feeRules[0] : null);
 
     let baseLowPct = 4;
     let baseTargetPct = 5;
@@ -364,7 +506,7 @@ export const bidBuilderService = {
       };
     }
 
-    const { data: rawMultipliers, error: multipliersError } = await supabase
+    const { data: rawMultipliers, error: multipliersError } = await sb
       .from("complexity_multipliers")
       .select("*")
       .eq("status", "active");
@@ -373,7 +515,7 @@ export const bidBuilderService = {
       console.error("Failed to load complexity multipliers", multipliersError);
     }
 
-    const multipliers = (rawMultipliers || []) as Tables<"complexity_multipliers">[];
+    const multipliers = (rawMultipliers || []) as ComplexityMultiplierRow[];
 
     const appliedMultipliers: {
       code: string;
@@ -382,7 +524,7 @@ export const bidBuilderService = {
       applies_to: string;
     }[] = [];
 
-    const pushMultiplier = (m: Tables<"complexity_multipliers">) => {
+    const pushMultiplier = (m: ComplexityMultiplierRow) => {
       appliedMultipliers.push({
         code: m.code,
         label: m.label,
@@ -483,8 +625,8 @@ export const bidBuilderService = {
     userId: string,
     input: QuickFeeInput,
     result: QuickFeeResult
-  ): Promise<Tables<"opportunity_fee_scenarios"> | null> {
-    const insertPayload: Partial<Tables<"opportunity_fee_scenarios">> = {
+  ): Promise<OpportunityFeeScenarioRow | null> {
+    const insertPayload: Partial<OpportunityFeeScenarioRow> = {
       opportunity_id: input.opportunityId,
       name: input.scenarioName || "Quick percentage scenario",
       scenario_type: "quick_percentage",
@@ -518,7 +660,7 @@ export const bidBuilderService = {
       created_by_user_id: userId,
     };
 
-    const { data, error } = await supabase
+    const { data, error } = await sb
       .from("opportunity_fee_scenarios")
       .insert(insertPayload as any)
       .select("*")
@@ -529,13 +671,13 @@ export const bidBuilderService = {
       return null;
     }
 
-    return data as Tables<"opportunity_fee_scenarios">;
+    return data as OpportunityFeeScenarioRow;
   },
 
   async convertScenarioToEstimate(
     userId: string,
-    scenario: Tables<"opportunity_fee_scenarios">
-  ): Promise<Tables<"opportunity_estimates"> | null> {
+    scenario: OpportunityFeeScenarioRow
+  ): Promise<OpportunityEstimateRow | null> {
     const selectedFee =
       scenario.selected_fee ??
       scenario.fee_target ??
@@ -545,7 +687,7 @@ export const bidBuilderService = {
     const name =
       scenario.name || "Estimate from quick percentage scenario";
 
-    const { data: estimate, error: estimateError } = await supabase
+    const { data: estimate, error: estimateError } = await sb
       .from("opportunity_estimates")
       .insert({
         opportunity_id: scenario.opportunity_id,
@@ -557,7 +699,7 @@ export const bidBuilderService = {
         assumptions: null,
         calculation_basis: scenario.calculation_basis as any,
         created_by_user_id: userId,
-      } as any)
+      } as Partial<OpportunityEstimateRow>)
       .select("*")
       .single();
 
@@ -566,10 +708,10 @@ export const bidBuilderService = {
       return null;
     }
 
-    const createdEstimate = estimate as Tables<"opportunity_estimates">;
+    const createdEstimate = estimate as OpportunityEstimateRow;
 
     if (selectedFee && selectedFee > 0) {
-      const { error: lineItemError } = await supabase
+      const { error: lineItemError } = await sb
         .from("opportunity_estimate_line_items")
         .insert({
           estimate_id: createdEstimate.id,
@@ -581,7 +723,7 @@ export const bidBuilderService = {
           total: selectedFee,
           stage: null,
           discipline: null,
-        } as any);
+        } as Partial<OpportunityEstimateLineItemRow>);
 
       if (lineItemError) {
         console.error(
@@ -591,7 +733,7 @@ export const bidBuilderService = {
       }
     }
 
-    const { error: updateScenarioError } = await supabase
+    const { error: updateScenarioError } = await sb
       .from("opportunity_fee_scenarios")
       .update({
         converted_to_estimate_id: createdEstimate.id,

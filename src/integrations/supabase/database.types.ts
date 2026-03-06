@@ -184,6 +184,62 @@ export type Database = {
           },
         ]
       }
+      complexity_multipliers: {
+        Row: {
+          applies_to: string
+          code: string
+          complexity_level: string | null
+          condition: string | null
+          created_at: string
+          created_by_user_id: string | null
+          id: string
+          label: string
+          multiplier: number
+          notes: string | null
+          programme_pressure: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          applies_to: string
+          code: string
+          complexity_level?: string | null
+          condition?: string | null
+          created_at?: string
+          created_by_user_id?: string | null
+          id?: string
+          label: string
+          multiplier: number
+          notes?: string | null
+          programme_pressure?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          applies_to?: string
+          code?: string
+          complexity_level?: string | null
+          condition?: string | null
+          created_at?: string
+          created_by_user_id?: string | null
+          id?: string
+          label?: string
+          multiplier?: number
+          notes?: string | null
+          programme_pressure?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "complexity_multipliers_created_by_user_id_fkey"
+            columns: ["created_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contact_events: {
         Row: {
           contact_id: string
@@ -352,6 +408,80 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fee_percentage_rules: {
+        Row: {
+          base_high_pct: number
+          base_low_pct: number
+          base_target_pct: number
+          building_type: string | null
+          created_at: string
+          created_by_user_id: string | null
+          disciplines: string[] | null
+          id: string
+          max_me_value: number | null
+          max_total_build_value: number | null
+          min_me_value: number | null
+          min_total_build_value: number | null
+          name: string
+          notes: string | null
+          project_status: string | null
+          sector: string | null
+          stages: string[] | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          base_high_pct: number
+          base_low_pct: number
+          base_target_pct: number
+          building_type?: string | null
+          created_at?: string
+          created_by_user_id?: string | null
+          disciplines?: string[] | null
+          id?: string
+          max_me_value?: number | null
+          max_total_build_value?: number | null
+          min_me_value?: number | null
+          min_total_build_value?: number | null
+          name: string
+          notes?: string | null
+          project_status?: string | null
+          sector?: string | null
+          stages?: string[] | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          base_high_pct?: number
+          base_low_pct?: number
+          base_target_pct?: number
+          building_type?: string | null
+          created_at?: string
+          created_by_user_id?: string | null
+          disciplines?: string[] | null
+          id?: string
+          max_me_value?: number | null
+          max_total_build_value?: number | null
+          min_me_value?: number | null
+          min_total_build_value?: number | null
+          name?: string
+          notes?: string | null
+          project_status?: string | null
+          sector?: string | null
+          stages?: string[] | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fee_percentage_rules_created_by_user_id_fkey"
+            columns: ["created_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -990,6 +1120,62 @@ export type Database = {
         }
         Relationships: []
       }
+      me_value_rules: {
+        Row: {
+          building_type: string | null
+          created_at: string
+          created_by_user_id: string | null
+          id: string
+          max_total_build_value: number | null
+          me_ratio: number
+          min_total_build_value: number | null
+          name: string
+          notes: string | null
+          project_status: string | null
+          sector: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          building_type?: string | null
+          created_at?: string
+          created_by_user_id?: string | null
+          id?: string
+          max_total_build_value?: number | null
+          me_ratio: number
+          min_total_build_value?: number | null
+          name: string
+          notes?: string | null
+          project_status?: string | null
+          sector?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          building_type?: string | null
+          created_at?: string
+          created_by_user_id?: string | null
+          id?: string
+          max_total_build_value?: number | null
+          me_ratio?: number
+          min_total_build_value?: number | null
+          name?: string
+          notes?: string | null
+          project_status?: string | null
+          sector?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "me_value_rules_created_by_user_id_fkey"
+            columns: ["created_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       monthly_budgets: {
         Row: {
           budget_cost: number | null
@@ -1143,6 +1329,185 @@ export type Database = {
           },
         ]
       }
+      opportunity_bid_files: {
+        Row: {
+          ai_summary: Json | null
+          content_type: string | null
+          filename: string
+          id: string
+          is_bid_builder_input: boolean
+          opportunity_id: string
+          parsed_text: string | null
+          size_bytes: number | null
+          storage_bucket: string
+          storage_object_path: string
+          tags: string[] | null
+          updated_at: string
+          uploaded_at: string
+          uploaded_by_user_id: string
+        }
+        Insert: {
+          ai_summary?: Json | null
+          content_type?: string | null
+          filename: string
+          id?: string
+          is_bid_builder_input?: boolean
+          opportunity_id: string
+          parsed_text?: string | null
+          size_bytes?: number | null
+          storage_bucket?: string
+          storage_object_path: string
+          tags?: string[] | null
+          updated_at?: string
+          uploaded_at?: string
+          uploaded_by_user_id: string
+        }
+        Update: {
+          ai_summary?: Json | null
+          content_type?: string | null
+          filename?: string
+          id?: string
+          is_bid_builder_input?: boolean
+          opportunity_id?: string
+          parsed_text?: string | null
+          size_bytes?: number | null
+          storage_bucket?: string
+          storage_object_path?: string
+          tags?: string[] | null
+          updated_at?: string
+          uploaded_at?: string
+          uploaded_by_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_bid_files_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_bid_files_uploaded_by_user_id_fkey"
+            columns: ["uploaded_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      opportunity_estimate_line_items: {
+        Row: {
+          created_at: string
+          description: string
+          discipline: string | null
+          estimate_id: string
+          id: string
+          quantity: number
+          rate: number | null
+          sort_order: number
+          stage: string | null
+          total: number | null
+          unit: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          discipline?: string | null
+          estimate_id: string
+          id?: string
+          quantity?: number
+          rate?: number | null
+          sort_order?: number
+          stage?: string | null
+          total?: number | null
+          unit?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          discipline?: string | null
+          estimate_id?: string
+          id?: string
+          quantity?: number
+          rate?: number | null
+          sort_order?: number
+          stage?: string | null
+          total?: number | null
+          unit?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_estimate_line_items_estimate_id_fkey"
+            columns: ["estimate_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_estimates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      opportunity_estimates: {
+        Row: {
+          assumptions: string | null
+          calculation_basis: Json | null
+          created_at: string
+          created_by_user_id: string
+          currency: string
+          id: string
+          name: string
+          opportunity_id: string
+          source: string | null
+          status: string
+          total_fee: number | null
+          updated_at: string
+        }
+        Insert: {
+          assumptions?: string | null
+          calculation_basis?: Json | null
+          created_at?: string
+          created_by_user_id: string
+          currency?: string
+          id?: string
+          name: string
+          opportunity_id: string
+          source?: string | null
+          status?: string
+          total_fee?: number | null
+          updated_at?: string
+        }
+        Update: {
+          assumptions?: string | null
+          calculation_basis?: Json | null
+          created_at?: string
+          created_by_user_id?: string
+          currency?: string
+          id?: string
+          name?: string
+          opportunity_id?: string
+          source?: string | null
+          status?: string
+          total_fee?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_estimates_created_by_user_id_fkey"
+            columns: ["created_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_estimates_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       opportunity_events: {
         Row: {
           created_at: string | null
@@ -1196,6 +1561,133 @@ export type Database = {
           },
           {
             foreignKeyName: "opportunity_events_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      opportunity_fee_scenarios: {
+        Row: {
+          applied_rule_ids: Json | null
+          base_high_pct: number | null
+          base_low_pct: number | null
+          base_target_pct: number | null
+          building_type: string | null
+          calculation_basis: Json | null
+          calculation_mode: string
+          complexity_level: string | null
+          converted_to_estimate_id: string | null
+          created_at: string
+          created_by_user_id: string
+          derived_me_value: number | null
+          disciplines_required: string[] | null
+          fee_high: number | null
+          fee_low: number | null
+          fee_target: number | null
+          id: string
+          is_active: boolean
+          listed_building: boolean | null
+          me_value: number | null
+          name: string
+          occupied_site: boolean | null
+          opportunity_id: string
+          programme_pressure: string | null
+          project_status: string | null
+          scenario_type: string
+          sector: string | null
+          selected_fee: number | null
+          selected_fee_label: string | null
+          stages_required: string[] | null
+          total_build_value: number | null
+          updated_at: string
+        }
+        Insert: {
+          applied_rule_ids?: Json | null
+          base_high_pct?: number | null
+          base_low_pct?: number | null
+          base_target_pct?: number | null
+          building_type?: string | null
+          calculation_basis?: Json | null
+          calculation_mode: string
+          complexity_level?: string | null
+          converted_to_estimate_id?: string | null
+          created_at?: string
+          created_by_user_id: string
+          derived_me_value?: number | null
+          disciplines_required?: string[] | null
+          fee_high?: number | null
+          fee_low?: number | null
+          fee_target?: number | null
+          id?: string
+          is_active?: boolean
+          listed_building?: boolean | null
+          me_value?: number | null
+          name: string
+          occupied_site?: boolean | null
+          opportunity_id: string
+          programme_pressure?: string | null
+          project_status?: string | null
+          scenario_type?: string
+          sector?: string | null
+          selected_fee?: number | null
+          selected_fee_label?: string | null
+          stages_required?: string[] | null
+          total_build_value?: number | null
+          updated_at?: string
+        }
+        Update: {
+          applied_rule_ids?: Json | null
+          base_high_pct?: number | null
+          base_low_pct?: number | null
+          base_target_pct?: number | null
+          building_type?: string | null
+          calculation_basis?: Json | null
+          calculation_mode?: string
+          complexity_level?: string | null
+          converted_to_estimate_id?: string | null
+          created_at?: string
+          created_by_user_id?: string
+          derived_me_value?: number | null
+          disciplines_required?: string[] | null
+          fee_high?: number | null
+          fee_low?: number | null
+          fee_target?: number | null
+          id?: string
+          is_active?: boolean
+          listed_building?: boolean | null
+          me_value?: number | null
+          name?: string
+          occupied_site?: boolean | null
+          opportunity_id?: string
+          programme_pressure?: string | null
+          project_status?: string | null
+          scenario_type?: string
+          sector?: string | null
+          selected_fee?: number | null
+          selected_fee_label?: string | null
+          stages_required?: string[] | null
+          total_build_value?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "opportunity_fee_scenarios_converted_to_estimate_id_fkey"
+            columns: ["converted_to_estimate_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_estimates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_fee_scenarios_created_by_user_id_fkey"
+            columns: ["created_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "opportunity_fee_scenarios_opportunity_id_fkey"
             columns: ["opportunity_id"]
             isOneToOne: false
             referencedRelation: "opportunities"

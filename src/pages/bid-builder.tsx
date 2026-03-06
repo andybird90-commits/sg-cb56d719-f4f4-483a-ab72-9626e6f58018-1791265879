@@ -41,6 +41,11 @@ interface AiInsights {
   notes?: string;
 }
 
+type QuickYesNoUnknown = "yes" | "no" | "unknown";
+type BidFile = Awaited<
+  ReturnType<typeof bidBuilderService.fetchBidFiles>
+>[number] | null;
+
 function humanCurrency(value: number | null | undefined): string {
   if (!value || Number.isNaN(value)) return "—";
   return new Intl.NumberFormat("en-GB", {
@@ -83,12 +88,8 @@ function BidBuilderContent() {
   const [quickSector, setQuickSector] = useState("");
   const [quickBuildingType, setQuickBuildingType] = useState("");
   const [quickProjectStatus, setQuickProjectStatus] = useState("");
-  const [quickListed, setQuickListed] = useState<"yes" | "no" | "unknown">(
-    "unknown"
-  );
-  const [quickOccupied, setQuickOccupied] = useState<"yes" | "no" | "unknown">(
-    "unknown"
-  );
+  const [quickListed, setQuickListed] = useState<QuickYesNoUnknown>("unknown");
+  const [quickOccupied, setQuickOccupied] = useState<QuickYesNoUnknown>("unknown");
   const [quickComplexity, setQuickComplexity] = useState("");
   const [quickProgramme, setQuickProgramme] = useState("");
   const [quickStages, setQuickStages] = useState("");
@@ -203,7 +204,7 @@ function BidBuilderContent() {
         "Multiple revisions detected in uploaded documents; scope or quantities may still be moving."
       );
     }
-    if (!bidFiles.some((f) => f.filename.toLowerCase().includes("boq"))) {
+    if (!filenames.some((f) => f.includes("boq"))) {
       feeRisks.push(
         "No BOQ or schedule of work detected; quantities may need to be inferred."
       );
@@ -329,8 +330,9 @@ function BidBuilderContent() {
     if (!profile?.id) return;
     if (!quickResult) return;
 
-    const { data: existingScenarioData, error } = await supabase
-      .from("opportunity_fee_scenarios")
+    const { data: existingScenarioData, error } = await (supabase.from as any)(
+      "opportunity_fee_scenarios"
+    )
       .select("*")
       .eq("opportunity_id", selectedOpportunityId)
       .eq("scenario_type", "quick_percentage")
@@ -570,7 +572,7 @@ function BidBuilderContent() {
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     <Button
-                      size="xs"
+                      size="sm"
                       variant="outline"
                       className="h-6 text-[11px] px-2"
                       onClick={async () => {
@@ -842,7 +844,7 @@ function BidBuilderContent() {
                 <Label className="text-xs">Project status</Label>
                 <Select
                   value={quickProjectStatus}
-                  onValueChange={setQuickProjectStatus}
+                  onValueChange={(value) => setQuickProjectStatus(value)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select" />
@@ -856,7 +858,12 @@ function BidBuilderContent() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Listed building</Label>
-                <Select value={quickListed} onValueChange={setQuickListed}>
+                <Select
+                  value={quickListed}
+                  onValueChange={(value) =>
+                    setQuickListed(value as QuickYesNoUnknown)
+                  }
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -869,7 +876,12 @@ function BidBuilderContent() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Occupied / live site</Label>
-                <Select value={quickOccupied} onValueChange={setQuickOccupied}>
+                <Select
+                  value={quickOccupied}
+                  onValueChange={(value) =>
+                    setQuickOccupied(value as QuickYesNoUnknown)
+                  }
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
