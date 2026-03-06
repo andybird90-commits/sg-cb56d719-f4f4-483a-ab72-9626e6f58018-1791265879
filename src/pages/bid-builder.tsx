@@ -1153,22 +1153,22 @@ function BidBuilderContent() {
 
   return (
     <Layout>
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight flex items-center gap-2">
+      <div className="space-y-6">
+        {/* Page header */}
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-1">
+            <h1 className="text-xl md:text-2xl font-semibold tracking-tight flex items-center gap-2">
               <FileText className="w-5 h-5 text-muted-foreground" />
               <span>Bid Builder</span>
             </h1>
-            <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-              Multi-start estimating for consulting engineering bids. Start from
-              enquiry documents, a quick percentage fee, a manual build, or a
-              reusable template&mdash;then convert everything into a single
-              editable estimate model.
+            <p className="text-sm text-muted-foreground max-w-2xl">
+              Multi-start estimating for consulting engineering bids. Start from enquiry
+              documents, a quick percentage fee, a manual build, or a reusable template—
+              then convert everything into a single editable estimate model.
             </p>
           </div>
 
-          <div className="w-full sm:w-auto space-y-2">
+          <div className="w-full md:w-auto space-y-2">
             <Label className="text-xs font-medium text-muted-foreground">
               Opportunity
             </Label>
@@ -1179,11 +1179,9 @@ function BidBuilderContent() {
                   setSelectedOpportunityId(value || null)
                 }
               >
-                <SelectTrigger className="min-w-[200px]">
+                <SelectTrigger className="min-w-[220px]">
                   <SelectValue
-                    placeholder={
-                      loadingOpps ? "Loading…" : "Select opportunity"
-                    }
+                    placeholder={loadingOpps ? "Loading…" : "Select opportunity"}
                   />
                 </SelectTrigger>
                 <SelectContent>
@@ -1225,11 +1223,121 @@ function BidBuilderContent() {
         {pageError && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription className="text-sm">{pageError}</AlertDescription>
+            <AlertDescription className="text-sm">
+              {pageError}
+            </AlertDescription>
           </Alert>
         )}
 
-        {renderStartCards()}
+        {/* Start mode selector */}
+        <div>
+          <h2 className="text-xs font-semibold text-muted-foreground mb-3">
+            Choose how you want to start this estimate
+          </h2>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <Card
+              className={`cursor-pointer transition-colors min-h-[176px] ${
+                startMode === "upload"
+                  ? "border-primary bg-primary/5"
+                  : "border-border/60 bg-background/40 hover:bg-background/70"
+              }`}
+              onClick={() => setStartMode("upload")}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Upload className="w-4 h-4 text-primary" />
+                  <span>Upload enquiry files</span>
+                </CardTitle>
+                <Badge variant="outline" className="text-[10px]">
+                  Document-led
+                </Badge>
+              </CardHeader>
+              <CardContent className="text-xs text-muted-foreground space-y-2">
+                <p>
+                  Drag PDFs, drawings, specs and tender docs in to set the context
+                  for your estimate. Files can be marked as Bid Builder input or
+                  reference.
+                </p>
+                <p className="text-[11px]">
+                  Files added here are temporary working files used to assist estimate
+                  creation. Once the estimate is saved, uploaded files are automatically
+                  removed from ConexaOF storage.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card
+              className={`cursor-pointer transition-colors min-h-[176px] ${
+                startMode === "quick"
+                  ? "border-emerald-500 bg-emerald-500/5"
+                  : "border-border/60 bg-background/40 hover:bg-background/70"
+              }`}
+              onClick={() => setStartMode("quick")}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Percent className="w-4 h-4 text-emerald-500" />
+                  <span>Quick percentage fee</span>
+                </CardTitle>
+                <Badge variant="outline" className="text-[10px]">
+                  Fast start
+                </Badge>
+              </CardHeader>
+              <CardContent className="text-xs text-muted-foreground">
+                Estimate fees from M&amp;E value or total build value using admin-managed
+                percentage and complexity rules. Save scenarios and convert into full
+                estimates.
+              </CardContent>
+            </Card>
+
+            <Card
+              className={`cursor-pointer transition-colors min-h-[176px] ${
+                startMode === "manual"
+                  ? "border-slate-400 bg-slate-400/5"
+                  : "border-border/60 bg-background/40 hover:bg-background/70"
+              }`}
+              onClick={() => setStartMode("manual")}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Edit3 className="w-4 h-4 text-slate-200" />
+                  <span>Manual estimate</span>
+                </CardTitle>
+                <Badge variant="outline" className="text-[10px]">
+                  Coming soon
+                </Badge>
+              </CardHeader>
+              <CardContent className="text-xs text-muted-foreground">
+                Build a detailed estimate line by line with stages, disciplines and
+                assumptions. This mode will use the same estimate model as quick
+                scenarios.
+              </CardContent>
+            </Card>
+
+            <Card
+              className={`cursor-pointer transition-colors min-h-[176px] ${
+                startMode === "template"
+                  ? "border-indigo-500 bg-indigo-500/5"
+                  : "border-border/60 bg-background/40 hover:bg-background/70"
+              }`}
+              onClick={() => setStartMode("template")}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Copy className="w-4 h-4 text-indigo-400" />
+                  <span>Use template</span>
+                </CardTitle>
+                <Badge variant="outline" className="text-[10px]">
+                  Coming soon
+                </Badge>
+              </CardHeader>
+              <CardContent className="text-xs text-muted-foreground">
+                Start from reusable fee templates for common project types, then adapt
+                the scope, stages and pricing for this specific opportunity.
+              </CardContent>
+            </Card>
+          </div>
+        </div>
 
         {startMode === "upload" && renderUploadMode()}
         {startMode === "quick" && renderQuickMode()}
@@ -1242,10 +1350,10 @@ function BidBuilderContent() {
               </CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
-              Manual estimate mode will let you build a detailed fee model using
-              stages, disciplines, hourly rates, and line items. It will use
-              the same underlying estimate tables as quick scenarios so you can
-              move seamlessly between high-level and detailed views.
+              Manual estimate mode will let you build a detailed fee model using stages,
+              disciplines, hourly rates and line items. It will use the same estimate
+              tables as quick scenarios so you can move between high-level and detailed
+              views.
             </CardContent>
           </Card>
         )}
@@ -1258,11 +1366,10 @@ function BidBuilderContent() {
               </CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
-              Template mode will surface admin-managed standard fee structures
-              for common project types (e.g. Cat A office, healthcare ward
-              refurb). You will be able to select a template, tweak the
-              assumptions and values, then save it as a scenario and convert it
-              into an editable estimate.
+              Template mode will surface admin-managed standard fee structures for
+              common project types (e.g. Cat A office, healthcare ward refurb). You
+              will be able to select a template, tweak the assumptions and values,
+              then save it as a scenario and convert it into an editable estimate.
             </CardContent>
           </Card>
         )}

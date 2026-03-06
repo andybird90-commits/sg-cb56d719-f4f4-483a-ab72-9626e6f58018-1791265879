@@ -1395,6 +1395,57 @@ export type Database = {
           },
         ]
       }
+      opportunity_bid_intake_files: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_path: string
+          file_size: number | null
+          file_type: string | null
+          id: string
+          opportunity_id: string | null
+          parsed_summary_json: Json | null
+          processed_at: string | null
+          purge_reason: string | null
+          purged_at: string | null
+          session_id: string
+          upload_status: string
+          uploaded_by_user_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          opportunity_id?: string | null
+          parsed_summary_json?: Json | null
+          processed_at?: string | null
+          purge_reason?: string | null
+          purged_at?: string | null
+          session_id: string
+          upload_status?: string
+          uploaded_by_user_id: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          opportunity_id?: string | null
+          parsed_summary_json?: Json | null
+          processed_at?: string | null
+          purge_reason?: string | null
+          purged_at?: string | null
+          session_id?: string
+          upload_status?: string
+          uploaded_by_user_id?: string
+        }
+        Relationships: []
+      }
       opportunity_estimate_line_items: {
         Row: {
           created_at: string
