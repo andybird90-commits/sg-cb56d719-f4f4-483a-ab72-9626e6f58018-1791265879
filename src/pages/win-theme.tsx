@@ -923,7 +923,7 @@ function WinThemePage() {
                                 </h3>
                                 {companyName && (
                                   <span
-                                    className="max-w-[220px] md:max-w-[260px] truncate rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground"
+                                    className="inline-flex max-w-full rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground whitespace-normal leading-snug"
                                   >
                                     {companyName}
                                   </span>
