@@ -860,13 +860,13 @@ function WinThemePage() {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] xl:grid-cols-[minmax(0,460px)_minmax(0,1fr)] gap-4 lg:gap-6">
-          <Card>
+          <Card className="flex flex-col h-full">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">
                 Opportunities with Win Themes
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 px-0">
+            <CardContent className="space-y-3 px-0 flex-1 flex flex-col">
               <Input
                 placeholder="Filter by opportunity, company, or summary"
                 value={searchTerm}
@@ -889,7 +889,7 @@ function WinThemePage() {
               )}
 
               {!loading && filteredLatest.length > 0 && (
-                <ScrollArea className="max-h-[360px]">
+                <ScrollArea className="flex-1 pr-1">
                   <div className="space-y-3 px-1">
                     {filteredLatest.map((item) => {
                       const opportunity = item.opportunity;
