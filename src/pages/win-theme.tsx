@@ -922,7 +922,7 @@ function WinThemePage() {
                                   {opportunity?.name || "Unknown opportunity"}
                                 </h3>
                                 {companyName && (
-                                  <span className="max-w-[45%] shrink-0 truncate rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                                  <span className="max-w-[60%] shrink-0 truncate rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
                                     {companyName}
                                   </span>
                                 )}
