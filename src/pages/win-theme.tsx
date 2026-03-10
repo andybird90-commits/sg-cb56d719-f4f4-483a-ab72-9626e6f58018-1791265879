@@ -916,18 +916,11 @@ function WinThemePage() {
                           }`}
                         >
                           <div className="flex min-w-0 items-start justify-between gap-2">
-                            <div className="min-w-0 flex-1 space-y-0.5">
+                            <div className="min-w-0 flex-1 space-y-1">
                               <div className="flex min-w-0 items-center gap-2">
                                 <h3 className="truncate text-sm font-semibold text-foreground">
                                   {opportunity?.name || "Unknown opportunity"}
                                 </h3>
-                                {companyName && (
-                                  <span
-                                    className="inline-flex max-w-full rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground whitespace-normal leading-snug"
-                                  >
-                                    {companyName}
-                                  </span>
-                                )}
                               </div>
                               {opportunity?.project_reference && (
                                 <p className="truncate text-xs text-muted-foreground">
@@ -946,6 +939,14 @@ function WinThemePage() {
                               )}
                             </div>
                           </div>
+
+                          {companyName && (
+                            <span
+                              className="mt-2 inline-flex w-full items-center justify-start rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground leading-snug break-words"
+                            >
+                              {companyName}
+                            </span>
+                          )}
 
                           {summaryText && (
                             <p className="mt-2 line-clamp-2 break-words text-xs text-muted-foreground">
