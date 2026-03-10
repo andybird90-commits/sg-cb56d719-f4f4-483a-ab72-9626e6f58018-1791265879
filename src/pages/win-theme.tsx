@@ -1886,7 +1886,7 @@ function WinThemePage() {
                 <CardContent>
                   <ScrollArea className="h-[160px] pr-2">
                     <div className="space-y-2">
-                      {selectedWinThemes.map((theme) => {
+                      {selectedWinThemes.slice(0, 3).map((theme) => {
                         const isActive = selectedWinTheme?.id === theme.id;
                         const dateLabel = formatDate(
                           (theme as any).generated_at || null,
