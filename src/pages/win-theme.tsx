@@ -735,7 +735,7 @@ function WinThemePage() {
   const filteredLatest = useMemo(() => {
     if (!searchTerm.trim()) return latestByOpportunity;
     const term = searchTerm.toLowerCase();
-    return latestByOpportunity.filter((item) => {
+    return latestByOpportunity.slice(0, 3).filter((item) => {
       const opportunity = item.opportunity;
       const isActive =
         selectedOpportunity?.id === item.opportunity_id;
@@ -891,7 +891,7 @@ function WinThemePage() {
               {!loading && filteredLatest.length > 0 && (
                 <ScrollArea className="pr-1">
                   <div className="space-y-3 px-1">
-                    {filteredLatest.map((item) => {
+                    {filteredLatest.slice(0, 3).map((item) => {
                       const opportunity = item.opportunity;
                       const isActive =
                         selectedOpportunity?.id === item.opportunity_id;
