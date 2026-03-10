@@ -17,8 +17,8 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  DialogTitle } from
+"@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,8 +27,8 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  SelectValue } from
+"@/components/ui/select";
 
 interface DashboardStats {
   companiesCount: number;
@@ -140,7 +140,7 @@ function DashboardContent() {
   const [pipelineLoading, setPipelineLoading] = useState(true);
   const [pipelineError, setPipelineError] = useState<string | null>(null);
   const [pipelineData, setPipelineData] = useState<PipelineData[]>([]);
-  
+
   const [showSecuredOnly, setShowSecuredOnly] = useState(false);
 
   const [sortField, setSortField] = useState<SortField>("created_at");
@@ -156,7 +156,7 @@ function DashboardContent() {
     start_time: "",
     end_time: "",
     location: "",
-    description: "",
+    description: ""
   });
   const [saving, setSaving] = useState(false);
 
@@ -186,7 +186,7 @@ function DashboardContent() {
         end_time: quickEventForm.end_time || null,
         location: quickEventForm.location || null,
         description: quickEventForm.description || null,
-        created_by_user_id: profile.id,
+        created_by_user_id: profile.id
       });
 
       if (error) throw error;
@@ -199,7 +199,7 @@ function DashboardContent() {
         start_time: "",
         end_time: "",
         location: "",
-        description: "",
+        description: ""
       });
       alert("Event created successfully!");
     } catch (err) {
@@ -247,9 +247,9 @@ function DashboardContent() {
       const thirtyDaysFromNow = new Date();
       thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
 
-      const { data, error } = await supabase
-        .from("opportunities")
-        .select(`
+      const { data, error } = await supabase.
+      from("opportunities").
+      select(`
           id,
           name,
           stage,
@@ -257,12 +257,12 @@ function DashboardContent() {
           companies (
             name
           )
-        `)
-        .not("tender_due_date", "is", null)
-        .gte("tender_due_date", now.toISOString().split("T")[0])
-        .lte("tender_due_date", thirtyDaysFromNow.toISOString().split("T")[0])
-        .order("tender_due_date")
-        .limit(5);
+        `).
+      not("tender_due_date", "is", null).
+      gte("tender_due_date", now.toISOString().split("T")[0]).
+      lte("tender_due_date", thirtyDaysFromNow.toISOString().split("T")[0]).
+      order("tender_due_date").
+      limit(5);
 
       if (error) throw error;
       setUpcomingTenders(data || []);
@@ -279,9 +279,9 @@ function DashboardContent() {
       setActivityLoading(true);
       setActivityError(null);
 
-      const { data: contactTimeline, error: contactError } = (await supabase
-        .from("contact_timeline" as any)
-        .select(`
+      const { data: contactTimeline, error: contactError } = (await supabase.
+      from("contact_timeline" as any).
+      select(`
           id,
           post_type,
           content,
@@ -297,15 +297,15 @@ function DashboardContent() {
           contact_events (
             event_type
           )
-        `)
-        .order("created_at", { ascending: false })
-        .limit(10)) as any;
+        `).
+      order("created_at", { ascending: false }).
+      limit(10)) as any;
 
       if (contactError) throw contactError;
 
-      const { data: opportunityTimeline, error: opportunityError } = (await supabase
-        .from("opportunity_timeline" as any)
-        .select(`
+      const { data: opportunityTimeline, error: opportunityError } = (await supabase.
+      from("opportunity_timeline" as any).
+      select(`
           id,
           post_type,
           content,
@@ -321,39 +321,39 @@ function DashboardContent() {
           opportunity_events (
             event_type
           )
-        `)
-        .order("created_at", { ascending: false })
-        .limit(10)) as any;
+        `).
+      order("created_at", { ascending: false }).
+      limit(10)) as any;
 
       if (opportunityError) throw opportunityError;
 
       const combinedActivity: ActivityEntry[] = [
-        ...(contactTimeline || []).map((entry: any) => ({
-          id: entry.id,
-          source: "contact" as const,
-          source_id: entry.contact_id,
-          source_name: entry.contacts?.name || "Unknown Contact",
-          post_type: entry.post_type,
-          content: entry.content,
-          created_at: entry.created_at,
-          author_name: entry.profiles?.full_name || entry.profiles?.email || "Unknown User",
-          event_type: entry.contact_events?.event_type
-        })),
-        ...(opportunityTimeline || []).map((entry: any) => ({
-          id: entry.id,
-          source: "opportunity" as const,
-          source_id: entry.opportunity_id,
-          source_name: entry.opportunities?.name || "Unknown Opportunity",
-          post_type: entry.post_type,
-          content: entry.content,
-          created_at: entry.created_at,
-          author_name: entry.profiles?.full_name || entry.profiles?.email || "Unknown User",
-          event_type: entry.opportunity_events?.event_type
-        }))
-      ];
+      ...(contactTimeline || []).map((entry: any) => ({
+        id: entry.id,
+        source: "contact" as const,
+        source_id: entry.contact_id,
+        source_name: entry.contacts?.name || "Unknown Contact",
+        post_type: entry.post_type,
+        content: entry.content,
+        created_at: entry.created_at,
+        author_name: entry.profiles?.full_name || entry.profiles?.email || "Unknown User",
+        event_type: entry.contact_events?.event_type
+      })),
+      ...(opportunityTimeline || []).map((entry: any) => ({
+        id: entry.id,
+        source: "opportunity" as const,
+        source_id: entry.opportunity_id,
+        source_name: entry.opportunities?.name || "Unknown Opportunity",
+        post_type: entry.post_type,
+        content: entry.content,
+        created_at: entry.created_at,
+        author_name: entry.profiles?.full_name || entry.profiles?.email || "Unknown User",
+        event_type: entry.opportunity_events?.event_type
+      }))];
+
 
       combinedActivity.sort((a, b) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
 
       setLatestActivity(combinedActivity.slice(0, 10));
@@ -370,9 +370,9 @@ function DashboardContent() {
       setLatestOpportunitiesLoading(true);
       setLatestOpportunitiesError(null);
 
-      const { data, error } = await supabase
-        .from("opportunities")
-        .select(`
+      const { data, error } = await supabase.
+      from("opportunities").
+      select(`
           id,
           name,
           stage,
@@ -382,9 +382,9 @@ function DashboardContent() {
           companies (
             name
           )
-        `)
-        .order("created_at", { ascending: false })
-        .limit(5);
+        `).
+      order("created_at", { ascending: false }).
+      limit(5);
 
       if (error) throw error;
       setLatestOpportunities(data || []);
@@ -406,9 +406,9 @@ function DashboardContent() {
       const sevenDaysFromNow = new Date(today);
       sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
 
-      const { data, error } = (await supabase
-        .from("contact_events" as any)
-        .select(`
+      const { data, error } = (await supabase.
+      from("contact_events" as any).
+      select(`
           *,
           contacts!contact_events_contact_id_fkey (
             name,
@@ -416,12 +416,12 @@ function DashboardContent() {
               name
             )
           )
-        `)
-        .gte("event_date", today.toISOString().split("T")[0])
-        .lte("event_date", sevenDaysFromNow.toISOString().split("T")[0])
-        .order("event_date")
-        .order("start_time")
-        .limit(20)) as any;
+        `).
+      gte("event_date", today.toISOString().split("T")[0]).
+      lte("event_date", sevenDaysFromNow.toISOString().split("T")[0]).
+      order("event_date").
+      order("start_time").
+      limit(20)) as any;
 
       if (error) throw error;
       setUpcomingVisits(data as ContactEvent[] || []);
@@ -453,13 +453,13 @@ function DashboardContent() {
         highPotential: 0,
         bid: 0,
         budget: 180000,
-        budgetGap: 0,
+        budgetGap: 0
       }));
 
       // Opportunities: mirror monthly view filters
-      const { data: oppsData, error: oppsError } = await supabase
-        .from("opportunities")
-        .select(`
+      const { data: oppsData, error: oppsError } = await supabase.
+      from("opportunities").
+      select(`
           id,
           name,
           stage,
@@ -471,19 +471,19 @@ function DashboardContent() {
             short_name,
             name
           )
-        `)
-        .eq("archived", false)
-        .neq("status", "closed_won")
-        .neq("status", "closed_lost")
-        .not("expected_fee_value", "is", null)
-        .gte("expected_end_date", startOfCurrentMonth.toISOString());
+        `).
+      eq("archived", false).
+      neq("status", "closed_won").
+      neq("status", "closed_lost").
+      not("expected_fee_value", "is", null).
+      gte("expected_end_date", startOfCurrentMonth.toISOString());
 
       if (oppsError) throw oppsError;
 
       // Projects: mirror monthly view filters
-      const { data: projectsData, error: projectsError } = await supabase
-        .from("projects")
-        .select(`
+      const { data: projectsData, error: projectsError } = await supabase.
+      from("projects").
+      select(`
           id,
           code,
           name,
@@ -495,44 +495,44 @@ function DashboardContent() {
             short_name,
             name
           )
-        `)
-        .eq("archived", false)
-        .not("agreed_fee_value", "is", null)
-        .gte("end_date", startOfCurrentMonth.toISOString());
+        `).
+      eq("archived", false).
+      not("agreed_fee_value", "is", null).
+      gte("end_date", startOfCurrentMonth.toISOString());
 
       if (projectsError) throw projectsError;
 
       // Manual phasing for opportunities
-      const { data: oppPhasingData, error: oppPhasingError } = await supabase
-        .from("opportunity_monthly_phasing")
-        .select("opportunity_id, year, month, revenue_amount")
-        .gte("year", now.getFullYear())
-        .lte("year", now.getFullYear() + 1);
+      const { data: oppPhasingData, error: oppPhasingError } = await supabase.
+      from("opportunity_monthly_phasing").
+      select("opportunity_id, year, month, revenue_amount").
+      gte("year", now.getFullYear()).
+      lte("year", now.getFullYear() + 1);
 
       if (oppPhasingError) throw oppPhasingError;
 
       // Manual phasing for projects
-      const { data: projPhasingData, error: projPhasingError } = await supabase
-        .from("project_monthly_phasing")
-        .select("project_id, year, month, revenue_amount")
-        .gte("year", now.getFullYear())
-        .lte("year", now.getFullYear() + 1);
+      const { data: projPhasingData, error: projPhasingError } = await supabase.
+      from("project_monthly_phasing").
+      select("project_id, year, month, revenue_amount").
+      gte("year", now.getFullYear()).
+      lte("year", now.getFullYear() + 1);
 
       if (projPhasingError) throw projPhasingError;
 
       // All projects that have ANY manual phasing
-      const { data: projectsWithAnyPhasing, error: projectsWithAnyPhasingError } = await supabase
-        .from("project_monthly_phasing")
-        .select("project_id")
-        .not("revenue_amount", "is", null);
+      const { data: projectsWithAnyPhasing, error: projectsWithAnyPhasingError } = await supabase.
+      from("project_monthly_phasing").
+      select("project_id").
+      not("revenue_amount", "is", null);
 
       if (projectsWithAnyPhasingError) throw projectsWithAnyPhasingError;
 
       // All opportunities that have ANY manual phasing
-      const { data: oppsWithAnyPhasing, error: oppsWithAnyPhasingError } = await supabase
-        .from("opportunity_monthly_phasing")
-        .select("opportunity_id")
-        .not("revenue_amount", "is", null);
+      const { data: oppsWithAnyPhasing, error: oppsWithAnyPhasingError } = await supabase.
+      from("opportunity_monthly_phasing").
+      select("opportunity_id").
+      not("revenue_amount", "is", null);
 
       if (oppsWithAnyPhasingError) throw oppsWithAnyPhasingError;
 
@@ -576,9 +576,9 @@ function DashboardContent() {
 
         const durationMonths = Math.max(
           1,
-          (endDate.getFullYear() - startDate.getFullYear()) * 12 +
-            (endDate.getMonth() - startDate.getMonth()) +
-            1
+          (endDate.getFullYear() - startDate.getFullYear()) * 12 + (
+          endDate.getMonth() - startDate.getMonth()) +
+          1
         );
         const defaultMonthlyTurnover = (opp.expected_fee_value || 0) / durationMonths;
 
@@ -596,8 +596,8 @@ function DashboardContent() {
 
           if (startDate <= monthEnd && endDate >= monthStart) {
             const phasingKey = `${monthDates[idx].getFullYear()}-${
-              monthDates[idx].getMonth() + 1
-            }`;
+            monthDates[idx].getMonth() + 1}`;
+
             const manualPhasing = oppPhasingMap.get(opp.id);
 
             // If the opportunity has ANY manual phasing:
@@ -605,9 +605,9 @@ function DashboardContent() {
             //   - Use 0 if no value exists for this month
             // If NO manual phasing at all:
             //   - Use defaultMonthlyTurnover (equal split)
-            const monthlyTurnover = hasManualPhasing
-              ? manualPhasing?.get(phasingKey) ?? 0
-              : defaultMonthlyTurnover;
+            const monthlyTurnover = hasManualPhasing ?
+            manualPhasing?.get(phasingKey) ?? 0 :
+            defaultMonthlyTurnover;
 
             if (opp.stage === "secured") {
               monthData.secured += monthlyTurnover;
@@ -633,9 +633,9 @@ function DashboardContent() {
 
         const durationMonths = Math.max(
           1,
-          (endDate.getFullYear() - startDate.getFullYear()) * 12 +
-            (endDate.getMonth() - startDate.getMonth()) +
-            1
+          (endDate.getFullYear() - startDate.getFullYear()) * 12 + (
+          endDate.getMonth() - startDate.getMonth()) +
+          1
         );
         const defaultMonthlyTurnover = (proj.agreed_fee_value || 0) / durationMonths;
 
@@ -653,13 +653,13 @@ function DashboardContent() {
 
           if (startDate <= monthEnd && endDate >= monthStart) {
             const phasingKey = `${monthDates[idx].getFullYear()}-${
-              monthDates[idx].getMonth() + 1
-            }`;
+            monthDates[idx].getMonth() + 1}`;
+
             const manualPhasing = projPhasingMap.get(proj.id);
 
-            const monthlyTurnover = hasManualPhasing
-              ? manualPhasing?.get(phasingKey) ?? 0
-              : defaultMonthlyTurnover;
+            const monthlyTurnover = hasManualPhasing ?
+            manualPhasing?.get(phasingKey) ?? 0 :
+            defaultMonthlyTurnover;
 
             // Projects always contribute to secured
             monthData.secured += monthlyTurnover;
@@ -687,9 +687,9 @@ function DashboardContent() {
       setOpportunitiesTableLoading(true);
       setOpportunitiesTableError(null);
 
-      const { data, error } = await supabase
-        .from("opportunities")
-        .select(`
+      const { data, error } = await supabase.
+      from("opportunities").
+      select(`
           id,
           name,
           stage,
@@ -703,12 +703,12 @@ function DashboardContent() {
           companies (
             name
           )
-        `)
-        .in("stage", ["bid", "high_potential"])
-        .order("created_at", { ascending: false });
+        `).
+      in("stage", ["bid", "high_potential"]).
+      order("created_at", { ascending: false });
 
       if (error) throw error;
-      setOpportunitiesTable((data as any) || []);
+      setOpportunitiesTable(data as any || []);
     } catch (error) {
       console.error("Failed to load opportunities table", error);
       setOpportunitiesTableError("Failed to load opportunities");
@@ -786,14 +786,14 @@ function DashboardContent() {
         <div className="flex items-center gap-2">
           {label}
           {isActive ?
-            sortDirection === "asc" ?
-            <ArrowUp className="w-3 h-3" /> :
-            <ArrowDown className="w-3 h-3" /> :
-            <ArrowUpDown className="w-3 h-3 opacity-40" />
+          sortDirection === "asc" ?
+          <ArrowUp className="w-3 h-3" /> :
+          <ArrowDown className="w-3 h-3" /> :
+          <ArrowUpDown className="w-3 h-3 opacity-40" />
           }
         </div>
-      </th>
-    );
+      </th>);
+
   };
 
   const formatCurrency = (value: number) => {
@@ -832,9 +832,9 @@ function DashboardContent() {
   };
 
   const getEventTypeColor = (type: "visit" | "function") => {
-    return type === "visit" ? 
-      "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400" : 
-      "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400";
+    return type === "visit" ?
+    "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400" :
+    "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400";
   };
 
   const getActivityPostTypeColor = (type: string) => {
@@ -873,21 +873,21 @@ function DashboardContent() {
   };
 
   const ErrorState = ({ message }: {message: string;}) =>
-    <Alert variant="destructive" className="my-4">
+  <Alert variant="destructive" className="my-4">
       <AlertTriangle className="h-4 w-4" />
       <AlertDescription>{message}</AlertDescription>
     </Alert>;
 
   const sortedOpportunities = getSortedOpportunities();
-  
-  const filteredPipelineData = showSecuredOnly
-    ? pipelineData.map(month => ({
-        ...month,
-        highPotential: 0,
-        bid: 0,
-        budgetGap: month.budget - month.secured
-      }))
-    : pipelineData;
+
+  const filteredPipelineData = showSecuredOnly ?
+  pipelineData.map((month) => ({
+    ...month,
+    highPotential: 0,
+    bid: 0,
+    budgetGap: month.budget - month.secured
+  })) :
+  pipelineData;
 
   const showLiveOpportunitiesTableOnDashboard = false;
 
@@ -897,7 +897,7 @@ function DashboardContent() {
         <div className="p-8">
           <div className="mb-8">
             <div className="flex items-center justify-between mb-2">
-              <h1 className="text-4xl font-bold">Dashboard</h1>
+              <h1 className="text-4xl font-bold">DASHBOARD</h1>
               <Button onClick={() => setShowQuickAddEvent(true)} className="gap-2">
                 <CalendarIcon className="h-4 w-4" />
                 <Plus className="h-4 w-4" />
@@ -911,8 +911,8 @@ function DashboardContent() {
         </div>
 
         {statsError ?
-          <ErrorState message={statsError} /> :
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+        <ErrorState message={statsError} /> :
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
             <Link href="/companies" className="group">
               <Card className="card-professional h-full">
                 <CardContent className="p-6">
@@ -993,17 +993,17 @@ function DashboardContent() {
                   size="sm"
                   onClick={() => setShowSecuredOnly(!showSecuredOnly)}
                   className="btn-professional">
-                  {showSecuredOnly ? (
-                    <>
+                  {showSecuredOnly ?
+                  <>
                       <EyeOff className="w-4 h-4 mr-2" />
                       Show All
-                    </>
-                  ) : (
-                    <>
+                    </> :
+
+                  <>
                       <Eye className="w-4 h-4 mr-2" />
                       Secured Only
                     </>
-                  )}
+                  }
                 </Button>
                 <Button
                   variant="outline"
@@ -1024,45 +1024,45 @@ function DashboardContent() {
           </CardHeader>
           <CardContent>
             {pipelineLoading ?
-              <div className="h-96 flex items-center justify-center">
+            <div className="h-96 flex items-center justify-center">
                 <p className="text-muted-foreground">Loading pipeline data...</p>
               </div> :
-              pipelineError ?
-              <div className="h-96 flex items-center justify-center">
+            pipelineError ?
+            <div className="h-96 flex items-center justify-center">
                 <p className="text-destructive">{pipelineError}</p>
               </div> :
-              <>
+            <>
                 <div className="w-full" style={{ minHeight: "500px", height: "auto" }}>
                   <ResponsiveContainer width="100%" height="100%" minHeight={500}>
                     <BarChart data={filteredPipelineData} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                       <XAxis
-                        dataKey="month"
-                        angle={-45}
-                        textAnchor="end"
-                        height={80}
-                        tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                      dataKey="month"
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                      tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
                       <YAxis
-                        tickFormatter={(value) => `£${(value / 1000).toFixed(0)}k`}
-                        tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                      tickFormatter={(value) => `£${(value / 1000).toFixed(0)}k`}
+                      tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
                       <Tooltip
-                        formatter={(value: number) => `£${value.toLocaleString()}`}
-                        contentStyle={{ 
-                          fontSize: 12,
-                          backgroundColor: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px"
-                        }} />
+                      formatter={(value: number) => `£${value.toLocaleString()}`}
+                      contentStyle={{
+                        fontSize: 12,
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px"
+                      }} />
                       <Legend
-                        wrapperStyle={{ paddingTop: "20px" }}
-                        iconType="circle" />
+                      wrapperStyle={{ paddingTop: "20px" }}
+                      iconType="circle" />
                       <Bar dataKey="secured" stackId="a" fill="#22c55e" name="Secured + Projects" radius={[0, 0, 0, 0]} />
-                      {!showSecuredOnly && (
-                        <>
+                      {!showSecuredOnly &&
+                    <>
                           <Bar dataKey="highPotential" stackId="a" name="High Potential" fill="#3b82f6" radius={[0, 0, 0, 0]} />
                           <Bar dataKey="bid" stackId="a" name="Bid" fill="#f59e0b" radius={[0, 0, 0, 0]} />
                         </>
-                      )}
+                    }
                       <Bar dataKey="budgetGap" stackId="a" name="Budget Gap" fill="#ef4444" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -1076,40 +1076,40 @@ function DashboardContent() {
                         <tr className="bg-muted/50">
                           <th className="border border-border p-3 text-left text-sm font-semibold">Month</th>
                           <th className="border border-border p-3 text-right text-sm font-semibold text-green-600 dark:text-green-400">Secured + Projects</th>
-                          {!showSecuredOnly && (
-                            <>
+                          {!showSecuredOnly &&
+                        <>
                               <th className="border border-border p-3 text-right text-sm font-semibold text-blue-600 dark:text-blue-400">High Potential</th>
                               <th className="border border-border p-3 text-right text-sm font-semibold text-amber-600 dark:text-amber-400">Bid</th>
                             </>
-                          )}
+                        }
                           <th className="border border-border p-3 text-right text-sm font-semibold text-red-600 dark:text-red-400">Budget Gap</th>
                           <th className="border border-border p-3 text-right text-sm font-bold">Total</th>
                         </tr>
                       </thead>
                       <tbody>
                         {filteredPipelineData.map((row) =>
-                          <tr key={row.month} className="hover:bg-muted/30 transition-professional">
+                      <tr key={row.month} className="hover:bg-muted/30 transition-professional">
                             <td className="border border-border p-3 text-sm font-medium">{row.month}</td>
                             <td className="border border-border p-3 text-right text-sm">{formatCurrency(row.secured)}</td>
-                            {!showSecuredOnly && (
-                              <>
+                            {!showSecuredOnly &&
+                        <>
                                 <td className="border border-border p-3 text-right text-sm">{formatCurrency(row.highPotential)}</td>
                                 <td className="border border-border p-3 text-right text-sm">{formatCurrency(row.bid)}</td>
                               </>
-                            )}
+                        }
                             <td className="border border-border p-3 text-right text-sm">{formatCurrency(row.budgetGap)}</td>
                             <td className="border border-border p-3 text-right text-sm font-semibold">
                               {formatCurrency(row.secured + row.highPotential + row.bid)}
                             </td>
                           </tr>
-                        )}
+                      )}
                         <tr className="bg-muted font-bold">
                           <td className="border border-border p-3 text-sm">TOTAL</td>
                           <td className="border border-border p-3 text-right text-sm text-green-600 dark:text-green-400">
                             {formatCurrency(filteredPipelineData.reduce((sum, month) => sum + month.secured, 0))}
                           </td>
-                          {!showSecuredOnly && (
-                            <>
+                          {!showSecuredOnly &&
+                        <>
                               <td className="border border-border p-3 text-right text-sm text-blue-600 dark:text-blue-400">
                                 {formatCurrency(filteredPipelineData.reduce((sum, month) => sum + month.highPotential, 0))}
                               </td>
@@ -1117,7 +1117,7 @@ function DashboardContent() {
                                 {formatCurrency(filteredPipelineData.reduce((sum, month) => sum + month.bid, 0))}
                               </td>
                             </>
-                          )}
+                        }
                           <td className="border border-border p-3 text-right text-sm text-red-600 dark:text-red-400">
                             {formatCurrency(filteredPipelineData.reduce((sum, month) => sum + month.budgetGap, 0))}
                           </td>
@@ -1151,21 +1151,21 @@ function DashboardContent() {
             </CardHeader>
             <CardContent>
               {tendersError ?
-                <ErrorState message={tendersError} /> :
-                tendersLoading ?
-                <div className="text-center py-8 text-muted-foreground text-sm">
+              <ErrorState message={tendersError} /> :
+              tendersLoading ?
+              <div className="text-center py-8 text-muted-foreground text-sm">
                   Loading tenders...
                 </div> :
-                upcomingTenders.length === 0 ?
-                <div className="text-center py-8 text-muted-foreground text-sm">
+              upcomingTenders.length === 0 ?
+              <div className="text-center py-8 text-muted-foreground text-sm">
                   No tenders due in the next 30 days
                 </div> :
-                <div className="space-y-3">
+              <div className="space-y-3">
                   {upcomingTenders.map((opp) =>
-                    <div
-                      key={opp.id}
-                      className="p-4 border border-border rounded-lg hover:bg-muted/30 transition-professional cursor-pointer"
-                      onClick={() => router.push(`/opportunities/${opp.id}`)}>
+                <div
+                  key={opp.id}
+                  className="p-4 border border-border rounded-lg hover:bg-muted/30 transition-professional cursor-pointer"
+                  onClick={() => router.push(`/opportunities/${opp.id}`)}>
                       <div className="flex items-start justify-between gap-3 mb-2">
                         <div className="font-medium text-sm line-clamp-2 flex-1">
                           {opp.name}
@@ -1181,7 +1181,7 @@ function DashboardContent() {
                         Due: <span className="font-medium">{formatDate(opp.tender_due_date)}</span>
                       </div>
                     </div>
-                  )}
+                )}
                 </div>
               }
             </CardContent>
@@ -1200,21 +1200,21 @@ function DashboardContent() {
             </CardHeader>
             <CardContent>
               {latestOpportunitiesError ?
-                <ErrorState message={latestOpportunitiesError} /> :
-                latestOpportunitiesLoading ?
-                <div className="text-center py-8 text-muted-foreground text-sm">
+              <ErrorState message={latestOpportunitiesError} /> :
+              latestOpportunitiesLoading ?
+              <div className="text-center py-8 text-muted-foreground text-sm">
                   Loading opportunities...
                 </div> :
-                latestOpportunities.length === 0 ?
-                <div className="text-center py-8 text-muted-foreground text-sm">
+              latestOpportunities.length === 0 ?
+              <div className="text-center py-8 text-muted-foreground text-sm">
                   No opportunities yet
                 </div> :
-                <div className="space-y-3">
+              <div className="space-y-3">
                   {latestOpportunities.map((opp) =>
-                    <div
-                      key={opp.id}
-                      className="p-4 border border-border rounded-lg hover:bg-muted/30 transition-professional cursor-pointer"
-                      onClick={() => router.push(`/opportunities/${opp.id}`)}>
+                <div
+                  key={opp.id}
+                  className="p-4 border border-border rounded-lg hover:bg-muted/30 transition-professional cursor-pointer"
+                  onClick={() => router.push(`/opportunities/${opp.id}`)}>
                       <div className="flex items-start justify-between gap-3 mb-2">
                         <div className="font-medium text-sm line-clamp-2 flex-1">
                           {opp.name}
@@ -1229,13 +1229,13 @@ function DashboardContent() {
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <span>{formatDate(opp.created_at)}</span>
                         {opp.expected_fee_value &&
-                          <span className="font-semibold">
+                    <span className="font-semibold">
                             {formatCurrency(opp.expected_fee_value)}
                           </span>
-                        }
+                    }
                       </div>
                     </div>
-                  )}
+                )}
                 </div>
               }
             </CardContent>
@@ -1254,26 +1254,26 @@ function DashboardContent() {
             </CardHeader>
             <CardContent>
               {activityError ?
-                <ErrorState message={activityError} /> :
-                activityLoading ?
-                <div className="text-center py-8 text-muted-foreground text-sm">
+              <ErrorState message={activityError} /> :
+              activityLoading ?
+              <div className="text-center py-8 text-muted-foreground text-sm">
                   Loading activity...
                 </div> :
-                latestActivity.length === 0 ?
-                <div className="text-center py-8 text-muted-foreground text-sm">
+              latestActivity.length === 0 ?
+              <div className="text-center py-8 text-muted-foreground text-sm">
                   No recent activity
                 </div> :
-                <div className="space-y-3">
+              <div className="space-y-3">
                   {latestActivity.map((activity) =>
-                    <div
-                      key={`${activity.source}-${activity.id}`}
-                      className="p-4 border border-border rounded-lg hover:bg-muted/30 transition-professional cursor-pointer"
-                      onClick={() => {
-                        const path = activity.source === "contact" ?
-                          `/contacts/${activity.source_id}` :
-                          `/opportunities/${activity.source_id}`;
-                        router.push(path);
-                      }}>
+                <div
+                  key={`${activity.source}-${activity.id}`}
+                  className="p-4 border border-border rounded-lg hover:bg-muted/30 transition-professional cursor-pointer"
+                  onClick={() => {
+                    const path = activity.source === "contact" ?
+                    `/contacts/${activity.source_id}` :
+                    `/opportunities/${activity.source_id}`;
+                    router.push(path);
+                  }}>
                       <div className="flex items-start gap-3">
                         <span className="text-lg">{getActivitySourceIcon(activity.source)}</span>
                         <div className="flex-1 min-w-0">
@@ -1296,7 +1296,7 @@ function DashboardContent() {
                         </div>
                       </div>
                     </div>
-                  )}
+                )}
                 </div>
               }
             </CardContent>
@@ -1315,32 +1315,32 @@ function DashboardContent() {
             </CardHeader>
             <CardContent>
               {visitsError ?
-                <ErrorState message={visitsError} /> :
-                visitsLoading ?
-                <div className="text-center py-8 text-muted-foreground text-sm">
+              <ErrorState message={visitsError} /> :
+              visitsLoading ?
+              <div className="text-center py-8 text-muted-foreground text-sm">
                   Loading visits...
                 </div> :
-                upcomingVisits.length === 0 ?
-                <div className="text-center py-8 text-muted-foreground text-sm">
+              upcomingVisits.length === 0 ?
+              <div className="text-center py-8 text-muted-foreground text-sm">
                   No visits or functions scheduled in the next 7 days
                 </div> :
-                <div className="space-y-3">
+              <div className="space-y-3">
                   {upcomingVisits.map((visit) =>
-                    <div
-                      key={visit.id}
-                      className="p-4 border border-border rounded-lg cursor-pointer hover:bg-muted/30 transition-professional"
-                      onClick={() => router.push(`/contacts/${visit.contact_id}`)}>
+                <div
+                  key={visit.id}
+                  className="p-4 border border-border rounded-lg cursor-pointer hover:bg-muted/30 transition-professional"
+                  onClick={() => router.push(`/contacts/${visit.contact_id}`)}>
                       <div className="flex gap-3">
                         <div className="flex-shrink-0 w-20">
                           <div className="text-sm font-semibold">
                             {formatDate(visit.event_date)}
                           </div>
                           {visit.start_time &&
-                            <div className="text-xs text-muted-foreground mt-0.5">
+                      <div className="text-xs text-muted-foreground mt-0.5">
                               {visit.start_time.substring(0, 5)}
                               {visit.end_time && ` - ${visit.end_time.substring(0, 5)}`}
                             </div>
-                          }
+                      }
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start gap-2 mb-2">
@@ -1354,18 +1354,18 @@ function DashboardContent() {
                           <div className="text-sm mb-1">
                             <span className="font-medium">{visit.contacts?.name}</span>
                             {visit.contacts?.companies?.name &&
-                              <span className="text-muted-foreground"> • {visit.contacts.companies.name}</span>
-                            }
+                        <span className="text-muted-foreground"> • {visit.contacts.companies.name}</span>
+                        }
                           </div>
                           {visit.location &&
-                            <div className="text-xs text-muted-foreground">
+                      <div className="text-xs text-muted-foreground">
                               📍 {visit.location}
                             </div>
-                          }
+                      }
                         </div>
                       </div>
                     </div>
-                  )}
+                )}
                 </div>
               }
             </CardContent>
@@ -1373,7 +1373,7 @@ function DashboardContent() {
         </div>
 
         {/* Live Opportunities & High Potentials Table */}
-        {showLiveOpportunitiesTableOnDashboard && (
+        {showLiveOpportunitiesTableOnDashboard &&
         <Card className="card-professional">
           <CardHeader className="pb-6">
             <div className="flex items-center gap-3 mb-2">
@@ -1386,16 +1386,16 @@ function DashboardContent() {
           </CardHeader>
           <CardContent>
             {opportunitiesTableError ?
-              <ErrorState message={opportunitiesTableError} /> :
-              opportunitiesTableLoading ?
-              <div className="text-center py-12 text-muted-foreground">
+            <ErrorState message={opportunitiesTableError} /> :
+            opportunitiesTableLoading ?
+            <div className="text-center py-12 text-muted-foreground">
                 Loading opportunities...
               </div> :
-              opportunitiesTable.length === 0 ?
-              <div className="text-center py-12 text-muted-foreground">
+            opportunitiesTable.length === 0 ?
+            <div className="text-center py-12 text-muted-foreground">
                 No active opportunities in pipeline
               </div> :
-              <div className="overflow-x-auto -mx-6">
+            <div className="overflow-x-auto -mx-6">
                 <table className="w-full min-w-[900px]">
                   <thead>
                     <tr className="border-b border-border">
@@ -1412,10 +1412,10 @@ function DashboardContent() {
                   </thead>
                   <tbody>
                     {sortedOpportunities.map((opp) =>
-                      <tr
-                        key={opp.id}
-                        className="border-b border-border hover:bg-muted/30 cursor-pointer transition-professional"
-                        onClick={() => router.push(`/opportunities/${opp.id}`)}>
+                  <tr
+                    key={opp.id}
+                    className="border-b border-border hover:bg-muted/30 cursor-pointer transition-professional"
+                    onClick={() => router.push(`/opportunities/${opp.id}`)}>
                         <td className="py-3 px-4 text-sm text-muted-foreground font-mono">
                           {opp.project_reference || "—"}
                         </td>
@@ -1446,7 +1446,7 @@ function DashboardContent() {
                           {opp.probability_percent !== null ? `${opp.probability_percent}%` : "—"}
                         </td>
                       </tr>
-                    )}
+                  )}
                   </tbody>
                   <tfoot>
                     <tr className="border-t-2 bg-muted/50">
@@ -1455,24 +1455,24 @@ function DashboardContent() {
                       </td>
                       <td className="py-4 px-4 text-right text-sm">
                         {(() => {
-                          const highPotentialTotal = opportunitiesTable
-                            .filter((opp) => opp.stage === "high_potential")
-                            .reduce((sum, opp) => sum + (opp.expected_fee_value || 0), 0);
-                          const bidTotal = opportunitiesTable
-                            .filter((opp) => opp.stage === "bid")
-                            .reduce((sum, opp) => sum + (opp.expected_fee_value || 0), 0);
+                        const highPotentialTotal = opportunitiesTable.
+                        filter((opp) => opp.stage === "high_potential").
+                        reduce((sum, opp) => sum + (opp.expected_fee_value || 0), 0);
+                        const bidTotal = opportunitiesTable.
+                        filter((opp) => opp.stage === "bid").
+                        reduce((sum, opp) => sum + (opp.expected_fee_value || 0), 0);
 
-                          return (
-                            <div className="space-y-1.5">
+                        return (
+                          <div className="space-y-1.5">
                               <div className="text-blue-600 dark:text-blue-400 font-semibold">
                                 High Potential: {formatCurrency(highPotentialTotal)}
                               </div>
                               <div className="text-amber-600 dark:text-amber-400 font-semibold">
                                 Bids: {formatCurrency(bidTotal)}
                               </div>
-                            </div>
-                          );
-                        })()}
+                            </div>);
+
+                      })()}
                       </td>
                       <td colSpan={4}></td>
                     </tr>
@@ -1482,7 +1482,7 @@ function DashboardContent() {
             }
           </CardContent>
         </Card>
-        )}
+        }
 
         {/* Quick Add Event Dialog */}
         <Dialog open={showQuickAddEvent} onOpenChange={setShowQuickAddEvent}>
@@ -1497,10 +1497,10 @@ function DashboardContent() {
                   id="quick-title"
                   value={quickEventForm.title}
                   onChange={(e) =>
-                    setQuickEventForm({ ...quickEventForm, title: e.target.value })
+                  setQuickEventForm({ ...quickEventForm, title: e.target.value })
                   }
-                  placeholder="Enter event title"
-                />
+                  placeholder="Enter event title" />
+                
               </div>
 
               <div className="space-y-2">
@@ -1508,9 +1508,9 @@ function DashboardContent() {
                 <Select
                   value={quickEventForm.event_type}
                   onValueChange={(value) =>
-                    setQuickEventForm({ ...quickEventForm, event_type: value })
-                  }
-                >
+                  setQuickEventForm({ ...quickEventForm, event_type: value })
+                  }>
+                  
                   <SelectTrigger id="quick-type">
                     <SelectValue />
                   </SelectTrigger>
@@ -1532,9 +1532,9 @@ function DashboardContent() {
                     type="date"
                     value={quickEventForm.event_date}
                     onChange={(e) =>
-                      setQuickEventForm({ ...quickEventForm, event_date: e.target.value })
-                    }
-                  />
+                    setQuickEventForm({ ...quickEventForm, event_date: e.target.value })
+                    } />
+                  
                 </div>
 
                 <div className="space-y-2">
@@ -1544,9 +1544,9 @@ function DashboardContent() {
                     type="time"
                     value={quickEventForm.start_time}
                     onChange={(e) =>
-                      setQuickEventForm({ ...quickEventForm, start_time: e.target.value })
-                    }
-                  />
+                    setQuickEventForm({ ...quickEventForm, start_time: e.target.value })
+                    } />
+                  
                 </div>
               </div>
 
@@ -1556,10 +1556,10 @@ function DashboardContent() {
                   id="quick-location"
                   value={quickEventForm.location}
                   onChange={(e) =>
-                    setQuickEventForm({ ...quickEventForm, location: e.target.value })
+                  setQuickEventForm({ ...quickEventForm, location: e.target.value })
                   }
-                  placeholder="Enter location"
-                />
+                  placeholder="Enter location" />
+                
               </div>
 
               <div className="space-y-2">
@@ -1568,19 +1568,19 @@ function DashboardContent() {
                   id="quick-description"
                   value={quickEventForm.description}
                   onChange={(e) =>
-                    setQuickEventForm({ ...quickEventForm, description: e.target.value })
+                  setQuickEventForm({ ...quickEventForm, description: e.target.value })
                   }
                   placeholder="Enter description"
-                  rows={3}
-                />
+                  rows={3} />
+                
               </div>
 
               <div className="flex justify-end gap-3 pt-4">
                 <Button
                   variant="outline"
                   onClick={() => setShowQuickAddEvent(false)}
-                  disabled={saving}
-                >
+                  disabled={saving}>
+                  
                   Cancel
                 </Button>
                 <Button onClick={handleQuickAddEvent} disabled={saving}>
@@ -1591,16 +1591,16 @@ function DashboardContent() {
           </DialogContent>
         </Dialog>
       </div>
-    </Layout>
-  );
+    </Layout>);
+
 }
 
 const DashboardPage = () => {
   return (
     <RequireAuth>
       <DashboardContent />
-    </RequireAuth>
-  );
+    </RequireAuth>);
+
 };
 
 export default DashboardPage;

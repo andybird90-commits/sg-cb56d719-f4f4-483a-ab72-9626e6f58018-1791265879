@@ -54,14 +54,7 @@ export default function SignUpPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-4">
           <div className="flex justify-center">
-            <Image 
-              src="/conexa_of_new_logo.png" 
-              alt="ConexaOF" 
-              width={400}
-              height={100}
-              priority
-              className="h-12 sm:h-16 w-auto object-contain"
-            />
+            <img src="/conexa_of_on_light.png" alt="Conexa" className="h-8 w-auto" />
           </div>
           <CardTitle className="text-xl sm:text-2xl font-bold text-center">Create Account</CardTitle>
           <CardDescription className="text-center text-sm sm:text-base">

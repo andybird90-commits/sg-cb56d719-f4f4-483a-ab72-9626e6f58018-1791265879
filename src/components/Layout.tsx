@@ -126,7 +126,7 @@ export function Layout({ children, variant = "default" }: LayoutProps) {
         <div className="flex h-16 shrink-0 items-center border-b px-4">
           <div className="relative w-40 h-10">
             <Image
-              src="/conexa_of_new_logo.png"
+              src="/conexa_of_on_light.png"
               alt="ConexaOF"
               fill
               sizes="160px"
@@ -184,7 +184,7 @@ export function Layout({ children, variant = "default" }: LayoutProps) {
             >
               <div className="relative h-8 w-32">
                 <Image
-                  src="/conexa_of_new_logo.png"
+                  src="/conexa_of_on_light.png"
                   alt="ConexaOF"
                   fill
                   sizes="128px"
