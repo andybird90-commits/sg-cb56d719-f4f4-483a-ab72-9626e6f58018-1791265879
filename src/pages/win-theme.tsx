@@ -949,7 +949,7 @@ function WinThemePage() {
                           )}
 
                           {summaryText && (
-                            <p className="mt-2 line-clamp-2 break-words text-xs text-muted-foreground">
+                            <p className="mt-2 break-words text-xs text-muted-foreground">
                               {summaryText}
                             </p>
                           )}
