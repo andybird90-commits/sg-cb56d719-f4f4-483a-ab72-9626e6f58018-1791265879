@@ -88,109 +88,103 @@
   :root {
     --radius: 0.5rem;
     
-    /* Professional Palette - Light Mode (kept subtle, secondary to dark) */
-    --background: 220 15% 97%;
-    --foreground: 222 47% 12%;
+    /* Light Mode - White + Orange Accent */
+    --background: 0 0% 100%;            /* pure white background */
+    --foreground: 222 47% 12%;          /* dark navy-ish text */
     
-    --card: 0 0% 100%;
+    --card: 0 0% 100%;                  /* white cards */
     --card-foreground: 222 47% 12%;
     
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 12%;
     
-    /* Cool blue primary for links/buttons */
-    --primary: 217 91% 55%;
+    /* Orange primary for main actions */
+    --primary: 24 94% 55%;              /* vibrant orange */
     --primary-foreground: 0 0% 100%;
     
-    /* Soft neutral surfaces */
-    --secondary: 220 15% 92%;
-    --secondary-foreground: 222 35% 18%;
+    /* Soft warm neutrals for secondary surfaces */
+    --secondary: 36 100% 96%;           /* very light warm tint */
+    --secondary-foreground: 24 80% 24%;
     
-    --muted: 220 15% 90%;
-    --muted-foreground: 220 15% 45%;
+    --muted: 210 16% 96%;               /* light gray background for subtle areas */
+    --muted-foreground: 215 16% 40%;    /* medium gray text */
     
-    /* Warm accent (orange) for call-to-actions */
-    --accent: 24 94% 50%;
+    /* Accent orange/gold for highlights */
+    --accent: 36 100% 50%;
     --accent-foreground: 0 0% 100%;
     
     --destructive: 0 84% 55%;
     --destructive-foreground: 0 0% 100%;
     
-    --border: 220 15% 85%;
-    --input: 220 15% 85%;
-    --ring: 217 91% 55%;
+    --border: 210 16% 90%;              /* light gray borders */
+    --input: 210 16% 90%;
+    --ring: 24 94% 55%;                 /* orange focus ring */
     
-    /* Chart palette tuned to match blue + orange style */
-    --chart-1: 217 91% 55%;
-    --chart-2: 24 94% 50%;
-    --chart-3: 160 84% 39%;
-    --chart-4: 280 84% 60%;
-    --chart-5: 43 96% 56%;
+    /* Charts tuned to orange-forward palette */
+    --chart-1: 24 94% 55%;              /* primary orange */
+    --chart-2: 36 100% 50%;             /* golden orange */
+    --chart-3: 160 84% 39%;             /* teal */
+    --chart-4: 217 91% 60%;             /* supporting blue */
+    --chart-5: 43 96% 56%;              /* amber */
     
-    /* Sidebar in light mode (rarely used) */
-    --sidebar: 220 15% 96%;
+    /* Sidebar in light mode */
+    --sidebar: 0 0% 100%;
     --sidebar-foreground: 222 47% 12%;
-    --sidebar-primary: 217 91% 55%;
+    --sidebar-primary: 24 94% 55%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 15% 92%;
-    --sidebar-accent-foreground: 222 35% 18%;
-    --sidebar-border: 220 15% 85%;
-    --sidebar-ring: 217 91% 55%;
+    --sidebar-accent: 36 100% 96%;
+    --sidebar-accent-foreground: 24 80% 24%;
+    --sidebar-border: 210 16% 90%;
+    --sidebar-ring: 24 94% 55%;
   }
 
   .dark {
     --radius: 0.5rem;
     
-    /* Deep Navy Professional Palette - Dark Mode */
-    --background: 222 47% 7%;        /* page background - near-black navy */
-    --foreground: 210 40% 96%;       /* main text - soft off-white */
+    /* Dark Mode - kept for optional use, but app defaults to light */
+    --background: 222 47% 7%;
+    --foreground: 210 40% 96%;
     
-    --card: 222 40% 12%;             /* cards / panels, slightly lighter for contrast */
+    --card: 222 40% 12%;
     --card-foreground: 210 40% 96%;
     
     --popover: 222 47% 12%;
     --popover-foreground: 210 40% 96%;
     
-    /* Electric blue primary for key actions */
-    --primary: 217 91% 60%;
+    /* Keep orange as the core accent in dark as well */
+    --primary: 24 94% 60%;
     --primary-foreground: 222 47% 7%;
     
-    /* Slightly lifted surfaces for secondary UI */
     --secondary: 222 32% 16%;
     --secondary-foreground: 210 40% 96%;
     
-    /* Muted text & chips - lightened for better legibility */
     --muted: 222 30% 18%;
     --muted-foreground: 220 15% 82%;
     
-    /* Warm orange accent for highlights/labels */
-    --accent: 24 94% 50%;
+    --accent: 36 100% 50%;
     --accent-foreground: 222 47% 7%;
     
     --destructive: 0 74% 58%;
     --destructive-foreground: 0 0% 100%;
     
-    /* Subtle but clear borders on dark */
     --border: 222 35% 20%;
     --input: 222 35% 20%;
-    --ring: 217 91% 60%;
+    --ring: 24 94% 60%;
     
-    /* Charts tuned for dark dashboards */
-    --chart-1: 217 91% 60%;  /* blue */
-    --chart-2: 24 94% 50%;   /* orange */
-    --chart-3: 160 84% 39%;  /* teal */
-    --chart-4: 280 84% 60%;  /* purple */
-    --chart-5: 43 96% 56%;   /* amber */
+    --chart-1: 24 94% 60%;
+    --chart-2: 36 100% 50%;
+    --chart-3: 160 84% 39%;
+    --chart-4: 217 91% 60%;
+    --chart-5: 43 96% 56%;
     
-    /* Sidebar aligned with deep navy layout */
     --sidebar: 222 47% 9%;
     --sidebar-foreground: 210 40% 96%;
-    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary: 24 94% 60%;
     --sidebar-primary-foreground: 222 47% 7%;
     --sidebar-accent: 222 32% 16%;
     --sidebar-accent-foreground: 210 40% 96%;
     --sidebar-border: 222 35% 20%;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-ring: 24 94% 60%;
   }
 }
 
