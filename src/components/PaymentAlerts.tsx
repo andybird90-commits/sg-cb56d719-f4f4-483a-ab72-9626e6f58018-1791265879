@@ -39,15 +39,15 @@ interface PaymentAlertsProps {
 }
 
 const severityStyles: Record<PaymentAlert["severity"], string> = {
-  high: "border-destructive/70 bg-destructive/5",
-  medium: "border-amber-500/60 bg-amber-500/5",
-  low: "border-muted bg-muted/30",
+  high: "border-destructive/60 bg-destructive/5",
+  medium: "border-amber-400/60 bg-amber-50",
+  low: "border-muted/60 bg-muted/40",
 };
 
 const statusBadgeStyles: Record<PaymentAlert["severity"], string> = {
-  high: "bg-destructive/80 text-destructive-foreground",
-  medium: "bg-amber-500 text-slate-950",
-  low: "bg-muted text-foreground",
+  high: "bg-destructive/10 text-destructive-foreground border border-destructive/40",
+  medium: "bg-amber-100 text-amber-800 border border-amber-300",
+  low: "bg-muted text-foreground border border-muted/60",
 };
 
 export function PaymentAlerts({ userRole, onViewProject }: PaymentAlertsProps) {
@@ -255,8 +255,8 @@ export function PaymentAlerts({ userRole, onViewProject }: PaymentAlertsProps) {
         <CardContent>
           <p className="text-sm text-muted-foreground">Loading payment alerts...</p>
         </CardContent>
-      </Card>);
-
+      </Card>
+    );
   }
 
   if (alerts.length === 0) {
@@ -286,8 +286,8 @@ export function PaymentAlerts({ userRole, onViewProject }: PaymentAlertsProps) {
             </p>
           </div>
         </CardContent>
-      </Card>);
-
+      </Card>
+    );
   }
 
   const overdueAlerts = alerts.filter((a) => a.isOverdue);
@@ -301,19 +301,19 @@ export function PaymentAlerts({ userRole, onViewProject }: PaymentAlertsProps) {
           Payment Alerts
         </CardTitle>
         {overdueAlerts.length > 0 && (
-          <p className="text-sm text-red-400 flex items-center gap-1">
-            <AlertTriangle className="w-3 h-3" />
+          <p className="text-sm text-amber-700 flex items-center gap-1">
+            <AlertTriangle className="w-3 h-3 text-amber-500" />
             Overdue Payments ({overdueAlerts.length})
           </p>
         )}
       </CardHeader>
       <CardContent>
         {loading && (
-          <div className="text-sm text-slate-400">Loading payment alerts...</div>
+          <div className="text-sm text-muted-foreground">Loading payment alerts...</div>
         )}
 
         {!loading && overdueAlerts.length === 0 && (
-          <div className="text-sm text-slate-400">
+          <div className="text-sm text-muted-foreground">
             No overdue payments at the moment.
           </div>
         )}
@@ -322,44 +322,54 @@ export function PaymentAlerts({ userRole, onViewProject }: PaymentAlertsProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {overdueAlerts.map((alert) => (
               <div key={alert.id} className="h-full">
-                <div className="relative flex flex-col justify-between rounded-lg border border-red-500/60 bg-slate-950/60 px-4 py-3 shadow-sm">
+                <div
+                  className={cn(
+                    "relative flex flex-col justify-between rounded-lg border px-4 py-3 shadow-sm bg-card",
+                    severityStyles[alert.severity]
+                  )}
+                >
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs text-red-300">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-mono text-xs text-muted-foreground">
                         {alert.invoiceNumber}
                       </span>
-                      <span className="rounded-full bg-red-900/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-100">
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                          statusBadgeStyles[alert.severity]
+                        )}
+                      >
                         {alert.daysOverdue} days overdue
                       </span>
-                      <span className="rounded-full border border-red-500/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-200">
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground border border-border/60">
                         {alert.source === "manual" ? "Manual" : "System"}
                       </span>
                     </div>
-                    <div className="text-right font-semibold text-red-100">
+                    <div className="text-right font-semibold text-foreground">
                       {formatCurrency(alert.amount)}
                     </div>
                   </div>
 
                   <div className="mb-3">
-                    <div className="text-sm font-semibold text-slate-100">
+                    <div className="text-sm font-semibold text-foreground">
                       {alert.clientName}
                       {alert.projectName && ` - ${alert.projectName}`}
                     </div>
-                    <div className="mt-1 text-xs text-slate-400">
+                    <div className="mt-1 text-xs text-muted-foreground">
                       Project Owner: {alert.projectOwnerName || "Unknown"}
                       {alert.dueDate && ` | Due: ${format(alert.dueDate, "d MMM yyyy")}`}
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between text-xs text-slate-400">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <div className="flex items-center gap-1">
-                      <AlertTriangle className="w-3 h-3 text-red-400" />
+                      <AlertTriangle className="w-3 h-3 text-amber-600" />
                       <span>{alert.daysOverdue} days overdue</span>
                     </div>
                     {alert.projectId && (
                       <Link
                         href={`/projects/${alert.projectId}`}
-                        className="text-xs font-semibold text-red-200 hover:text-red-100 underline-offset-2 hover:underline"
+                        className="text-xs font-semibold text-primary hover:text-primary/80 underline-offset-2 hover:underline"
                       >
                         View Project
                       </Link>
@@ -371,6 +381,6 @@ export function PaymentAlerts({ userRole, onViewProject }: PaymentAlertsProps) {
           </div>
         )}
       </CardContent>
-    </Card>);
-
+    </Card>
+  );
 }
