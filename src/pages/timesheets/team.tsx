@@ -21,6 +21,7 @@ interface Timesheet {
   projects?: {
     code: string | null;
     project_reference?: string | null;
+    opportunity_reference?: string | null;
     name: string;
   };
   project_activities?: {
@@ -81,6 +82,7 @@ function TeamTimesheetsContent() {
           projects (
             code,
             project_reference,
+            opportunity_reference,
             name
           ),
           project_activities (
@@ -229,7 +231,12 @@ function TeamTimesheetsContent() {
                         </div>
                         <div className="text-sm text-slate-700 mb-1">
                           {(() => {
-                            const rawRef = (ts.projects?.code ?? ts.projects?.project_reference ?? "").trim();
+                            const rawRef = (
+                              ts.projects?.code ??
+                              ts.projects?.project_reference ??
+                              ts.projects?.opportunity_reference ??
+                              ""
+                            ).trim();
                             const ref = rawRef && rawRef !== "-" ? rawRef : "";
                             const name = ts.projects?.name || "—";
                             return ref ? `${ref} — ${name}` : name;

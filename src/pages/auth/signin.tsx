@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
@@ -15,9 +15,9 @@ export default function SignInPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
+  const passwordRef = useRef<HTMLInputElement | null>(null);
   const [formData, setFormData] = useState({
     email: "",
-    password: "",
   });
 
   useEffect(() => {
@@ -51,7 +51,7 @@ export default function SignInPage() {
     try {
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email: formData.email,
-        password: formData.password,
+        password: passwordRef.current?.value ?? "",
       });
 
       if (signInError) {
@@ -128,8 +128,7 @@ export default function SignInPage() {
                 type="password"
                 autoComplete="current-password"
                 placeholder="••••••••"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                ref={passwordRef}
                 required
               />
             </div>
