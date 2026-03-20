@@ -592,8 +592,11 @@ export function ContactCalendar({ contactId, contactName, isDetailView = false }
                   variant="outline"
                   className="flex-1"
                   onClick={() => {
-                    handleEdit(selectedEvent);
+                    const eventToEdit = selectedEvent;
                     setSelectedEvent(null);
+                    if (eventToEdit) {
+                      requestAnimationFrame(() => handleEdit(eventToEdit));
+                    }
                   }}
                 >
                   <Edit className="w-4 h-4 mr-2" />

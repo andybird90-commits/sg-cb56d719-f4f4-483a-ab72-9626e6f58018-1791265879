@@ -370,8 +370,9 @@ function MyTimesheetsContent() {
                     </SelectTrigger>
                     <SelectContent>
                       {projects.map((p) => {
-                        const ref = p.code || p.project_reference;
-                        const label = ref ? `${ref} - ${p.name}` : p.name;
+                        const rawRef = (p.code ?? p.project_reference ?? "").trim();
+                        const ref = rawRef && rawRef !== "-" ? rawRef : "";
+                        const label = ref ? `${ref} — ${p.name}` : p.name;
 
                         return (
                           <SelectItem key={p.id} value={p.id}>
@@ -527,8 +528,10 @@ function MyTimesheetsContent() {
                               <div className="flex-1 min-w-0">
                                 <div className="font-medium text-sm">
                                   {(() => {
-                                    const ref = ts.projects?.code || ts.projects?.project_reference;
-                                    return ref ? `${ref} - ${ts.projects?.name || ""}`.trim() : (ts.projects?.name || "—");
+                                    const rawRef = (ts.projects?.code ?? ts.projects?.project_reference ?? "").trim();
+                                    const ref = rawRef && rawRef !== "-" ? rawRef : "";
+                                    const name = ts.projects?.name || "—";
+                                    return ref ? `${ref} — ${name}` : name;
                                   })()}
                                 </div>
                                 {ts.project_activities && (

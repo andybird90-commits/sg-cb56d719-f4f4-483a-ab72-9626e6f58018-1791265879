@@ -135,12 +135,17 @@ export default function SignInPage() {
                   checked={rememberMe}
                   onCheckedChange={(checked) => setRememberMe(checked as boolean)}
                 />
-                <Label 
-                  htmlFor="remember" 
-                  className="text-sm font-normal cursor-pointer"
-                >
-                  Remember email
-                </Label>
+                <div className="flex flex-col">
+                  <Label 
+                    htmlFor="remember" 
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    Remember email
+                  </Label>
+                  <span className="text-[11px] text-slate-500 leading-tight">
+                    Passwords are never stored.
+                  </span>
+                </div>
               </div>
               <Link 
                 href="/auth/forgot-password" 

@@ -741,7 +741,8 @@ function ProjectDetailContent() {
       return;
     }
 
-    const newStatus = variationForm.status as "proposed" | "accepted" | "rejected";
+    const normalizedStatus = variationForm.status === "pending" ? "proposed" : variationForm.status;
+    const newStatus = normalizedStatus as "proposed" | "accepted" | "rejected";
 
     try {
       if (editingVariation) {
