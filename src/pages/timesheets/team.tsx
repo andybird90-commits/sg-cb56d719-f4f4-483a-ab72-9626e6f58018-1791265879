@@ -19,7 +19,8 @@ interface Timesheet {
     full_name: string;
   };
   projects?: {
-    code: string;
+    code: string | null;
+    project_reference?: string | null;
     name: string;
   };
   project_activities?: {
@@ -79,6 +80,7 @@ function TeamTimesheetsContent() {
           ),
           projects (
             code,
+            project_reference,
             name
           ),
           project_activities (
@@ -226,7 +228,12 @@ function TeamTimesheetsContent() {
                           </div>
                         </div>
                         <div className="text-sm text-slate-700 mb-1">
-                          {ts.projects?.code} - {ts.projects?.name}
+                          {(() => {
+                            const rawRef = (ts.projects?.code ?? ts.projects?.project_reference ?? "").trim();
+                            const ref = rawRef && rawRef !== "-" ? rawRef : "";
+                            const name = ts.projects?.name || "—";
+                            return ref ? `${ref} — ${name}` : name;
+                          })()}
                         </div>
                         {ts.project_activities && (
                           <div className="text-xs text-slate-600">

@@ -573,15 +573,10 @@ function ProjectDetailContent() {
       return;
     }
     
-    let totalFee = project.agreed_fee_value || 0;
-    
-    const acceptedVariations = variations.filter(v => v.status === "accepted");
-    acceptedVariations.forEach(v => {
-      totalFee += v.value;
-    });
+    const totalFee = project.agreed_fee_value || 0;
     
     if (totalFee === 0) {
-      alert("No revenue to distribute (agreed fee + accepted variations = 0).");
+      alert("No revenue to distribute (agreed fee = 0).");
       return;
     }
     
@@ -762,7 +757,8 @@ function ProjectDetailContent() {
         let feeAdjustment = 0;
         if (wasAccepted && !willBeAccepted) {
           feeAdjustment = -existing.value;
-        } else if (!wasAccepted && willBeAccepted) {
+        }
+        else if (!wasAccepted && willBeAccepted) {
           feeAdjustment = newValue;
         } else if (wasAccepted && willBeAccepted) {
           feeAdjustment = newValue - existing.value;
@@ -781,10 +777,10 @@ function ProjectDetailContent() {
         if (updateError) throw updateError;
 
         if (feeAdjustment !== 0) {
-          const currentFee = project.agreed_fee_value || 0;
+          const newAgreedFee = (project.agreed_fee_value || 0) + feeAdjustment;
           const { error: projectError } = await supabase
             .from("projects")
-            .update({ agreed_fee_value: currentFee + feeAdjustment })
+            .update({ agreed_fee_value: newAgreedFee })
             .eq("id", project.id);
 
           if (projectError) throw projectError;
@@ -1118,11 +1114,7 @@ function ProjectDetailContent() {
   };
 
   const getTotalProjectFee = () => {
-    let total = project?.agreed_fee_value || 0;
-    variations.filter(v => v.status === "accepted").forEach(v => {
-      total += v.value;
-    });
-    return total;
+    return project?.agreed_fee_value || 0;
   };
 
   if (projectLoading) {
