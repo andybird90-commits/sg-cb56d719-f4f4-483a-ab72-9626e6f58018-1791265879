@@ -311,7 +311,7 @@ export function ContactTimeline({ contactId, contactName }: ContactTimelineProps
 
                       {/* Event badge if linked to calendar event */}
                       {entry.contact_events && (
-                        <div className="mb-2">
+                        <div className="mb-2 flex items-center gap-2 flex-wrap">
                           <Badge
                             className={`${
                               entry.contact_events.event_type === "visit" ? "bg-blue-500" : "bg-purple-500"
@@ -324,6 +324,23 @@ export function ContactTimeline({ contactId, contactName }: ContactTimelineProps
                               month: "short",
                             })}
                           </Badge>
+                          {entry.event_id && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-xs"
+                              onClick={() => {
+                                window.dispatchEvent(
+                                  new CustomEvent("contact-event-edit", {
+                                    detail: { eventId: entry.event_id },
+                                  }),
+                                );
+                              }}
+                            >
+                              Edit event
+                            </Button>
+                          )}
                         </div>
                       )}
 

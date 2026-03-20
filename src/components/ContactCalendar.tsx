@@ -55,6 +55,22 @@ export function ContactCalendar({ contactId, contactName, isDetailView = false }
     fetchEvents();
   }, [contactId]);
 
+  useEffect(() => {
+    const handler = (evt: Event) => {
+      const custom = evt as CustomEvent<{ eventId?: string }>;
+      const eventId = custom.detail?.eventId;
+      if (!eventId) return;
+
+      const match = events.find((e) => e.id === eventId) || null;
+      if (!match) return;
+
+      setSelectedEvent(match);
+    };
+
+    window.addEventListener("contact-event-edit", handler as EventListener);
+    return () => window.removeEventListener("contact-event-edit", handler as EventListener);
+  }, [events]);
+
   const fetchEvents = async () => {
     try {
       setLoading(true);

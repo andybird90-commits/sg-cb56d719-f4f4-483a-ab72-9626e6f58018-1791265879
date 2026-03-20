@@ -25,6 +25,7 @@ interface Timesheet {
   projects?: {
     code: string | null;
     project_reference: string | null;
+    opportunity_reference?: string | null;
     name: string;
   };
   project_activities?: {
@@ -39,6 +40,7 @@ interface Project {
   id: string;
   code: string | null;
   project_reference: string | null;
+  opportunity_reference?: string | null;
   name: string;
 }
 
@@ -124,6 +126,7 @@ function MyTimesheetsContent() {
           projects (
             code,
             project_reference,
+            opportunity_reference,
             name
           ),
           project_activities (
@@ -142,7 +145,7 @@ function MyTimesheetsContent() {
 
       const { data: projectsData, error: projectsError } = await supabase
         .from("projects")
-        .select("id, code, project_reference, name")
+        .select("id, code, project_reference, opportunity_reference, name")
         .in("status", ["live", "pipeline"])
         .order("name");
 
@@ -370,7 +373,7 @@ function MyTimesheetsContent() {
                     </SelectTrigger>
                     <SelectContent>
                       {projects.map((p) => {
-                        const rawRef = (p.code ?? p.project_reference ?? "").trim();
+                        const rawRef = (p.code ?? p.project_reference ?? p.opportunity_reference ?? "").trim();
                         const ref = rawRef && rawRef !== "-" ? rawRef : "";
                         const label = ref ? `${ref} — ${p.name}` : p.name;
 
@@ -528,7 +531,7 @@ function MyTimesheetsContent() {
                               <div className="flex-1 min-w-0">
                                 <div className="font-medium text-sm">
                                   {(() => {
-                                    const rawRef = (ts.projects?.code ?? ts.projects?.project_reference ?? "").trim();
+                                    const rawRef = (ts.projects?.code ?? ts.projects?.project_reference ?? ts.projects?.opportunity_reference ?? "").trim();
                                     const ref = rawRef && rawRef !== "-" ? rawRef : "";
                                     const name = ts.projects?.name || "—";
                                     return ref ? `${ref} — ${name}` : name;

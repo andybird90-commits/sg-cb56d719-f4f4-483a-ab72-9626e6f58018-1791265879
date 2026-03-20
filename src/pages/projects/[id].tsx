@@ -736,8 +736,7 @@ function ProjectDetailContent() {
       return;
     }
 
-    const normalizedStatus = variationForm.status === "pending" ? "proposed" : variationForm.status;
-    const newStatus = normalizedStatus as "proposed" | "accepted" | "rejected";
+    const newStatus = variationForm.status as "proposed" | "accepted" | "rejected";
 
     try {
       if (editingVariation) {
@@ -1626,7 +1625,10 @@ function ProjectDetailContent() {
                         New Variation
                       </Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent
+                      onPointerDownOutside={(e) => e.preventDefault()}
+                      onInteractOutside={(e) => e.preventDefault()}
+                    >
                       <DialogHeader>
                         <DialogTitle>{editingVariation ? "Edit Variation" : "New Variation"}</DialogTitle>
                       </DialogHeader>
