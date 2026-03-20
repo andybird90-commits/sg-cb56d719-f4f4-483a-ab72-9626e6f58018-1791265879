@@ -1287,7 +1287,18 @@ export default function InvoicingPage() {
                                       </TableCell>
                                       {/* Project Number */}
                                       <TableCell className="min-w-[130px] px-4 py-3 text-sm font-mono">
-                                        {item.project_reference || "—"}
+                                        {(() => {
+                                          const raw = (
+                                            item.project_reference ??
+                                            item.project_code ??
+                                            ""
+                                          )
+                                            .toString()
+                                            .trim();
+
+                                          if (!raw || raw === "-") return "—";
+                                          return raw;
+                                        })()}
                                       </TableCell>
                                       {/* Project Owner */}
                                       <TableCell className="min-w-[150px] px-4 py-3 text-sm">

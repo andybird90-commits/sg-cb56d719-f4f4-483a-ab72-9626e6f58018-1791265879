@@ -214,12 +214,53 @@ export const invoicingService = {
   async getInvoiceItems(invoiceMonthId: string): Promise<InvoiceItem[]> {
     const { data, error } = await supabase
       .from("invoice_items")
-      .select("*")
+      .select(
+        `
+        *,
+        projects:projects!invoice_items_project_id_fkey (
+          code,
+          project_reference
+        )
+      `,
+      )
       .eq("invoice_month_id", invoiceMonthId)
       .order("project_code", { ascending: true });
 
     if (error) throw error;
-    return data || [];
+
+    const clean = (value: unknown): string => {
+      if (typeof value !== "string") return "";
+      return value.trim();
+    };
+
+    const rows = (data || []) as Array<
+      InvoiceItem & {
+        projects?: { code: string | null; project_reference: string | null } | null;
+      }
+    >;
+
+    return rows.map((row) => {
+      const project = row.projects;
+
+      const storedCode = clean(row.project_code);
+      const storedRef = clean(row.project_reference);
+
+      const projectCode =
+        storedCode.length > 0 ? storedCode : clean(project?.code ?? null);
+
+      const projectRef =
+        storedRef.length > 0
+          ? storedRef
+          : clean(project?.project_reference ?? null);
+
+      const { projects: _projects, ...rest } = row as any;
+
+      return {
+        ...(rest as InvoiceItem),
+        project_code: projectCode.length > 0 ? projectCode : null,
+        project_reference: projectRef.length > 0 ? projectRef : null,
+      };
+    });
   },
 
   async updateInvoiceItem(
