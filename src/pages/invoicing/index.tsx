@@ -1178,7 +1178,26 @@ export default function InvoicingPage() {
                                           href={`/projects/${item.project_id}`}
                                           className="text-blue-600 hover:underline"
                                         >
-                                          {item.project_code} - {item.project_name}
+                                          {(() => {
+                                            const rawRef = (
+                                              item.project_code ??
+                                              item.project_reference ??
+                                              ""
+                                            )
+                                              .toString()
+                                              .trim();
+
+                                            const ref =
+                                              rawRef.length > 0 && rawRef !== "-"
+                                                ? rawRef
+                                                : "";
+
+                                            const name = (item.project_name ?? "").toString().trim();
+
+                                            if (ref && name) return `${ref} — ${name}`;
+                                            if (ref) return ref;
+                                            return name || "—";
+                                          })()}
                                         </Link>
                                       </TableCell>
                                       {/* Client */}
