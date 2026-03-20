@@ -92,6 +92,26 @@ export function ContactCalendar({ contactId, contactName, isDetailView = false }
           .eq("id", editingEvent.id)) as any;
 
         if (error) throw error;
+
+        const newTimelineContent = buildTimelineContent({
+          title: formData.title,
+          event_type: formData.event_type,
+          start_time: formData.start_time,
+          location: formData.location,
+        });
+
+        const { error: timelineUpdateError } = await (supabase
+          .from("contact_timeline" as any)
+          .update({
+            content: newTimelineContent,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("event_id", editingEvent.id)
+          .eq("post_type", "event")) as any;
+
+        if (timelineUpdateError) {
+          console.error("Timeline update failed:", timelineUpdateError);
+        }
       } else {
         console.log("=== CREATING NEW EVENT ===");
         console.log("User ID:", user?.id);
@@ -103,7 +123,6 @@ export function ContactCalendar({ contactId, contactName, isDetailView = false }
           return;
         }
 
-        // Insert new event with created_by field
         const { data: newEvent, error: insertError } = await (supabase
           .from("contact_events" as any)
           .insert({
@@ -127,16 +146,15 @@ export function ContactCalendar({ contactId, contactName, isDetailView = false }
 
         console.log("✅ Event created successfully:", newEvent);
 
-        // Create timeline entry for the new event
         if (newEvent) {
           console.log("=== CREATING TIMELINE ENTRY ===");
-          const eventTypeLabel = formData.event_type === "visit" ? "Visit" : "Function";
-          const timeInfo = formData.start_time 
-            ? ` at ${formData.start_time.substring(0, 5)}`
-            : "";
-          const locationInfo = formData.location ? ` at ${formData.location}` : "";
-          
-          const timelineContent = `Scheduled ${eventTypeLabel.toLowerCase()}: ${formData.title}${timeInfo}${locationInfo}`;
+
+          const timelineContent = buildTimelineContent({
+            title: formData.title,
+            event_type: formData.event_type,
+            start_time: formData.start_time,
+            location: formData.location,
+          });
 
           console.log("Timeline content:", timelineContent);
           console.log("Event ID:", newEvent.id);
@@ -239,6 +257,18 @@ export function ContactCalendar({ contactId, contactName, isDetailView = false }
 
   const getEventColor = (type: "visit" | "function") => {
     return type === "visit" ? "bg-blue-500" : "bg-purple-500";
+  };
+
+  const buildTimelineContent = (data: {
+    title: string;
+    event_type: string;
+    start_time: string;
+    location: string;
+  }) => {
+    const eventTypeLabel = data.event_type === "visit" ? "Visit" : "Function";
+    const timeInfo = data.start_time ? ` at ${data.start_time.substring(0, 5)}` : "";
+    const locationInfo = data.location ? ` at ${data.location}` : "";
+    return `Scheduled ${eventTypeLabel.toLowerCase()}: ${data.title}${timeInfo}${locationInfo}`;
   };
 
   const { daysInMonth, startingDayOfWeek, year, month } = getDaysInMonth(currentMonth);
@@ -462,7 +492,7 @@ export function ContactCalendar({ contactId, contactName, isDetailView = false }
                   return (
                     <div
                       key={dayNumber}
-                      className={`p-2 border-b border-r min-h-[80px] relative group hover:bg-slate-50 transition-colors ${
+                      className={`p-2 border-b border-r min-h-[80px] relative hover:bg-slate-50 transition-colors ${
                         isPast ? "bg-slate-50/50" : ""
                       }`}
                     >
@@ -478,78 +508,17 @@ export function ContactCalendar({ contactId, contactName, isDetailView = false }
                         {dayNumber}
                       </div>
 
-                      {/* Event indicators */}
                       <div className="space-y-1">
                         {dateEvents.map((event) => (
-                          <div key={event.id} className="relative">
-                            {/* Desktop: Hover tooltip */}
-                            <div className="hidden lg:block">
-                              <div
-                                className={`${getEventColor(event.event_type)} text-white text-[10px] px-1.5 py-0.5 rounded cursor-pointer truncate`}
-                              >
-                                {event.title}
-                              </div>
-                              {/* Hover tooltip - FIXED: Allow pointer events */}
-                              <div className="absolute left-0 top-full mt-1 w-64 bg-white border shadow-lg rounded-lg p-3 z-50 opacity-0 group-hover:opacity-100 invisible group-hover:visible transition-all">
-                                <div className="space-y-2">
-                                  <div>
-                                    <Badge
-                                      className={`${getEventColor(event.event_type)} text-white text-xs mb-2`}
-                                    >
-                                      {event.event_type}
-                                    </Badge>
-                                    <div className="font-semibold text-sm text-slate-900">{event.title}</div>
-                                  </div>
-                                  {(event.start_time || event.end_time) && (
-                                    <div className="flex items-center gap-2 text-xs text-slate-600">
-                                      <Clock className="w-3 h-3" />
-                                      {formatTime(event.start_time)}
-                                      {event.end_time && ` - ${formatTime(event.end_time)}`}
-                                    </div>
-                                  )}
-                                  {event.location && (
-                                    <div className="flex items-center gap-2 text-xs text-slate-600">
-                                      <MapPin className="w-3 h-3" />
-                                      {event.location}
-                                    </div>
-                                  )}
-                                  {event.notes && (
-                                    <div className="text-xs text-slate-600 border-t pt-2">{event.notes}</div>
-                                  )}
-                                  <div className="flex gap-2 border-t pt-2">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-7 text-xs flex-1"
-                                      onClick={() => handleEdit(event)}
-                                    >
-                                      <Edit className="w-3 h-3 mr-1" />
-                                      Edit
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-7 text-xs flex-1 text-red-600 hover:text-red-700"
-                                      onClick={() => handleDelete(event.id)}
-                                    >
-                                      <Trash2 className="w-3 h-3 mr-1" />
-                                      Delete
-                                    </Button>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Mobile: Click to open dialog */}
-                            <div className="lg:hidden">
-                              <div
-                                className={`${getEventColor(event.event_type)} text-white text-[10px] px-1.5 py-0.5 rounded cursor-pointer truncate`}
-                                onClick={() => setSelectedEvent(event)}
-                              >
-                                {event.title}
-                              </div>
-                            </div>
-                          </div>
+                          <button
+                            key={event.id}
+                            type="button"
+                            className={`${getEventColor(event.event_type)} text-white text-[10px] px-1.5 py-0.5 rounded cursor-pointer truncate w-full text-left`}
+                            onClick={() => setSelectedEvent(event)}
+                            title={event.title}
+                          >
+                            {event.title}
+                          </button>
                         ))}
                       </div>
                     </div>

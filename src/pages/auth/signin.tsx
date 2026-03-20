@@ -12,6 +12,7 @@ import Image from "next/image";
 
 export default function SignInPage() {
   const router = useRouter();
+  const [checkingSession, setCheckingSession] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
@@ -20,7 +21,21 @@ export default function SignInPage() {
     password: "",
   });
 
-  // Load saved email if "Remember Me" was previously checked
+  useEffect(() => {
+    if (!router.isReady) return;
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        router.replace("/dashboard");
+        return;
+      }
+      setCheckingSession(false);
+    }).catch(() => {
+      setCheckingSession(false);
+    });
+  }, [router.isReady, router]);
+
+  // Load saved email if "Remember email" was previously checked
   useEffect(() => {
     const savedEmail = localStorage.getItem("rememberedEmail");
     if (savedEmail) {
@@ -63,6 +78,14 @@ export default function SignInPage() {
       setLoading(false);
     }
   };
+
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
+        <div className="text-slate-200 text-sm">Checking session...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
@@ -116,7 +139,7 @@ export default function SignInPage() {
                   htmlFor="remember" 
                   className="text-sm font-normal cursor-pointer"
                 >
-                  Remember me
+                  Remember email
                 </Label>
               </div>
               <Link 

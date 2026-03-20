@@ -178,7 +178,7 @@ function ProjectDetailContent() {
   const [variationForm, setVariationForm] = useState({
     description: "",
     value: "",
-    status: "pending",
+    status: "proposed",
     po_number: "",
   });
 
@@ -741,18 +741,79 @@ function ProjectDetailContent() {
       return;
     }
 
+    const newStatus = variationForm.status as "proposed" | "accepted" | "rejected";
+
     try {
+      if (editingVariation) {
+        const existing = variations.find((v) => v.id === editingVariation.id);
+        if (!existing) {
+          toast({
+            title: "Error",
+            description: "Could not find variation to update. Please refresh and try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        const wasAccepted = existing.status === "accepted";
+        const willBeAccepted = newStatus === "accepted";
+
+        let feeAdjustment = 0;
+        if (wasAccepted && !willBeAccepted) {
+          feeAdjustment = -existing.value;
+        } else if (!wasAccepted && willBeAccepted) {
+          feeAdjustment = newValue;
+        } else if (wasAccepted && willBeAccepted) {
+          feeAdjustment = newValue - existing.value;
+        }
+
+        const { error: updateError } = await supabase
+          .from("variations")
+          .update({
+            description: variationForm.description,
+            value: newValue,
+            status: newStatus,
+            po_number: variationForm.po_number || null,
+          })
+          .eq("id", existing.id);
+
+        if (updateError) throw updateError;
+
+        if (feeAdjustment !== 0) {
+          const currentFee = project.agreed_fee_value || 0;
+          const { error: projectError } = await supabase
+            .from("projects")
+            .update({ agreed_fee_value: currentFee + feeAdjustment })
+            .eq("id", project.id);
+
+          if (projectError) throw projectError;
+        }
+
+        setVariationFormOpen(false);
+        setEditingVariation(null);
+        setVariationForm({ description: "", value: "", status: "proposed", po_number: "" });
+
+        await fetchProjectData();
+
+        toast({
+          title: "Success",
+          description: "Variation updated",
+        });
+
+        return;
+      }
+
       const { error } = await supabase.from("variations").insert({
         project_id: project.id,
         description: variationForm.description,
         value: newValue,
-        status: variationForm.status,
+        status: newStatus,
         po_number: variationForm.po_number || null,
       });
 
       if (error) throw error;
 
-      if (variationForm.status === "accepted") {
+      if (newStatus === "accepted") {
         const newAgreedFee = (project.agreed_fee_value || 0) + newValue;
         const { error: projectError } = await supabase
           .from("projects")
@@ -763,7 +824,9 @@ function ProjectDetailContent() {
       }
 
       setVariationFormOpen(false);
-      setVariationForm({ description: "", value: "", status: "pending", po_number: "" });
+      setEditingVariation(null);
+      setVariationForm({ description: "", value: "", status: "proposed", po_number: "" });
+
       await fetchProjectData();
 
       toast({
@@ -771,10 +834,10 @@ function ProjectDetailContent() {
         description: "Variation added successfully",
       });
     } catch (error) {
-      console.error("Error adding variation:", error);
+      console.error("Error saving variation:", error);
       toast({
         title: "Error",
-        description: "Failed to add variation. Please try again.",
+        description: "Failed to save variation. Please try again.",
         variant: "destructive",
       });
     }
@@ -1552,7 +1615,10 @@ function ProjectDetailContent() {
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Variations</CardTitle>
                 {canDelete && (
-                  <Dialog open={variationFormOpen} onOpenChange={setVariationFormOpen}>
+                  <Dialog open={variationFormOpen} onOpenChange={(open) => {
+                    setVariationFormOpen(open);
+                    if (!open) setEditingVariation(null);
+                  }}>
                     <DialogTrigger asChild>
                       <Button size="sm" className="gap-2" onClick={() => {
                         setEditingVariation(null);
@@ -1605,7 +1671,6 @@ function ProjectDetailContent() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="pending">Pending</SelectItem>
                               <SelectItem value="proposed">Proposed</SelectItem>
                               <SelectItem value="accepted">Accepted</SelectItem>
                               <SelectItem value="rejected">Rejected</SelectItem>

@@ -23,7 +23,8 @@ interface Timesheet {
   hours: number;
   notes: string | null;
   projects?: {
-    code: string;
+    code: string | null;
+    project_reference: string | null;
     name: string;
   };
   project_activities?: {
@@ -36,7 +37,8 @@ interface Timesheet {
 
 interface Project {
   id: string;
-  code: string;
+  code: string | null;
+  project_reference: string | null;
   name: string;
 }
 
@@ -121,6 +123,7 @@ function MyTimesheetsContent() {
           *,
           projects (
             code,
+            project_reference,
             name
           ),
           project_activities (
@@ -139,9 +142,9 @@ function MyTimesheetsContent() {
 
       const { data: projectsData, error: projectsError } = await supabase
         .from("projects")
-        .select("id, code, name")
+        .select("id, code, project_reference, name")
         .in("status", ["live", "pipeline"])
-        .order("code");
+        .order("name");
 
       if (projectsError) throw projectsError;
 
@@ -366,11 +369,16 @@ function MyTimesheetsContent() {
                       <SelectValue placeholder="Select a project" />
                     </SelectTrigger>
                     <SelectContent>
-                      {projects.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.code} - {p.name}
-                        </SelectItem>
-                      ))}
+                      {projects.map((p) => {
+                        const ref = p.code || p.project_reference;
+                        const label = ref ? `${ref} - ${p.name}` : p.name;
+
+                        return (
+                          <SelectItem key={p.id} value={p.id}>
+                            {label}
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                 </div>
@@ -518,7 +526,10 @@ function MyTimesheetsContent() {
                             <div key={ts.id} className="flex items-start justify-between p-3 bg-slate-50 rounded gap-3">
                               <div className="flex-1 min-w-0">
                                 <div className="font-medium text-sm">
-                                  {ts.projects?.code} - {ts.projects?.name}
+                                  {(() => {
+                                    const ref = ts.projects?.code || ts.projects?.project_reference;
+                                    return ref ? `${ref} - ${ts.projects?.name || ""}`.trim() : (ts.projects?.name || "—");
+                                  })()}
                                 </div>
                                 {ts.project_activities && (
                                   <div className="text-xs text-slate-600 truncate">
