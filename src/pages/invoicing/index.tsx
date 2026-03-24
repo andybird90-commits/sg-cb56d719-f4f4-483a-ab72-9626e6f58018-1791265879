@@ -225,6 +225,11 @@ export default function InvoicingPage() {
                 name,
                 payment_terms
               )
+            ),
+            invoice_collections (
+              id,
+              due_date,
+              collected_date
             )
           )
         `,
@@ -279,7 +284,11 @@ export default function InvoicingPage() {
 
           const company = item.projects?.companies;
           const paymentTerms = company?.payment_terms || 30;
-          const dueDate = addDays(issueDate, paymentTerms);
+          
+          const collection = item.invoice_collections?.[0];
+          const dueDate = collection?.due_date ? new Date(collection.due_date) : addDays(issueDate, paymentTerms);
+          const isCollected = !!collection?.collected_date;
+          const collectedDate = collection?.collected_date ? new Date(collection.collected_date) : null;
 
           const rawRef = (item.invoice_reference as string | null) || null;
           const trimmedRef =
@@ -298,8 +307,8 @@ export default function InvoicingPage() {
             dueDate,
             amount: item.invoice_value,
             paymentTerms,
-            collected: false,
-            collectedDate: null,
+            collected: isCollected,
+            collectedDate,
             is_manual: false,
           };
 
@@ -431,7 +440,7 @@ export default function InvoicingPage() {
     }
   };
 
-  const markAsCollected = async (invoiceId: string, isManual?: boolean) => {
+  const markAsCollected = async (invoiceId: string, isManual?: boolean, invoiceMonthId?: string, dueDate?: Date) => {
     try {
       if (isManual) {
         // First get the net amount
@@ -452,11 +461,34 @@ export default function InvoicingPage() {
 
         if (error) throw error;
       } else {
-        toast({
-          title: "Info",
-          description: "Collection tracking for system invoices coming soon",
-        });
-        return;
+        // Handle system invoices via invoice_collections
+        const { data: existingCol } = await supabase
+          .from("invoice_collections")
+          .select("id")
+          .eq("invoice_item_id", invoiceId)
+          .maybeSingle();
+
+        if (existingCol) {
+          const { error } = await supabase
+            .from("invoice_collections")
+            .update({
+              collected_date: format(new Date(), "yyyy-MM-dd"),
+              collected_by_user_id: profile?.id,
+            })
+            .eq("id", existingCol.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase
+            .from("invoice_collections")
+            .insert({
+              invoice_item_id: invoiceId,
+              invoice_month_id: invoiceMonthId,
+              due_date: dueDate ? format(dueDate, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd"),
+              collected_date: format(new Date(), "yyyy-MM-dd"),
+              collected_by_user_id: profile?.id,
+            });
+          if (error) throw error;
+        }
       }
 
       toast({
@@ -759,8 +791,9 @@ export default function InvoicingPage() {
           )
         `,
         )
-        .eq("status", "live")
         .eq("archived", false)
+        .not("agreed_fee_value", "is", null)
+        .gte("end_date", startOfMonth.toISOString())
         .order("name", { ascending: true });
 
       if (projectsError) throw projectsError;
@@ -1533,7 +1566,7 @@ export default function InvoicingPage() {
                                         <Button
                                           size="sm"
                                           onClick={() =>
-                                            markAsCollected(invoice.id, invoice.is_manual)
+                                            markAsCollected(invoice.id, invoice.is_manual, invoice.invoiceMonthId, invoice.dueDate)
                                           }
                                         >
                                           <CheckCircle2 className="h-4 w-4 mr-1" />

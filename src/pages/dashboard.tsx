@@ -609,9 +609,9 @@ function DashboardContent() {
             manualPhasing?.get(phasingKey) ?? 0 :
             defaultMonthlyTurnover;
 
-            if (opp.stage === "secured") {
-              monthData.secured += monthlyTurnover;
-            } else if (opp.stage === "high_potential") {
+            // IMPORTANT: Opportunities never contribute to "secured/projects".
+            // They only contribute to Bid / High Potential buckets.
+            if (opp.stage === "high_potential") {
               monthData.highPotential += monthlyTurnover;
             } else if (opp.stage === "bid") {
               monthData.bid += monthlyTurnover;
@@ -1056,7 +1056,7 @@ function DashboardContent() {
                       <Legend
                       wrapperStyle={{ paddingTop: "20px" }}
                       iconType="circle" />
-                      <Bar dataKey="secured" stackId="a" fill="#22c55e" name="Secured + Projects" radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="secured" stackId="a" fill="#22c55e" name="Projects" radius={[0, 0, 0, 0]} />
                       {!showSecuredOnly &&
                     <>
                           <Bar dataKey="highPotential" stackId="a" name="High Potential" fill="#3b82f6" radius={[0, 0, 0, 0]} />
@@ -1075,7 +1075,7 @@ function DashboardContent() {
                       <thead>
                         <tr className="bg-muted/50">
                           <th className="border border-border p-3 text-left text-sm font-semibold">Month</th>
-                          <th className="border border-border p-3 text-right text-sm font-semibold text-green-600 dark:text-green-400">Secured + Projects</th>
+                          <th className="border border-border p-3 text-right text-sm font-semibold text-green-600 dark:text-green-400">Projects</th>
                           {!showSecuredOnly &&
                         <>
                               <th className="border border-border p-3 text-right text-sm font-semibold text-blue-600 dark:text-blue-400">High Potential</th>
@@ -1090,14 +1090,14 @@ function DashboardContent() {
                         {filteredPipelineData.map((row) =>
                       <tr key={row.month} className="hover:bg-muted/30 transition-professional">
                             <td className="border border-border p-3 text-sm font-medium">{row.month}</td>
-                            <td className="border border-border p-3 text-right text-sm">{formatCurrency(row.secured)}</td>
+                            <td className="border border-border p-3 text-right text-sm text-green-600 dark:text-green-400">{formatCurrency(row.secured)}</td>
                             {!showSecuredOnly &&
                         <>
-                                <td className="border border-border p-3 text-right text-sm">{formatCurrency(row.highPotential)}</td>
-                                <td className="border border-border p-3 text-right text-sm">{formatCurrency(row.bid)}</td>
-                              </>
+                              <td className="border border-border p-3 text-right text-sm text-blue-600 dark:text-blue-400">{formatCurrency(row.highPotential)}</td>
+                              <td className="border border-border p-3 text-right text-sm text-amber-600 dark:text-amber-400">{formatCurrency(row.bid)}</td>
+                            </>
                         }
-                            <td className="border border-border p-3 text-right text-sm">{formatCurrency(row.budgetGap)}</td>
+                            <td className="border border-border p-3 text-right text-sm text-red-600 dark:text-red-400">{formatCurrency(row.budgetGap)}</td>
                             <td className="border border-border p-3 text-right text-sm font-semibold">
                               {formatCurrency(row.secured + row.highPotential + row.bid)}
                             </td>

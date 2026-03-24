@@ -95,7 +95,9 @@ export const invoicingService = {
           email
         )
       `)
-      .eq("archived", false);
+      .eq("archived", false)
+      .not("agreed_fee_value", "is", null)
+      .gte("end_date", startOfMonth.toISOString());
 
     if (projectsError) throw projectsError;
 
