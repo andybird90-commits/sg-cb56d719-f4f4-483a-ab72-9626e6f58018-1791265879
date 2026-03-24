@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Calendar, CheckCircle2, AlertTriangle, Clock } from "lucide-react";
 import { format, addDays, startOfWeek, endOfWeek, addWeeks, isBefore, isAfter, isWithinInterval } from "date-fns";
 import type { Tables } from "@/integrations/supabase/types";
+import { useToast } from "@/hooks/use-toast";
 
 interface InvoiceWithCollection {
   id: string;
@@ -66,7 +67,8 @@ type InvoiceItemRow = Tables<"invoice_items"> & {
 };
 
 function CashFlowContent() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
+  const { toast } = useToast();
   const [invoices, setInvoices] = useState<InvoiceWithCollection[]>([]);
   const [weeks, setWeeks] = useState<WeekData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -237,23 +239,30 @@ function CashFlowContent() {
   };
 
   const handleMarkCollected = async (invoiceId: string, collectionId: string) => {
-    if (!profile) return;
-
     try {
       const { error: updateError } = await supabase
         .from("invoice_collections")
         .update({
           collected_date: format(new Date(), "yyyy-MM-dd"),
-          collected_by_user_id: profile.id,
+          collected_by_user_id: profile?.id || user?.id,
         })
         .eq("id", collectionId);
 
       if (updateError) throw updateError;
 
+      toast({
+        title: "Success",
+        description: "Invoice marked as collected",
+      });
+
       await fetchInvoicesAndCollections();
     } catch (err) {
       console.error("Failed to mark as collected", err);
-      alert("Failed to mark as collected");
+      toast({
+        title: "Error",
+        description: "Failed to mark invoice as collected",
+        variant: "destructive",
+      });
     }
   };
 
