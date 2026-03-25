@@ -86,7 +86,7 @@ export function PaymentAlerts({ userRole, onViewProject }: PaymentAlertsProps) {
           due_date,
           status,
           project_id,
-          projects (
+          projects!invoice_history_project_id_fkey (
             id,
             name,
             added_by_user_id,
@@ -98,7 +98,9 @@ export function PaymentAlerts({ userRole, onViewProject }: PaymentAlertsProps) {
         .in("status", ["unpaid", "part_paid"])
         .order("due_date", { ascending: true });
 
-      if (manualError) throw manualError;
+      if (manualError) {
+        console.error("Manual invoices fetch error:", manualError);
+      }
 
       // Process manual invoices
       (manualInvoices || []).forEach((invoice: any) => {
@@ -125,7 +127,7 @@ export function PaymentAlerts({ userRole, onViewProject }: PaymentAlertsProps) {
             clientName: invoice.client_name || "Unknown",
             projectName: invoice.project_name || "Unknown",
             projectId: invoice.project_id,
-            amount: Number(invoice.net_amount),
+            amount: Number(invoice.net_amount) + Number(invoice.vat_amount || 0),
             dueDate,
             projectOwnerName: invoice.projects?.profiles?.full_name || "Unknown",
             projectOwnerId: invoice.projects?.added_by_user_id || "",

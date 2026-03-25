@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 
 interface InvoiceWithCollection {
   id: string;
+  source?: "system" | "manual";
   invoice_number: string;
   issue_date: string;
   total_amount: number;
@@ -73,6 +74,7 @@ function CashFlowContent() {
   const [weeks, setWeeks] = useState<WeekData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [weekOffset, setWeekOffset] = useState(0);
 
   useEffect(() => {
     fetchInvoicesAndCollections();
@@ -82,7 +84,7 @@ function CashFlowContent() {
     if (invoices.length > 0) {
       organizeByWeeks();
     }
-  }, [invoices]);
+  }, [invoices, weekOffset]);
 
   const fetchInvoicesAndCollections = async () => {
     try {
@@ -174,6 +176,7 @@ function CashFlowContent() {
 
             allInvoices.push({
               id: item.id,
+              source: "system",
               invoice_number: invoiceNumber,
               issue_date: format(issueDate, "yyyy-MM-dd"),
               total_amount: Number(item.invoice_value),
@@ -201,6 +204,60 @@ function CashFlowContent() {
         }
       }
 
+      // Fetch Manual Intake Invoices
+      const { data: manualInvoices, error: manualError } = await supabase
+        .from("invoice_history")
+        .select(`
+          id,
+          invoice_number,
+          invoice_date,
+          due_date,
+          net_amount,
+          vat_amount,
+          status,
+          client_name,
+          project_name,
+          company_id,
+          project_id,
+          companies!invoice_history_company_id_fkey (
+            name,
+            payment_terms
+          )
+        `)
+        .in("status", ["unpaid", "part_paid"]);
+
+      if (!manualError && manualInvoices) {
+        manualInvoices.forEach((inv: any) => {
+          const gross = Number(inv.net_amount) + Number(inv.vat_amount || 0);
+          allInvoices.push({
+            id: inv.id,
+            source: "manual",
+            invoice_number: inv.invoice_number || "Unknown",
+            issue_date: inv.invoice_date,
+            total_amount: gross,
+            company_id: inv.company_id || "",
+            project_id: inv.project_id || "",
+            companies: {
+              name: inv.companies?.name || inv.client_name || "Unknown",
+              payment_terms: inv.companies?.payment_terms || 30,
+            },
+            projects: {
+              project_name: inv.project_name || "Unknown",
+            },
+            invoice_collections: [
+              {
+                id: inv.id, // Use invoice id as collection id for manual invoices
+                due_date: inv.due_date,
+                collected_date: null, // Because they are fetched as unpaid/part_paid
+                collected_by_user_id: null,
+              },
+            ],
+          });
+        });
+      } else if (manualError) {
+        console.error("Failed to load manual invoices:", manualError);
+      }
+
       setInvoices(allInvoices);
     } catch (err) {
       console.error("Failed to load cash flow data", err);
@@ -214,10 +271,10 @@ function CashFlowContent() {
     const today = new Date();
     const weeksData: WeekData[] = [];
 
-    // Generate 12 weeks of data (3 months)
+    // Generate 12 weeks of data based on the current weekOffset
     for (let i = 0; i < 12; i++) {
-      const weekStart = startOfWeek(addWeeks(today, i), { weekStartsOn: 1 }); // Monday
-      const weekEnd = endOfWeek(addWeeks(today, i), { weekStartsOn: 1 }); // Sunday
+      const weekStart = startOfWeek(addWeeks(today, weekOffset + i), { weekStartsOn: 1 }); // Monday
+      const weekEnd = endOfWeek(addWeeks(today, weekOffset + i), { weekStartsOn: 1 }); // Sunday
 
       const weekInvoices = invoices.filter((invoice) => {
         const collection = invoice.invoice_collections?.[0];
@@ -245,17 +302,26 @@ function CashFlowContent() {
     setWeeks(weeksData);
   };
 
-  const handleMarkCollected = async (invoiceId: string, collectionId: string) => {
+  const handleMarkCollected = async (invoiceId: string, collectionId: string, source: "system" | "manual" = "system") => {
     try {
-      const { error: updateError } = await supabase
-        .from("invoice_collections")
-        .update({
-          collected_date: format(new Date(), "yyyy-MM-dd"),
-          collected_by_user_id: profile?.id || user?.id,
-        })
-        .eq("id", collectionId);
-
-      if (updateError) throw updateError;
+      if (source === "manual") {
+        const { error: updateError } = await supabase
+          .from("invoice_history")
+          .update({
+            status: "paid",
+          })
+          .eq("id", invoiceId);
+        if (updateError) throw updateError;
+      } else {
+        const { error: updateError } = await supabase
+          .from("invoice_collections")
+          .update({
+            collected_date: format(new Date(), "yyyy-MM-dd"),
+            collected_by_user_id: profile?.id || user?.id,
+          })
+          .eq("id", collectionId);
+        if (updateError) throw updateError;
+      }
 
       toast({
         title: "Success",
@@ -317,9 +383,22 @@ function CashFlowContent() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Cash Flow Forecast</h1>
-          <p className="text-slate-600 mt-1">Track expected collections and payment status</p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900">Cash Flow Forecast</h1>
+            <p className="text-slate-600 mt-1">Track expected collections and payment status</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setWeekOffset(prev => prev - 4)}>
+              &larr; Prev 4 Weeks
+            </Button>
+            <Button variant="outline" onClick={() => setWeekOffset(0)} disabled={weekOffset === 0}>
+              Current
+            </Button>
+            <Button variant="outline" onClick={() => setWeekOffset(prev => prev + 4)}>
+              Next 4 Weeks &rarr;
+            </Button>
+          </div>
         </div>
 
         {/* Summary Cards */}
@@ -466,7 +545,7 @@ function CashFlowContent() {
                                 {!isCollected && collection && (
                                   <Button
                                     size="sm"
-                                    onClick={() => handleMarkCollected(invoice.id, collection.id)}
+                                    onClick={() => handleMarkCollected(invoice.id, collection.id, invoice.source || "system")}
                                     className="gap-1"
                                   >
                                     <CheckCircle2 className="w-4 h-4" />
