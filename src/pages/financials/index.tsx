@@ -130,29 +130,6 @@ function FinancialsContent() {
 
       if (projectsError) throw projectsError;
 
-      // Fetch all opportunities (matches pipeline logic exactly)
-      const { data: opportunitiesData, error: opportunitiesError } = await supabase
-        .from("opportunities")
-        .select(`
-          id,
-          name,
-          stage,
-          expected_start_date,
-          expected_end_date,
-          tender_due_date,
-          expected_fee_value,
-          company_id,
-          companies (
-            name
-          )
-        `)
-        .eq("archived", false)
-        .neq("status", "closed_won")
-        .neq("status", "closed_lost")
-        .not("expected_fee_value", "is", null);
-
-      if (opportunitiesError) throw opportunitiesError;
-
       // Fetch manual phasing for projects - FOR SELECTED MONTH
       const projectIds = (projectsData || []).map(p => p.id);
       let projPhasingData: any[] = [];
@@ -180,45 +157,13 @@ function FinancialsContent() {
       
       const manuallyPhasedProjectSet = new Set(allPhasedProjects.map(p => p.project_id));
 
-      // Fetch manual phasing for opportunities - FOR SELECTED MONTH
-      const opportunityIds = (opportunitiesData || []).map(o => o.id);
-      let oppPhasingData: any[] = [];
-      let allPhasedOpps: any[] = [];
-      
-      if (opportunityIds.length > 0) {
-        const { data, error } = await supabase
-          .from("opportunity_monthly_phasing")
-          .select("opportunity_id, revenue_amount")
-          .in("opportunity_id", opportunityIds)
-          .eq("year", selectedYear)
-          .eq("month", selectedMonth);
-        if (error) throw error;
-        oppPhasingData = data || [];
-
-        // Check which opportunities have ANY manual phasing
-        const { data: all, error: err } = await supabase
-          .from("opportunity_monthly_phasing")
-          .select("opportunity_id")
-          .in("opportunity_id", opportunityIds)
-          .not("revenue_amount", "is", null);
-        if (err) throw err;
-        allPhasedOpps = all || [];
-      }
-      
-      const manuallyPhasedOppSet = new Set(allPhasedOpps.map(o => o.opportunity_id));
-
       // Create phasing lookup maps for CURRENT MONTH values
       const projPhasingMap = new Map<string, number>();
       projPhasingData.forEach(p => {
         projPhasingMap.set(p.project_id, p.revenue_amount || 0);
       });
 
-      const oppPhasingMap = new Map<string, number>();
-      oppPhasingData.forEach(p => {
-        oppPhasingMap.set(p.opportunity_id, p.revenue_amount || 0);
-      });
-
-      // Combine projects and secured opportunities (same as pipeline)
+      // Combine projects
       const allRevenueItems = [
         ...(projectsData || []).map(p => ({
           id: p.id,
@@ -230,17 +175,6 @@ function FinancialsContent() {
           total_value: p.agreed_fee_value || 0,
           type: "project" as const,
           stage: "secured",
-        })),
-        ...(opportunitiesData || []).map(o => ({
-          id: o.id,
-          code: "OPP",
-          name: o.name,
-          client_name: o.companies?.name || "—",
-          start_date: o.expected_start_date || o.tender_due_date,
-          end_date: o.expected_end_date,
-          total_value: o.expected_fee_value || 0,
-          type: "opportunity" as const,
-          stage: o.stage,
         }))
       ];
 
@@ -404,17 +338,11 @@ function FinancialsContent() {
         let monthlyRevenue: number;
         
         // Check if item has manual phasing enabled (exists in ANY month)
-        const isManuallyPhased = item.type === "project" 
-          ? manuallyPhasedProjectSet.has(item.id)
-          : manuallyPhasedOppSet.has(item.id);
+        const isManuallyPhased = manuallyPhasedProjectSet.has(item.id);
           
         if (isManuallyPhased) {
           // If manually phased, use the value for THIS month (or 0 if not set for this month)
-          if (item.type === "project") {
-            monthlyRevenue = projPhasingMap.get(item.id) ?? 0;
-          } else {
-            monthlyRevenue = oppPhasingMap.get(item.id) ?? 0;
-          }
+          monthlyRevenue = projPhasingMap.get(item.id) ?? 0;
         } else {
           // No manual phasing at all - use default calculation
           const durationMonths = Math.max(
@@ -426,8 +354,8 @@ function FinancialsContent() {
         }
 
         // Get costs (only for projects, not opportunities)
-        const internalCost = item.type === "project" ? (timesheetsByProject.get(item.id) || 0) : 0;
-        const subcontractorCost = item.type === "project" ? (subcontractorByProject.get(item.id) || 0) : 0;
+        const internalCost = timesheetsByProject.get(item.id) || 0;
+        const subcontractorCost = subcontractorByProject.get(item.id) || 0;
         const totalCost = internalCost + subcontractorCost;
         
         // Skip items that have exactly £0 revenue and £0 costs to avoid cluttering the table
