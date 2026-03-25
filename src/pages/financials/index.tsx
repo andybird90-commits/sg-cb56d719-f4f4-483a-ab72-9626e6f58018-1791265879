@@ -139,6 +139,7 @@ function FinancialsContent() {
           stage,
           expected_start_date,
           expected_end_date,
+          tender_due_date,
           expected_fee_value,
           company_id,
           companies (
@@ -165,7 +166,8 @@ function FinancialsContent() {
       const { data: allPhasedProjects, error: allPhasedProjError } = await supabase
         .from("project_monthly_phasing")
         .select("project_id")
-        .in("project_id", projectIds);
+        .in("project_id", projectIds)
+        .not("revenue_amount", "is", null);
       
       if (allPhasedProjError) throw allPhasedProjError;
       
@@ -186,7 +188,8 @@ function FinancialsContent() {
       const { data: allPhasedOpps, error: allPhasedOppsError } = await supabase
         .from("opportunity_monthly_phasing")
         .select("opportunity_id")
-        .in("opportunity_id", opportunityIds);
+        .in("opportunity_id", opportunityIds)
+        .not("revenue_amount", "is", null);
         
       if (allPhasedOppsError) throw allPhasedOppsError;
       
@@ -221,7 +224,7 @@ function FinancialsContent() {
           code: "OPP",
           name: o.name,
           client_name: o.companies?.name || "—",
-          start_date: o.expected_start_date,
+          start_date: o.expected_start_date || o.tender_due_date,
           end_date: o.expected_end_date,
           total_value: o.expected_fee_value || 0,
           type: "opportunity" as const,
