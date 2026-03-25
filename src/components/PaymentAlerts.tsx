@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, Clock, ExternalLink } from "lucide-react";
 import Link from "next/link";
-import { differenceInDays, format, parseISO } from "date-fns";
+import { differenceInDays, format, parseISO, endOfMonth, addDays } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -146,18 +146,26 @@ export function PaymentAlerts({ userRole, onViewProject }: PaymentAlertsProps) {
           year,
           month,
           created_at,
+          locked_at,
           invoice_items (
             id,
             invoice_value,
+            invoice_reference,
             excluded_this_month,
             project_id,
             project_name,
             client_name,
-            payment_terms,
+            invoice_collections (
+              due_date,
+              collected_date
+            ),
             projects (
               id,
               name,
               added_by_user_id,
+              companies (
+                payment_terms
+              ),
               profiles:added_by_user_id (
                 full_name
               )
@@ -171,14 +179,25 @@ export function PaymentAlerts({ userRole, onViewProject }: PaymentAlertsProps) {
 
       // Process system invoices
       (systemInvoices || []).forEach((month: any) => {
-        const issueDate = parseISO(month.created_at);
+        const issueDate = month.locked_at ? parseISO(month.locked_at) : parseISO(month.created_at);
 
         (month.invoice_items || []).forEach((item: any) => {
           if (!item.invoice_value || item.excluded_this_month) return;
 
-          const paymentTerms = item.payment_terms || 30;
-          const dueDate = new Date(issueDate);
-          dueDate.setDate(dueDate.getDate() + paymentTerms);
+          // Skip if already collected
+          const collection = item.invoice_collections?.[0];
+          if (collection?.collected_date) return;
+
+          const company = item.projects?.companies;
+          const paymentTerms = company?.payment_terms || 30;
+          
+          let dueDate: Date;
+          if (collection?.due_date) {
+            dueDate = parseISO(collection.due_date);
+          } else {
+            const monthEnd = endOfMonth(issueDate);
+            dueDate = addDays(monthEnd, paymentTerms);
+          }
 
           const daysUntilDue = differenceInDays(dueDate, today);
 
@@ -195,13 +214,15 @@ export function PaymentAlerts({ userRole, onViewProject }: PaymentAlertsProps) {
             } else {
               severity = "low";
             }
+            
+            const rawRef = item.invoice_reference;
+            const invoiceNumber = (rawRef && rawRef.trim().length > 0) 
+              ? rawRef.trim() 
+              : `INV-${month.year}-${String(month.month).padStart(2, "0")}`;
 
             allAlerts.push({
               id: item.id,
-              invoiceNumber: `INV-${month.year}-${String(month.month).padStart(
-                2,
-                "0"
-              )}`,
+              invoiceNumber: invoiceNumber,
               clientName: item.client_name || "Unknown",
               projectName: item.project_name || "Unknown",
               projectId: item.project_id,

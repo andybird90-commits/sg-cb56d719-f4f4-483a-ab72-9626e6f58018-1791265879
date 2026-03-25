@@ -101,6 +101,12 @@ function CashFlowContent() {
             project_id,
             project_name,
             invoice_reference,
+            invoice_collections (
+              id,
+              due_date,
+              collected_date,
+              collected_by_user_id
+            ),
             projects (
               id,
               name,
