@@ -155,56 +155,66 @@ function FinancialsContent() {
 
       // Fetch manual phasing for projects - FOR SELECTED MONTH
       const projectIds = (projectsData || []).map(p => p.id);
-      const { data: projPhasingData, error: projPhasingError } = await supabase
-        .from("project_monthly_phasing")
-        .select("project_id, revenue_amount")
-        .in("project_id", projectIds)
-        .eq("year", selectedYear)
-        .eq("month", selectedMonth);
-
-      if (projPhasingError) throw projPhasingError;
-
-      // Check which projects have ANY manual phasing (to handle 0s correctly)
-      const { data: allPhasedProjects, error: allPhasedProjError } = await supabase
-        .from("project_monthly_phasing")
-        .select("project_id")
-        .in("project_id", projectIds)
-        .not("revenue_amount", "is", null);
+      let projPhasingData: any[] = [];
+      let allPhasedProjects: any[] = [];
       
-      if (allPhasedProjError) throw allPhasedProjError;
+      if (projectIds.length > 0) {
+        const { data, error } = await supabase
+          .from("project_monthly_phasing")
+          .select("project_id, revenue_amount")
+          .in("project_id", projectIds)
+          .eq("year", selectedYear)
+          .eq("month", selectedMonth);
+        if (error) throw error;
+        projPhasingData = data || [];
+
+        // Check which projects have ANY manual phasing (to handle 0s correctly)
+        const { data: all, error: err } = await supabase
+          .from("project_monthly_phasing")
+          .select("project_id")
+          .in("project_id", projectIds)
+          .not("revenue_amount", "is", null);
+        if (err) throw err;
+        allPhasedProjects = all || [];
+      }
       
-      const manuallyPhasedProjectSet = new Set(allPhasedProjects?.map(p => p.project_id));
+      const manuallyPhasedProjectSet = new Set(allPhasedProjects.map(p => p.project_id));
 
       // Fetch manual phasing for opportunities - FOR SELECTED MONTH
       const opportunityIds = (opportunitiesData || []).map(o => o.id);
-      const { data: oppPhasingData, error: oppPhasingError } = await supabase
-        .from("opportunity_monthly_phasing")
-        .select("opportunity_id, revenue_amount")
-        .in("opportunity_id", opportunityIds)
-        .eq("year", selectedYear)
-        .eq("month", selectedMonth);
-
-      if (oppPhasingError) throw oppPhasingError;
-
-      // Check which opportunities have ANY manual phasing
-      const { data: allPhasedOpps, error: allPhasedOppsError } = await supabase
-        .from("opportunity_monthly_phasing")
-        .select("opportunity_id")
-        .in("opportunity_id", opportunityIds)
-        .not("revenue_amount", "is", null);
-        
-      if (allPhasedOppsError) throw allPhasedOppsError;
+      let oppPhasingData: any[] = [];
+      let allPhasedOpps: any[] = [];
       
-      const manuallyPhasedOppSet = new Set(allPhasedOpps?.map(o => o.opportunity_id));
+      if (opportunityIds.length > 0) {
+        const { data, error } = await supabase
+          .from("opportunity_monthly_phasing")
+          .select("opportunity_id, revenue_amount")
+          .in("opportunity_id", opportunityIds)
+          .eq("year", selectedYear)
+          .eq("month", selectedMonth);
+        if (error) throw error;
+        oppPhasingData = data || [];
+
+        // Check which opportunities have ANY manual phasing
+        const { data: all, error: err } = await supabase
+          .from("opportunity_monthly_phasing")
+          .select("opportunity_id")
+          .in("opportunity_id", opportunityIds)
+          .not("revenue_amount", "is", null);
+        if (err) throw err;
+        allPhasedOpps = all || [];
+      }
+      
+      const manuallyPhasedOppSet = new Set(allPhasedOpps.map(o => o.opportunity_id));
 
       // Create phasing lookup maps for CURRENT MONTH values
       const projPhasingMap = new Map<string, number>();
-      projPhasingData?.forEach(p => {
+      projPhasingData.forEach(p => {
         projPhasingMap.set(p.project_id, p.revenue_amount || 0);
       });
 
       const oppPhasingMap = new Map<string, number>();
-      oppPhasingData?.forEach(p => {
+      oppPhasingData.forEach(p => {
         oppPhasingMap.set(p.opportunity_id, p.revenue_amount || 0);
       });
 
@@ -235,28 +245,32 @@ function FinancialsContent() {
       ];
 
       // Fetch timesheets for internal cost (only for projects)
-      const { data: timesheetsData, error: timesheetsError } = await supabase
-        .from("timesheets")
-        .select(`
-          id,
-          date,
-          hours,
-          project_id,
-          user_id,
-          profiles!timesheets_user_id_fkey (
+      let timesheetsData: any[] = [];
+      if (projectIds.length > 0) {
+        const { data, error } = await supabase
+          .from("timesheets")
+          .select(`
             id,
-            full_name,
-            default_hourly_cost_rate
-          )
-        `)
-        .in("project_id", projectIds)
-        .gte("date", startOfMonth.toISOString().split("T")[0])
-        .lte("date", endOfMonth.toISOString().split("T")[0]);
+            date,
+            hours,
+            project_id,
+            user_id,
+            profiles!timesheets_user_id_fkey (
+              id,
+              full_name,
+              default_hourly_cost_rate
+            )
+          `)
+          .in("project_id", projectIds)
+          .gte("date", startOfMonth.toISOString().split("T")[0])
+          .lte("date", endOfMonth.toISOString().split("T")[0]);
 
-      if (timesheetsError) throw timesheetsError;
+        if (error) throw error;
+        timesheetsData = data || [];
+      }
 
       const timesheetsByProject = new Map<string, number>();
-      (timesheetsData || []).forEach((ts: any) => {
+      timesheetsData.forEach((ts: any) => {
         const cost = ts.hours * (ts.profiles?.default_hourly_cost_rate || 0);
         timesheetsByProject.set(
           ts.project_id,
@@ -266,7 +280,7 @@ function FinancialsContent() {
 
       // Build user time breakdown with per-day entries
       const userTimeMap = new Map<string, UserTimeBreakdown>();
-      (timesheetsData || []).forEach((ts: any) => {
+      timesheetsData.forEach((ts: any) => {
         const userId = ts.user_id as string;
         const userName = ts.profiles?.full_name || "Unknown User";
         const hourlyRate = ts.profiles?.default_hourly_cost_rate || 0;
@@ -322,17 +336,21 @@ function FinancialsContent() {
       setUserTimesheetBreakdown(Array.from(userTimeMap.values()));
 
       // Fetch subcontractor costs (only for projects)
-      const { data: costsData, error: costsError } = await supabase
-        .from("subcontractor_costs")
-        .select("project_id, cost_amount")
-        .in("project_id", projectIds)
-        .gte("cost_date", startOfMonth.toISOString().split("T")[0])
-        .lte("cost_date", endOfMonth.toISOString().split("T")[0]);
+      let costsData: any[] = [];
+      if (projectIds.length > 0) {
+        const { data, error } = await supabase
+          .from("subcontractor_costs")
+          .select("project_id, cost_amount")
+          .in("project_id", projectIds)
+          .gte("cost_date", startOfMonth.toISOString().split("T")[0])
+          .lte("cost_date", endOfMonth.toISOString().split("T")[0]);
 
-      if (costsError) throw costsError;
+        if (error) throw error;
+        costsData = data || [];
+      }
 
       const subcontractorByProject = new Map<string, number>();
-      (costsData || []).forEach((cost) => {
+      costsData.forEach((cost) => {
         subcontractorByProject.set(
           cost.project_id,
           (subcontractorByProject.get(cost.project_id) || 0) + cost.cost_amount
@@ -411,6 +429,10 @@ function FinancialsContent() {
         const internalCost = item.type === "project" ? (timesheetsByProject.get(item.id) || 0) : 0;
         const subcontractorCost = item.type === "project" ? (subcontractorByProject.get(item.id) || 0) : 0;
         const totalCost = internalCost + subcontractorCost;
+        
+        // Skip items that have exactly £0 revenue and £0 costs to avoid cluttering the table
+        if (monthlyRevenue === 0 && totalCost === 0) continue;
+
         const margin = monthlyRevenue - totalCost;
         const marginPercent = monthlyRevenue > 0 ? (margin / monthlyRevenue) * 100 : 0;
 
