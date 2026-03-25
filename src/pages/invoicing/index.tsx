@@ -39,7 +39,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Download, Lock, LockOpen, Plus, RefreshCw, CheckCircle2, AlertTriangle, Clock } from "lucide-react";
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format, addDays, startOfWeek, endOfWeek, addWeeks, isBefore, isWithinInterval } from "date-fns";
+import { format, addDays, startOfWeek, endOfWeek, addWeeks, isBefore, isWithinInterval, endOfMonth } from "date-fns";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -286,7 +286,8 @@ export default function InvoicingPage() {
           const paymentTerms = company?.payment_terms || 30;
           
           const collection = item.invoice_collections?.[0];
-          const dueDate = collection?.due_date ? new Date(collection.due_date) : addDays(issueDate, paymentTerms);
+          const monthEnd = endOfMonth(issueDate);
+          const dueDate = collection?.due_date ? new Date(collection.due_date) : addDays(monthEnd, paymentTerms);
           const isCollected = !!collection?.collected_date;
           const collectedDate = collection?.collected_date ? new Date(collection.collected_date) : null;
 
