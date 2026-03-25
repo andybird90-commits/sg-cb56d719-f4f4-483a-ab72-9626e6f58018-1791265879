@@ -2084,6 +2084,7 @@ export type Database = {
           notes: string | null
           opportunity_id: string | null
           opportunity_reference: string | null
+          payment_terms: number | null
           po_number: string | null
           project_reference: string | null
           start_date: string | null
@@ -2106,6 +2107,7 @@ export type Database = {
           notes?: string | null
           opportunity_id?: string | null
           opportunity_reference?: string | null
+          payment_terms?: number | null
           po_number?: string | null
           project_reference?: string | null
           start_date?: string | null
@@ -2128,6 +2130,7 @@ export type Database = {
           notes?: string | null
           opportunity_id?: string | null
           opportunity_reference?: string | null
+          payment_terms?: number | null
           po_number?: string | null
           project_reference?: string | null
           start_date?: string | null

@@ -165,6 +165,7 @@ export function PaymentAlerts({ userRole, onViewProject }: PaymentAlertsProps) {
               id,
               name,
               added_by_user_id,
+              payment_terms,
               companies (
                 payment_terms
               ),
@@ -190,8 +191,9 @@ export function PaymentAlerts({ userRole, onViewProject }: PaymentAlertsProps) {
           const collection = item.invoice_collections?.[0];
           if (collection?.collected_date) return;
 
-          const company = item.projects?.companies;
-          const paymentTerms = company?.payment_terms || 30;
+          const projectPaymentTerms = item.projects?.payment_terms;
+          const companyPaymentTerms = item.projects?.companies?.payment_terms;
+          const paymentTerms = projectPaymentTerms ?? companyPaymentTerms ?? 30;
           
           let dueDate: Date;
           if (collection?.due_date) {

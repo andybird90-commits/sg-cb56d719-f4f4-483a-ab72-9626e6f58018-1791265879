@@ -34,6 +34,7 @@ interface Project {
   po_number?: string;
   notes?: string;
   archived?: boolean;
+  payment_terms?: number;
   companies?: {
     name: string;
     accounts_email?: string;
@@ -123,6 +124,7 @@ type ProjectForm = {
   agreed_fee_value: string;
   po_number: string;
   notes: string;
+  payment_terms: string;
 };
 
 function ProjectDetailContent() {
@@ -161,6 +163,7 @@ function ProjectDetailContent() {
     agreed_fee_value: "",
     po_number: "",
     notes: "",
+    payment_terms: "",
   });
 
   const [activityFormOpen, setActivityFormOpen] = useState(false);
@@ -304,6 +307,7 @@ function ProjectDetailContent() {
         agreed_fee_value: typedProjectData.agreed_fee_value?.toString() || "",
         po_number: typedProjectData.po_number || "",
         notes: typedProjectData.notes || "",
+        payment_terms: typedProjectData.payment_terms?.toString() || "",
       });
     } catch (error) {
       console.error("Error fetching project:", error);
@@ -369,6 +373,7 @@ function ProjectDetailContent() {
         agreed_fee_value: projectForm.agreed_fee_value ? parseFloat(projectForm.agreed_fee_value) : null,
         po_number: projectForm.po_number || null,
         notes: projectForm.notes || null,
+        payment_terms: projectForm.payment_terms ? parseInt(projectForm.payment_terms, 10) : null,
         updated_at: new Date().toISOString(),
       };
 
@@ -1304,6 +1309,17 @@ function ProjectDetailContent() {
                       onChange={(e) => setProjectForm({ ...projectForm, po_number: e.target.value })}
                     />
                   </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-payment-terms">Payment Terms Override (Days)</Label>
+                    <Input
+                      id="edit-payment-terms"
+                      type="number"
+                      placeholder="Leave blank for company default"
+                      value={projectForm.payment_terms}
+                      onChange={(e) => setProjectForm({ ...projectForm, payment_terms: e.target.value })}
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -1367,9 +1383,18 @@ function ProjectDetailContent() {
 
                 {project.companies?.payment_terms && (
                   <div>
-                    <div className="text-sm font-medium text-slate-500 mb-1">Payment Terms</div>
+                    <div className="text-sm font-medium text-slate-500 mb-1">Company Payment Terms</div>
                     <div className="text-slate-900">
                       {project.companies.payment_terms} days
+                    </div>
+                  </div>
+                )}
+
+                {project.payment_terms !== null && project.payment_terms !== undefined && (
+                  <div>
+                    <div className="text-sm font-medium text-slate-500 mb-1">Project Payment Terms (Override)</div>
+                    <div className="text-slate-900 font-medium text-blue-700">
+                      {project.payment_terms} days
                     </div>
                   </div>
                 )}

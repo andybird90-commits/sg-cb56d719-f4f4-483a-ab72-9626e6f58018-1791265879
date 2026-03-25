@@ -20,6 +20,7 @@ interface InvoiceWithCollection {
   total_amount: number;
   company_id: string;
   project_id: string;
+  effective_payment_terms: number;
   companies: {
     name: string;
     payment_terms: number | null;
@@ -112,6 +113,7 @@ function CashFlowContent() {
             projects (
               id,
               name,
+              payment_terms,
               companies (
                 id,
                 name,
@@ -142,7 +144,10 @@ function CashFlowContent() {
             }
 
             const company = item.projects?.companies;
-            const paymentTerms = company?.payment_terms || 30;
+            const projectPaymentTerms = item.projects?.payment_terms;
+            const companyPaymentTerms = company?.payment_terms;
+            const paymentTerms = projectPaymentTerms ?? companyPaymentTerms ?? 30;
+            
             const monthEnd = endOfMonth(issueDate);
             const dueDate = addDays(monthEnd, paymentTerms);
 
@@ -182,9 +187,10 @@ function CashFlowContent() {
               total_amount: Number(item.invoice_value),
               company_id: item.projects?.client_company_id || "",
               project_id: item.project_id,
+              effective_payment_terms: paymentTerms,
               companies: {
                 name: company?.name || item.client_name,
-                payment_terms: paymentTerms,
+                payment_terms: companyPaymentTerms || null,
               },
               projects: {
                 project_name: item.project_name,
@@ -237,6 +243,7 @@ function CashFlowContent() {
             total_amount: gross,
             company_id: inv.company_id || "",
             project_id: inv.project_id || "",
+            effective_payment_terms: inv.companies?.payment_terms || 30, // For manuals, terms are generally pre-calculated on due_date
             companies: {
               name: inv.companies?.name || inv.client_name || "Unknown",
               payment_terms: inv.companies?.payment_terms || 30,
@@ -537,7 +544,7 @@ function CashFlowContent() {
                                 <div className="text-xs text-slate-500 mt-1">
                                   Issue: {format(new Date(invoice.issue_date), "dd MMM yyyy")} • 
                                   Due: {collection ? format(new Date(collection.due_date), "dd MMM yyyy") : "—"} • 
-                                  Terms: {invoice.companies?.payment_terms || 30} days
+                                  Terms: {invoice.effective_payment_terms} days
                                 </div>
                               </div>
                               <div className="text-right flex flex-col items-end gap-2">
