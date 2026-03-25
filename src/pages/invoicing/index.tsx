@@ -87,6 +87,7 @@ export default function InvoicingPage() {
   const [showLockDialog, setShowLockDialog] = useState(false);
   const [editingItems, setEditingItems] = useState<Set<string>>(new Set());
   const [phasingTotal, setPhasingTotal] = useState<number | null>(null);
+  const [weekOffset, setWeekOffset] = useState(0);
 
   // Dialog state for editing description
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -170,6 +171,36 @@ export default function InvoicingPage() {
     }
   }, []);
 
+  useEffect(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const weeks: any[] = [];
+    for (let i = 0; i < 12; i++) {
+      const weekStart = startOfWeek(addWeeks(today, weekOffset + i), { weekStartsOn: 1 });
+      const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
+      weeks.push({
+        weekCommencing: weekStart,
+        weekEnding: weekEnd,
+        invoices: [],
+        total: 0,
+      });
+    }
+
+    collections.forEach((invoice) => {
+      if (!invoice.collected) {
+        weeks.forEach((week) => {
+          if (isWithinInterval(invoice.dueDate, { start: week.weekCommencing, end: week.weekEnding })) {
+            week.invoices.push(invoice);
+            const amountToAdd = invoice.outstanding !== undefined ? invoice.outstanding : invoice.amount;
+            week.total += amountToAdd;
+          }
+        });
+      }
+    });
+    setWeeklyData(weeks);
+  }, [collections, weekOffset]);
+
   const loadInvoiceData = useCallback(async (year: number, month: number) => {
     setLoading(true);
     setError(null);
@@ -220,6 +251,7 @@ export default function InvoicingPage() {
             projects (
               id,
               name,
+              payment_terms,
               companies (
                 id,
                 name,
@@ -283,7 +315,9 @@ export default function InvoicingPage() {
           if (!item.invoice_value || item.excluded_this_month) return;
 
           const company = item.projects?.companies;
-          const paymentTerms = company?.payment_terms || 30;
+          const projectPaymentTerms = item.projects?.payment_terms;
+          const companyPaymentTerms = company?.payment_terms;
+          const paymentTerms = projectPaymentTerms ?? companyPaymentTerms ?? 30;
           
           const collection = item.invoice_collections?.[0];
           const monthEnd = endOfMonth(issueDate);
@@ -374,29 +408,6 @@ export default function InvoicingPage() {
           // VAT on outstanding invoices: allocate proportionally based on the remaining gross
           const vatRatio = gross > 0 ? vat / gross : 0;
           totalVatOutstanding += outstandingGross * vatRatio;
-
-          // Add outstanding portion into the appropriate week bucket
-          weeks.forEach((week) => {
-            if (isWithinInterval(dueDate, { start: week.weekCommencing, end: week.weekEnding })) {
-              week.invoices.push({
-                id: invoice.id,
-                invoiceNumber: invoice.invoice_number,
-                client: invoice.client_name,
-                project: invoice.project_name || "N/A",
-                issueDate: invoiceDate,
-                dueDate,
-                // Keep full invoice value for display in the row
-                amount: gross,
-                // Track outstanding separately for any future use
-                outstanding: outstandingGross,
-                paymentTerms: daysDiff,
-                collected: isCollected,
-                collectedDate: isCollected ? dueDate : null,
-                is_manual: true,
-              });
-              week.total += outstandingGross;
-            }
-          });
         }
 
         // Collection list uses the same record shape
@@ -407,7 +418,9 @@ export default function InvoicingPage() {
           project: invoice.project_name || "N/A",
           issueDate: invoiceDate,
           dueDate,
+          // Keep full invoice value for display in the row
           amount: gross,
+          // Track outstanding separately for any future use
           outstanding: outstandingGross,
           paymentTerms: daysDiff,
           collected: isCollected,
@@ -419,7 +432,6 @@ export default function InvoicingPage() {
       });
 
       // Set state
-      setWeeklyData(weeks);
       setCollections(allInvoices);
       setTotals({
         totalOutstanding: totalOut,
@@ -1404,6 +1416,20 @@ export default function InvoicingPage() {
                 <div className="text-center py-12">Loading cash flow data...</div>
               ) : (
                 <>
+                  <div className="flex justify-end mb-4">
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setWeekOffset(prev => prev - 4)}>
+                        &larr; Prev 4 Weeks
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => setWeekOffset(0)} disabled={weekOffset === 0}>
+                        Current
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => setWeekOffset(prev => prev + 4)}>
+                        Next 4 Weeks &rarr;
+                      </Button>
+                    </div>
+                  </div>
+
                   {/* Summary Cards */}
                   <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
                     <Card>
