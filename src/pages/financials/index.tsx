@@ -130,7 +130,7 @@ function FinancialsContent() {
 
       if (projectsError) throw projectsError;
 
-      // Fetch all SECURED opportunities (matches pipeline logic)
+      // Fetch all opportunities (matches pipeline logic exactly)
       const { data: opportunitiesData, error: opportunitiesError } = await supabase
         .from("opportunities")
         .select(`
@@ -146,8 +146,10 @@ function FinancialsContent() {
             name
           )
         `)
-        .eq("stage", "secured")
-        .eq("archived", false);
+        .eq("archived", false)
+        .neq("status", "closed_won")
+        .neq("status", "closed_lost")
+        .not("expected_fee_value", "is", null);
 
       if (opportunitiesError) throw opportunitiesError;
 
