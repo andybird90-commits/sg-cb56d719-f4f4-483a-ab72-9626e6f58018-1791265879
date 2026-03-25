@@ -35,6 +35,7 @@ interface Company {
   notes?: string | null;
   created_at: string;
   status: "active" | "prospect" | "inactive";
+  payment_terms?: number | null;
 }
 
 interface Contact {
@@ -79,6 +80,7 @@ function CompanyDetailContent() {
     accounts_email: "",
     notes: "",
     status: "prospect" as "active" | "prospect" | "inactive",
+    payment_terms: "" as number | "",
   });
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
@@ -135,6 +137,7 @@ function CompanyDetailContent() {
         accounts_email: companyData.accounts_email || "",
         notes: companyData.notes || "",
         status: companyData.status,
+        payment_terms: companyData.payment_terms ?? "",
       });
     } catch (err) {
       console.error("Failed to load company data", err);
@@ -162,6 +165,7 @@ function CompanyDetailContent() {
           accounts_email: formData.accounts_email || null,
           notes: formData.notes || null,
           status: formData.status,
+          payment_terms: formData.payment_terms === "" ? null : Number(formData.payment_terms),
         })
         .eq("id", id);
 
@@ -449,6 +453,17 @@ function CompanyDetailContent() {
                           onChange={(e) => setFormData({ ...formData, accounts_email: e.target.value })}
                         />
                       </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="payment_terms">Payment Terms (Days)</Label>
+                        <Input
+                          id="payment_terms"
+                          type="number"
+                          placeholder="e.g. 30"
+                          value={formData.payment_terms}
+                          onChange={(e) => setFormData({ ...formData, payment_terms: e.target.value === "" ? "" : Number(e.target.value) })}
+                        />
+                      </div>
                     </div>
 
                     <div className="space-y-2">
@@ -537,6 +552,12 @@ function CompanyDetailContent() {
                             <Mail className="w-4 h-4" />
                             <span>{company.accounts_email}</span>
                           </a>
+                        </div>
+                      )}
+                      {company.payment_terms !== null && company.payment_terms !== undefined && (
+                        <div>
+                          <div className="text-sm font-medium text-slate-500">Payment Terms</div>
+                          <div className="text-slate-900">{company.payment_terms} days</div>
                         </div>
                       )}
                     </div>
