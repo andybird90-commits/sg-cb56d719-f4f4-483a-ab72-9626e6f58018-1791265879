@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Calendar, CheckCircle2, AlertTriangle, Clock } from "lucide-react";
-import { format, addDays, startOfWeek, endOfWeek, addWeeks, isBefore, isAfter, isWithinInterval } from "date-fns";
+import { format, addDays, startOfWeek, endOfWeek, addWeeks, isBefore, isAfter, isWithinInterval, endOfMonth } from "date-fns";
 import type { Tables } from "@/integrations/supabase/types";
 import { useToast } from "@/hooks/use-toast";
 
@@ -135,7 +135,8 @@ function CashFlowContent() {
 
             const company = item.projects?.companies;
             const paymentTerms = company?.payment_terms || 30;
-            const dueDate = addDays(issueDate, paymentTerms);
+            const monthEnd = endOfMonth(issueDate);
+            const dueDate = addDays(monthEnd, paymentTerms);
 
             const rawRef = (item.invoice_reference as string | null) || null;
             const trimmedRef =
