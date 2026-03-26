@@ -30,6 +30,7 @@ import {
   Gauge,
   ShoppingCart,
   Receipt,
+  BadgeCheck,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useState } from "react";
@@ -82,6 +83,7 @@ export function Layout({ children, variant = "default" }: LayoutProps) {
     { href: "/financials", icon: PoundSterling, label: "Financials" },
     { href: "/invoicing", icon: FileText, label: "Invoicing" },
     { href: "/absences/my", icon: CalendarIcon, label: "Absences" },
+    { href: "/accreditations", icon: BadgeCheck, label: "Accreditations" },
     { href: "/health-and-safety", icon: Shield, label: "Health & Safety (Coming Soon)" },
     { href: "/programming", icon: GanttChart, label: "Programming (Coming Soon)" },
     { href: "/reporting", icon: BarChart3, label: "Reporting (Coming Soon)" },
