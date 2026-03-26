@@ -23,9 +23,9 @@ export const accreditationsService = {
     return data as Accreditation[];
   },
 
-  async createAccreditation(accreditation: Partial<Accreditation>, file?: File) {
-    let file_path = accreditation.file_path;
-    let filename = accreditation.filename;
+  async createAccreditation(accreditation: { title: string; description: string; expiry_date: string }, file?: File) {
+    let file_path: string | null = null;
+    let filename: string | null = null;
 
     if (file) {
       const fileExt = file.name.split('.').pop();
@@ -46,7 +46,9 @@ export const accreditationsService = {
     const { data, error } = await supabase
       .from("accreditations")
       .insert([{ 
-        ...accreditation, 
+        title: accreditation.title,
+        description: accreditation.description,
+        expiry_date: accreditation.expiry_date,
         file_path,
         filename,
         created_by: userData.user?.id
