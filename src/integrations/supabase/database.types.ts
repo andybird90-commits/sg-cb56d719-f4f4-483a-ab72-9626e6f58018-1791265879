@@ -66,50 +66,6 @@ export type Database = {
           },
         ]
       }
-      accreditations: {
-        Row: {
-          created_at: string | null
-          created_by: string | null
-          description: string
-          expiry_date: string
-          file_path: string | null
-          filename: string | null
-          id: string
-          title: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          created_by?: string | null
-          description: string
-          expiry_date: string
-          file_path?: string | null
-          filename?: string | null
-          id?: string
-          title: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          created_by?: string | null
-          description?: string
-          expiry_date?: string
-          file_path?: string | null
-          filename?: string | null
-          id?: string
-          title?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "accreditations_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       calendar_events: {
         Row: {
           all_day: boolean | null
@@ -222,6 +178,50 @@ export type Database = {
           {
             foreignKeyName: "companies_added_by_user_id_fkey"
             columns: ["added_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_documents: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string
+          expiry_date: string
+          file_path: string | null
+          filename: string | null
+          id: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description: string
+          expiry_date: string
+          file_path?: string | null
+          filename?: string | null
+          id?: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string
+          expiry_date?: string
+          file_path?: string | null
+          filename?: string | null
+          id?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accreditations_created_by_fkey"
+            columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]

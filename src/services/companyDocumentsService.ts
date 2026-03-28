@@ -1,29 +1,28 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export interface Accreditation {
+export interface CompanyDocument {
   id: string;
   title: string;
-  description: string;
+  description: string | null;
+  file_path: string | null;
+  filename: string | null;
   expiry_date: string;
-  file_path?: string | null;
-  filename?: string | null;
-  created_by?: string | null;
-  created_at?: string;
-  updated_at?: string;
+  created_at: string;
+  created_by: string | null;
 }
 
-export const accreditationsService = {
-  async getAccreditations() {
+export const companyDocumentsService = {
+  async getDocuments() {
     const { data, error } = await supabase
-      .from("accreditations")
+      .from("company_documents")
       .select("*")
       .order("expiry_date", { ascending: true });
-      
+
     if (error) throw error;
-    return data as Accreditation[];
+    return data as CompanyDocument[];
   },
 
-  async createAccreditation(accreditation: { title: string; description: string; expiry_date: string }, file?: File) {
+  async createDocument(doc: { title: string; description: string; expiry_date: string }, file?: File) {
     let file_path: string | null = null;
     let filename: string | null = null;
 
@@ -32,7 +31,7 @@ export const accreditationsService = {
       const randomName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
       
       const { error: uploadError, data } = await supabase.storage
-        .from("accreditations")
+        .from("company_documents")
         .upload(randomName, file);
 
       if (uploadError) throw uploadError;
@@ -41,14 +40,15 @@ export const accreditationsService = {
       filename = file.name;
     }
 
-    const { data: userData } = await supabase.auth.getUser();
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError) throw userError;
 
     const { data, error } = await supabase
-      .from("accreditations")
+      .from("company_documents")
       .insert([{ 
-        title: accreditation.title,
-        description: accreditation.description,
-        expiry_date: accreditation.expiry_date,
+        title: doc.title,
+        description: doc.description,
+        expiry_date: doc.expiry_date,
         file_path,
         filename,
         created_by: userData.user?.id
@@ -57,29 +57,32 @@ export const accreditationsService = {
       .single();
 
     if (error) throw error;
-    return data as Accreditation;
+    return data as CompanyDocument;
   },
 
-  async deleteAccreditation(id: string, filePath?: string | null) {
+  async deleteDocument(id: string, filePath?: string | null) {
     if (filePath) {
-      await supabase.storage.from("accreditations").remove([filePath]);
+      const { error: storageError } = await supabase.storage
+        .from("company_documents")
+        .remove([filePath]);
+      if (storageError) console.error("Storage deletion error:", storageError);
     }
-    
+
     const { error } = await supabase
-      .from("accreditations")
+      .from("company_documents")
       .delete()
       .eq("id", id);
-      
+
     if (error) throw error;
   },
 
-  async downloadFile(filePath: string, fileName: string) {
+  async downloadDocument(filePath: string, fileName: string) {
     const { data, error } = await supabase.storage
-      .from("accreditations")
+      .from("company_documents")
       .download(filePath);
-      
+
     if (error) throw error;
-    
+
     const url = URL.createObjectURL(data);
     const a = document.createElement('a');
     a.href = url;

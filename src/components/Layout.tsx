@@ -83,7 +83,7 @@ export function Layout({ children, variant = "default" }: LayoutProps) {
     { href: "/financials", icon: PoundSterling, label: "Financials" },
     { href: "/invoicing", icon: FileText, label: "Invoicing" },
     { href: "/absences/my", icon: CalendarIcon, label: "Absences" },
-    { href: "/accreditations", icon: BadgeCheck, label: "Accreditations" },
+    { href: "/company-documents", icon: BadgeCheck, label: "Company Documents" },
     { href: "/health-and-safety", icon: Shield, label: "Health & Safety (Coming Soon)" },
     { href: "/programming", icon: GanttChart, label: "Programming (Coming Soon)" },
     { href: "/reporting", icon: BarChart3, label: "Reporting (Coming Soon)" },
