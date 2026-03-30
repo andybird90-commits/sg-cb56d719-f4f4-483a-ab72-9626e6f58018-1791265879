@@ -553,7 +553,15 @@ function CashFlowContent() {
                                   <Button
                                     type="button"
                                     size="sm"
-                                    onClick={() => handleMarkCollected(invoice.id, collection.id, invoice.source || "system")}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      void handleMarkCollected(
+                                        invoice.id,
+                                        collection.id,
+                                        invoice.source || "system",
+                                      );
+                                    }}
                                     className="gap-1"
                                   >
                                     <CheckCircle2 className="w-4 h-4" />
