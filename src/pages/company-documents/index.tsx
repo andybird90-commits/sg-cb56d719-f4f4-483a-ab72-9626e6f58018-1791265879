@@ -1,30 +1,24 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FileText, Plus, AlertCircle, Download, Trash2, Loader2, Calendar } from "lucide-react";
+import { FileText, Plus, AlertCircle, Download, Trash2, Loader2, Calendar, Pencil } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { companyDocumentsService, CompanyDocument } from "@/services/companyDocumentsService";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { CompanyDocumentDialog, type CompanyDocumentDialogMode, type CompanyDocumentUpsertValues } from "@/components/company-documents/CompanyDocumentDialog";
 
 export default function CompanyDocumentsPage() {
   const [documents, setDocuments] = useState<CompanyDocument[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const { toast } = useToast();
 
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    expiry_date: "",
-  });
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogMode, setDialogMode] = useState<CompanyDocumentDialogMode>("create");
+  const [editingDoc, setEditingDoc] = useState<CompanyDocument | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const { toast } = useToast();
 
   const fetchDocuments = async () => {
     try {
@@ -44,18 +38,23 @@ export default function CompanyDocumentsPage() {
   };
 
   useEffect(() => {
-    fetchDocuments();
+    void fetchDocuments();
   }, []);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
-    }
+  const openCreate = () => {
+    setDialogMode("create");
+    setEditingDoc(null);
+    setDialogOpen(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.title || !formData.expiry_date) {
+  const openEdit = (doc: CompanyDocument) => {
+    setDialogMode("edit");
+    setEditingDoc(doc);
+    setDialogOpen(true);
+  };
+
+  const handleUpsert = async (values: CompanyDocumentUpsertValues, file?: File) => {
+    if (!values.title || !values.expiry_date) {
       toast({
         title: "Validation Error",
         description: "Please provide a title and an expiry date.",
@@ -65,27 +64,36 @@ export default function CompanyDocumentsPage() {
     }
 
     try {
-      setIsSubmitting(true);
-      await companyDocumentsService.createDocument(formData, selectedFile || undefined);
-      
-      toast({
-        title: "Success",
-        description: "Company document added successfully.",
-      });
-      
-      setIsDialogOpen(false);
-      setFormData({ title: "", description: "", expiry_date: "" });
-      setSelectedFile(null);
-      fetchDocuments();
+      setSubmitting(true);
+
+      if (dialogMode === "create") {
+        await companyDocumentsService.createDocument(values, file);
+        toast({ title: "Success", description: "Company document added successfully." });
+      } else {
+        if (!editingDoc) return;
+
+        await companyDocumentsService.updateDocument({
+          id: editingDoc.id,
+          updates: values,
+          newFile: file,
+          existingFilePath: editingDoc.file_path,
+        });
+
+        toast({ title: "Success", description: "Company document updated successfully." });
+      }
+
+      setDialogOpen(false);
+      setEditingDoc(null);
+      await fetchDocuments();
     } catch (error) {
-      console.error("Error creating document:", error);
+      console.error("Error saving document:", error);
       toast({
         title: "Error",
-        description: "Failed to upload document.",
+        description: "Failed to save document.",
         variant: "destructive",
       });
     } finally {
-      setIsSubmitting(false);
+      setSubmitting(false);
     }
   };
 
@@ -98,7 +106,7 @@ export default function CompanyDocumentsPage() {
         title: "Success",
         description: "Document deleted successfully.",
       });
-      fetchDocuments();
+      await fetchDocuments();
     } catch (error) {
       console.error("Error deleting document:", error);
       toast({
@@ -139,9 +147,23 @@ export default function CompanyDocumentsPage() {
     return { label: "Valid", color: "text-emerald-700 bg-emerald-50 border-emerald-200", alertVariant: "default" as const };
   };
 
-  // Get all documents that need alerts (<= 30 days or expired)
-  const alertDocuments = documents.filter(doc => getDaysUntilExpiry(doc.expiry_date) <= 30)
-    .sort((a, b) => getDaysUntilExpiry(a.expiry_date) - getDaysUntilExpiry(b.expiry_date));
+  const alertDocuments = useMemo(() => {
+    return documents
+      .filter((doc) => getDaysUntilExpiry(doc.expiry_date) <= 30)
+      .sort((a, b) => getDaysUntilExpiry(a.expiry_date) - getDaysUntilExpiry(b.expiry_date));
+  }, [documents]);
+
+  const dialogInitial = useMemo(() => {
+    if (dialogMode === "create") {
+      return { title: "", description: "", expiry_date: "", filename: null };
+    }
+    return {
+      title: editingDoc?.title ?? "",
+      description: editingDoc?.description ?? "",
+      expiry_date: editingDoc?.expiry_date ?? "",
+      filename: editingDoc?.filename ?? null,
+    };
+  }, [dialogMode, editingDoc]);
 
   return (
     <Layout>
@@ -151,98 +173,49 @@ export default function CompanyDocumentsPage() {
           <p className="text-muted-foreground mt-1">Manage health & safety policies, insurances, and other official documents.</p>
         </div>
 
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="w-4 h-4" />
-              Upload Document
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
-            <form onSubmit={handleSubmit}>
-              <DialogHeader>
-                <DialogTitle>Upload Company Document</DialogTitle>
-                <DialogDescription>
-                  Add a new official document to the company registry.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="title">Document Title <span className="text-red-500">*</span></Label>
-                  <Input
-                    id="title"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    placeholder="e.g., Public Liability Insurance"
-                    required
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="description">Description & Purpose</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Briefly describe what this document is for..."
-                    rows={3}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="expiry_date">Expiry Date <span className="text-red-500">*</span></Label>
-                  <Input
-                    id="expiry_date"
-                    type="date"
-                    value={formData.expiry_date}
-                    onChange={(e) => setFormData({ ...formData, expiry_date: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="file">File Attachment</Label>
-                  <Input
-                    id="file"
-                    type="file"
-                    onChange={handleFileChange}
-                    className="cursor-pointer"
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Save Document
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Button className="gap-2" onClick={openCreate}>
+          <Plus className="w-4 h-4" />
+          Upload Document
+        </Button>
       </div>
 
-      {alertDocuments.length > 0 && (
+      <CompanyDocumentDialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) setEditingDoc(null);
+        }}
+        mode={dialogMode}
+        submitting={submitting}
+        initial={dialogInitial}
+        onSubmit={handleUpsert}
+      />
+
+      {alertDocuments.length > 0 ? (
         <div className="mb-8 space-y-3">
           {alertDocuments.map((doc) => {
             const days = getDaysUntilExpiry(doc.expiry_date);
             const status = getExpiryStatus(days);
-            
+
             return (
-              <Alert key={`alert-${doc.id}`} variant={status.alertVariant} className={`border ${days <= 7 ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50'}`}>
-                <AlertCircle className={`h-4 w-4 ${days <= 7 ? 'text-red-600' : 'text-amber-600'}`} />
-                <AlertTitle className={`font-semibold ${days <= 7 ? 'text-red-800' : 'text-amber-800'}`}>
+              <Alert
+                key={`alert-${doc.id}`}
+                variant={status.alertVariant}
+                className={`border ${days <= 7 ? "border-red-200 bg-red-50" : "border-amber-200 bg-amber-50"}`}
+              >
+                <AlertCircle className={`h-4 w-4 ${days <= 7 ? "text-red-600" : "text-amber-600"}`} />
+                <AlertTitle className={`font-semibold ${days <= 7 ? "text-red-800" : "text-amber-800"}`}>
                   Document Attention Required: {doc.title}
                 </AlertTitle>
-                <AlertDescription className={days <= 7 ? 'text-red-700' : 'text-amber-700'}>
-                  This document {days < 0 ? 'expired' : 'expires'} on {new Date(doc.expiry_date).toLocaleDateString()} 
-                  <strong className="ml-1">({status.label})</strong>. 
-                  Please review and upload a renewed version if necessary.
+                <AlertDescription className={days <= 7 ? "text-red-700" : "text-amber-700"}>
+                  This document {days < 0 ? "expired" : "expires"} on {new Date(doc.expiry_date).toLocaleDateString()}
+                  <strong className="ml-1">({status.label})</strong>. Please review and upload a renewed version if necessary.
                 </AlertDescription>
               </Alert>
             );
           })}
         </div>
-      )}
+      ) : null}
 
       <Card className="shadow-sm border-muted">
         <CardHeader className="bg-muted/30 border-b">
@@ -250,10 +223,9 @@ export default function CompanyDocumentsPage() {
             <FileText className="w-5 h-5 text-primary" />
             Document Registry
           </CardTitle>
-          <CardDescription>
-            A complete log of all active and historical company documents.
-          </CardDescription>
+          <CardDescription>A complete log of all active and historical company documents.</CardDescription>
         </CardHeader>
+
         <CardContent className="p-0">
           {loading ? (
             <div className="flex flex-col items-center justify-center p-12 text-muted-foreground">
@@ -265,7 +237,7 @@ export default function CompanyDocumentsPage() {
               <FileText className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
               <h3 className="text-lg font-medium text-foreground mb-1">No Documents Found</h3>
               <p className="text-muted-foreground mb-4">You haven't uploaded any company documents yet.</p>
-              <Button onClick={() => setIsDialogOpen(true)} variant="outline" className="gap-2">
+              <Button onClick={openCreate} variant="outline" className="gap-2">
                 <Plus className="w-4 h-4" />
                 Add Your First Document
               </Button>
@@ -282,50 +254,66 @@ export default function CompanyDocumentsPage() {
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
+
                 <TableBody>
                   {documents.map((doc) => {
                     const days = getDaysUntilExpiry(doc.expiry_date);
                     const status = getExpiryStatus(days);
-                    
+
                     return (
                       <TableRow key={doc.id}>
                         <TableCell className="font-medium">
                           {doc.title}
-                          {doc.filename && (
+                          {doc.filename ? (
                             <div className="text-xs text-muted-foreground font-normal mt-1 flex items-center gap-1">
                               <FileText className="w-3 h-3" /> {doc.filename}
                             </div>
-                          )}
+                          ) : null}
                         </TableCell>
+
                         <TableCell className="text-muted-foreground max-w-xs truncate">
-                          {doc.description || "—"}
+                          {doc.description && doc.description.trim().length > 0 ? doc.description : "—"}
                         </TableCell>
+
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Calendar className="w-4 h-4 text-muted-foreground" />
                             {new Date(doc.expiry_date).toLocaleDateString()}
                           </div>
                         </TableCell>
+
                         <TableCell>
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${status.color}`}>
                             {status.label}
                           </span>
                         </TableCell>
+
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
-                            {doc.file_path && doc.filename && (
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-slate-700 hover:text-slate-900 hover:bg-slate-50"
+                              onClick={() => openEdit(doc)}
+                              title="Edit Document"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+
+                            {doc.file_path && doc.filename ? (
+                              <Button
+                                variant="ghost"
+                                size="icon"
                                 className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                                 onClick={() => handleDownload(doc.file_path!, doc.filename!)}
                                 title="Download Document"
                               >
                                 <Download className="w-4 h-4" />
                               </Button>
-                            )}
-                            <Button 
-                              variant="ghost" 
+                            ) : null}
+
+                            <Button
+                              variant="ghost"
                               size="icon"
                               className="text-red-600 hover:text-red-700 hover:bg-red-50"
                               onClick={() => handleDelete(doc.id, doc.file_path)}
