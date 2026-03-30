@@ -76,6 +76,7 @@ function CashFlowContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [weekOffset, setWeekOffset] = useState(0);
+  const [markingInvoiceId, setMarkingInvoiceId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchInvoicesAndCollections();
@@ -311,23 +312,48 @@ function CashFlowContent() {
 
   const handleMarkCollected = async (invoiceId: string, collectionId: string, source: "system" | "manual" = "system") => {
     try {
+      setMarkingInvoiceId(invoiceId);
+
       if (source === "manual") {
-        const { error: updateError } = await supabase
+        const { data: updatedRows, error: updateError } = await supabase
           .from("invoice_history")
           .update({
             status: "paid",
           })
-          .eq("id", invoiceId);
+          .eq("id", invoiceId)
+          .select("id");
+
         if (updateError) throw updateError;
+
+        if (!updatedRows || updatedRows.length === 0) {
+          toast({
+            title: "Not permitted",
+            description: "Your account doesn't have permission to update this invoice.",
+            variant: "destructive",
+          });
+          return;
+        }
       } else {
-        const { error: updateError } = await supabase
+        const { data: updatedRows, error: updateError } = await supabase
           .from("invoice_collections")
           .update({
             collected_date: format(new Date(), "yyyy-MM-dd"),
-            collected_by_user_id: profile?.id || user?.id,
+            collected_by_user_id: user?.id ?? profile?.id ?? null,
           })
-          .eq("id", collectionId);
+          .eq("id", collectionId)
+          .select("id");
+
         if (updateError) throw updateError;
+
+        if (!updatedRows || updatedRows.length === 0) {
+          toast({
+            title: "Not permitted",
+            description:
+              "Your account doesn't have permission to mark invoices as collected. Ask an admin/director to update your role or adjust invoice collection permissions.",
+            variant: "destructive",
+          });
+          return;
+        }
       }
 
       toast({
@@ -343,6 +369,8 @@ function CashFlowContent() {
         description: "Failed to mark invoice as collected",
         variant: "destructive",
       });
+    } finally {
+      setMarkingInvoiceId(null);
     }
   };
 
@@ -553,6 +581,7 @@ function CashFlowContent() {
                                   <Button
                                     type="button"
                                     size="sm"
+                                    disabled={markingInvoiceId === invoice.id}
                                     onClick={(e) => {
                                       e.preventDefault();
                                       e.stopPropagation();
@@ -565,7 +594,7 @@ function CashFlowContent() {
                                     className="gap-1"
                                   >
                                     <CheckCircle2 className="w-4 h-4" />
-                                    Mark Collected
+                                    {markingInvoiceId === invoice.id ? "Marking..." : "Mark Collected"}
                                   </Button>
                                 )}
                               </div>
