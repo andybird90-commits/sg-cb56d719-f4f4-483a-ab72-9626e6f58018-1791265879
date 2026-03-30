@@ -1593,9 +1593,16 @@ export default function InvoicingPage() {
                                         <Button
                                           type="button"
                                           size="sm"
-                                          onClick={() =>
-                                            markAsCollected(invoice.id, invoice.is_manual, invoice.invoiceMonthId, invoice.dueDate)
-                                          }
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            void markAsCollected(
+                                              invoice.id,
+                                              invoice.is_manual,
+                                              invoice.invoiceMonthId,
+                                              invoice.dueDate,
+                                            );
+                                          }}
                                         >
                                           <CheckCircle2 className="h-4 w-4 mr-1" />
                                           Mark Collected
