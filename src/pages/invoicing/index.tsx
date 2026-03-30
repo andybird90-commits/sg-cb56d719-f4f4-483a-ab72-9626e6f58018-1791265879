@@ -231,9 +231,12 @@ export default function InvoicingPage() {
     }
   }, []);
 
-  const fetchCashFlowData = async () => {
+  const fetchCashFlowData = async (options: { silent?: boolean } = {}) => {
     try {
-      setCashFlowLoading(true);
+      const silent = options.silent === true;
+      if (!silent) {
+        setCashFlowLoading(true);
+      }
 
       // Fetch locked invoice months with items
       const { data: lockedMonths, error: lockedError } = await supabase
@@ -456,25 +459,32 @@ export default function InvoicingPage() {
   const markAsCollected = async (invoiceId: string, isManual?: boolean, invoiceMonthId?: string, dueDate?: Date) => {
     try {
       if (isManual) {
-        // First get the net amount
         const { data: invoiceData } = await supabase
           .from("invoice_history")
           .select("net_amount, vat_amount")
           .eq("id", invoiceId)
           .single();
 
-        // Update invoice_history for manual invoices
-        const { error } = await supabase
+        const { data: updatedRows, error } = await supabase
           .from("invoice_history")
           .update({
             status: "paid",
             paid_amount: invoiceData?.net_amount || 0,
           })
-          .eq("id", invoiceId);
+          .eq("id", invoiceId)
+          .select("id");
 
         if (error) throw error;
+
+        if (!updatedRows || updatedRows.length === 0) {
+          toast({
+            title: "Not permitted",
+            description: "Your account doesn't have permission to update this invoice.",
+            variant: "destructive",
+          });
+          return;
+        }
       } else {
-        // Handle system invoices via invoice_collections
         const { data: existingCol } = await supabase
           .from("invoice_collections")
           .select("id")
@@ -482,16 +492,28 @@ export default function InvoicingPage() {
           .maybeSingle();
 
         if (existingCol) {
-          const { error } = await supabase
+          const { data: updatedRows, error } = await supabase
             .from("invoice_collections")
             .update({
               collected_date: format(new Date(), "yyyy-MM-dd"),
               collected_by_user_id: profile?.id,
             })
-            .eq("id", existingCol.id);
+            .eq("id", existingCol.id)
+            .select("id");
+
           if (error) throw error;
+
+          if (!updatedRows || updatedRows.length === 0) {
+            toast({
+              title: "Not permitted",
+              description:
+                "Your account doesn't have permission to mark invoices as collected. Ask an admin/director to update your role or adjust invoice collection permissions.",
+              variant: "destructive",
+            });
+            return;
+          }
         } else {
-          const { error } = await supabase
+          const { data: insertedRows, error } = await supabase
             .from("invoice_collections")
             .insert({
               invoice_item_id: invoiceId,
@@ -499,8 +521,20 @@ export default function InvoicingPage() {
               due_date: dueDate ? format(dueDate, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd"),
               collected_date: format(new Date(), "yyyy-MM-dd"),
               collected_by_user_id: profile?.id,
-            });
+            })
+            .select("id");
+
           if (error) throw error;
+
+          if (!insertedRows || insertedRows.length === 0) {
+            toast({
+              title: "Not permitted",
+              description:
+                "Your account doesn't have permission to mark invoices as collected. Ask an admin/director to update your role or adjust invoice collection permissions.",
+              variant: "destructive",
+            });
+            return;
+          }
         }
       }
 
@@ -509,7 +543,7 @@ export default function InvoicingPage() {
         description: "Invoice marked as collected",
       });
 
-      fetchCashFlowData();
+      void fetchCashFlowData({ silent: true });
     } catch (error) {
       console.error("Error marking as collected:", error);
       toast({
@@ -986,19 +1020,21 @@ export default function InvoicingPage() {
   );
   const displayedTotal = totalValue;
 
-  console.log("Invoice Items Debug:", {
-    totalItems: invoiceItems.length,
-    includedItems: includedItems.length,
-    excludedItems: invoiceItems.filter((i) => i.excluded_this_month).length,
-    nullValueItems: invoiceItems.filter((i) => i.invoice_value === null).length,
-    calculatedTotalFromItems: totalValue,
-    phasingTotal,
-    itemBreakdown: includedItems.map((i) => ({
-      project: i.project_name,
-      value: i.invoice_value,
-      excluded: i.excluded_this_month,
-    })),
-  });
+  if (process.env.NODE_ENV === "development") {
+    const w = window as unknown as { __invoiceItemsDebugLogged?: boolean };
+    if (!w.__invoiceItemsDebugLogged) {
+      w.__invoiceItemsDebugLogged = true;
+       
+      console.log("Invoice Items Debug:", {
+        totalItems: invoiceItems.length,
+        includedItems: includedItems.length,
+        excludedItems: invoiceItems.filter((i) => i.excluded_this_month).length,
+        nullValueItems: invoiceItems.filter((i) => i.invoice_value === null).length,
+        calculatedTotalFromItems: totalValue,
+        phasingTotal,
+      });
+    }
+  }
 
   useEffect(() => {
     loadInvoiceData(selectedYear, selectedMonth);
@@ -1593,9 +1629,27 @@ export default function InvoicingPage() {
                                         <Button
                                           type="button"
                                           size="sm"
+                                          onPointerDown={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                          }}
                                           onClick={(e) => {
                                             e.preventDefault();
                                             e.stopPropagation();
+
+                                            if (process.env.NODE_ENV === "development") {
+                                              toast({
+                                                title: "Debug",
+                                                description: `Click reached handler for invoice ${invoice.invoiceNumber}`,
+                                              });
+                                               
+                                              console.log("[invoicing cashflow tab] Mark Collected clicked", {
+                                                invoiceId: invoice.id,
+                                                isManual: invoice.is_manual,
+                                                invoiceMonthId: invoice.invoiceMonthId,
+                                              });
+                                            }
+
                                             void markAsCollected(
                                               invoice.id,
                                               invoice.is_manual,
