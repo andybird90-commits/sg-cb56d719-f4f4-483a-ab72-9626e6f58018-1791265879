@@ -1591,6 +1591,7 @@ export default function InvoicingPage() {
                                       </div>
                                       {!invoice.collected && (
                                         <Button
+                                          type="button"
                                           size="sm"
                                           onClick={() =>
                                             markAsCollected(invoice.id, invoice.is_manual, invoice.invoiceMonthId, invoice.dueDate)

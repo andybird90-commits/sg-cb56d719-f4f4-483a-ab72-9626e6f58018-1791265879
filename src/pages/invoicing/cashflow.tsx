@@ -551,6 +551,7 @@ function CashFlowContent() {
                                 <div className="font-semibold text-lg">{formatCurrency(invoice.total_amount)}</div>
                                 {!isCollected && collection && (
                                   <Button
+                                    type="button"
                                     size="sm"
                                     onClick={() => handleMarkCollected(invoice.id, collection.id, invoice.source || "system")}
                                     className="gap-1"
