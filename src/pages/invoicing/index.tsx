@@ -108,6 +108,7 @@ export default function InvoicingPage() {
     totalValue: 0,
     vatOutstanding: 0,
   });
+  const [markingCollectedId, setMarkingCollectedId] = useState<string | null>(null);
 
   const [invoiceMonths, setInvoiceMonths] = useState<InvoiceMonth[]>([]);
 
@@ -458,6 +459,17 @@ export default function InvoicingPage() {
 
   const markAsCollected = async (invoiceId: string, isManual?: boolean, invoiceMonthId?: string, dueDate?: Date) => {
     try {
+      setMarkingCollectedId(invoiceId);
+
+      // Optimistic UI: immediately clear it from the forecast list
+      setCollections((prev) =>
+        prev.map((inv) =>
+          inv.id === invoiceId
+            ? { ...inv, collected: true, collectedDate: new Date() }
+            : inv,
+        ),
+      );
+
       if (isManual) {
         const { data: invoiceData } = await supabase
           .from("invoice_history")
@@ -474,6 +486,16 @@ export default function InvoicingPage() {
           .eq("id", invoiceId)
           .select("id");
 
+         
+        console.log("[cashflow] mark collected (manual) result", {
+          invoiceId,
+          updatedRowsCount: updatedRows?.length ?? 0,
+          error,
+          role: profile?.role ?? null,
+          authUserId: user?.id ?? null,
+          profileId: profile?.id ?? null,
+        });
+
         if (error) throw error;
 
         if (!updatedRows || updatedRows.length === 0) {
@@ -482,14 +504,30 @@ export default function InvoicingPage() {
             description: "Your account doesn't have permission to update this invoice.",
             variant: "destructive",
           });
+          // Revert optimistic update
+          setCollections((prev) =>
+            prev.map((inv) =>
+              inv.id === invoiceId
+                ? { ...inv, collected: false, collectedDate: null }
+                : inv,
+            ),
+          );
           return;
         }
       } else {
-        const { data: existingCol } = await supabase
+        const { data: existingCol, error: existingColError } = await supabase
           .from("invoice_collections")
           .select("id")
           .eq("invoice_item_id", invoiceId)
           .maybeSingle();
+
+        if (existingColError) {
+           
+          console.log("[cashflow] existing collection lookup error", {
+            invoiceId,
+            existingColError,
+          });
+        }
 
         if (existingCol) {
           const { data: updatedRows, error } = await supabase
@@ -499,7 +537,19 @@ export default function InvoicingPage() {
               collected_by_user_id: profile?.id,
             })
             .eq("id", existingCol.id)
-            .select("id");
+            .select("id, collected_date");
+
+           
+          console.log("[cashflow] mark collected (system update) result", {
+            invoiceId,
+            collectionId: existingCol.id,
+            updatedRowsCount: updatedRows?.length ?? 0,
+            updatedRows,
+            error,
+            role: profile?.role ?? null,
+            authUserId: user?.id ?? null,
+            profileId: profile?.id ?? null,
+          });
 
           if (error) throw error;
 
@@ -510,6 +560,14 @@ export default function InvoicingPage() {
                 "Your account doesn't have permission to mark invoices as collected. Ask an admin/director to update your role or adjust invoice collection permissions.",
               variant: "destructive",
             });
+            // Revert optimistic update
+            setCollections((prev) =>
+              prev.map((inv) =>
+                inv.id === invoiceId
+                  ? { ...inv, collected: false, collectedDate: null }
+                  : inv,
+              ),
+            );
             return;
           }
         } else {
@@ -522,7 +580,18 @@ export default function InvoicingPage() {
               collected_date: format(new Date(), "yyyy-MM-dd"),
               collected_by_user_id: profile?.id,
             })
-            .select("id");
+            .select("id, collected_date");
+
+           
+          console.log("[cashflow] mark collected (system insert) result", {
+            invoiceId,
+            insertedRowsCount: insertedRows?.length ?? 0,
+            insertedRows,
+            error,
+            role: profile?.role ?? null,
+            authUserId: user?.id ?? null,
+            profileId: profile?.id ?? null,
+          });
 
           if (error) throw error;
 
@@ -533,6 +602,14 @@ export default function InvoicingPage() {
                 "Your account doesn't have permission to mark invoices as collected. Ask an admin/director to update your role or adjust invoice collection permissions.",
               variant: "destructive",
             });
+            // Revert optimistic update
+            setCollections((prev) =>
+              prev.map((inv) =>
+                inv.id === invoiceId
+                  ? { ...inv, collected: false, collectedDate: null }
+                  : inv,
+              ),
+            );
             return;
           }
         }
@@ -546,11 +623,23 @@ export default function InvoicingPage() {
       void fetchCashFlowData({ silent: true });
     } catch (error) {
       console.error("Error marking as collected:", error);
+
+      // Revert optimistic update on unexpected error
+      setCollections((prev) =>
+        prev.map((inv) =>
+          inv.id === invoiceId
+            ? { ...inv, collected: false, collectedDate: null }
+            : inv,
+        ),
+      );
+
       toast({
         title: "Error",
         description: "Failed to mark invoice as collected",
         variant: "destructive",
       });
+    } finally {
+      setMarkingCollectedId(null);
     }
   };
 
@@ -1629,6 +1718,7 @@ export default function InvoicingPage() {
                                         <Button
                                           type="button"
                                           size="sm"
+                                          disabled={markingCollectedId === invoice.id}
                                           onPointerDown={(e) => {
                                             e.preventDefault();
                                             e.stopPropagation();
@@ -1636,19 +1726,6 @@ export default function InvoicingPage() {
                                           onClick={(e) => {
                                             e.preventDefault();
                                             e.stopPropagation();
-
-                                            if (process.env.NODE_ENV === "development") {
-                                              toast({
-                                                title: "Debug",
-                                                description: `Click reached handler for invoice ${invoice.invoiceNumber}`,
-                                              });
-                                               
-                                              console.log("[invoicing cashflow tab] Mark Collected clicked", {
-                                                invoiceId: invoice.id,
-                                                isManual: invoice.is_manual,
-                                                invoiceMonthId: invoice.invoiceMonthId,
-                                              });
-                                            }
 
                                             void markAsCollected(
                                               invoice.id,
@@ -1659,7 +1736,9 @@ export default function InvoicingPage() {
                                           }}
                                         >
                                           <CheckCircle2 className="h-4 w-4 mr-1" />
-                                          Mark Collected
+                                          {markingCollectedId === invoice.id
+                                            ? "Marking..."
+                                            : "Mark Collected"}
                                         </Button>
                                       )}
                                     </div>
