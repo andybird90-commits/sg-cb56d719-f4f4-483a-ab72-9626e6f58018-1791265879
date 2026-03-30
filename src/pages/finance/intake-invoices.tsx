@@ -36,6 +36,7 @@ import { Switch } from "@/components/ui/switch";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { formatGBP } from "@/lib/format";
 
 interface InvoiceHistory {
   id: string;
@@ -410,10 +411,7 @@ function IntakeInvoicesContent() {
             <CardHeader className="pb-3">
               <CardDescription>Total Outstanding (Net)</CardDescription>
               <CardTitle className="text-3xl">
-                £{totalOutstandingNet.toLocaleString("en-GB", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
+                {formatGBP(totalOutstandingNet)}
               </CardTitle>
             </CardHeader>
           </Card>
@@ -427,10 +425,7 @@ function IntakeInvoicesContent() {
             <CardHeader className="pb-3">
               <CardDescription>VAT on Unpaid Invoices</CardDescription>
               <CardTitle className="text-3xl">
-                £{totalVatOutstanding.toLocaleString("en-GB", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
+                {formatGBP(totalVatOutstanding)}
               </CardTitle>
             </CardHeader>
           </Card>
@@ -670,7 +665,7 @@ function IntakeInvoicesContent() {
               <div className="space-y-2">
                 <Label>Gross Amount (£)</Label>
                 <div className="text-2xl font-bold text-green-600">
-                  £{grossAmount.toFixed(2)}
+                  {formatGBP(grossAmount)}
                 </div>
                 <p className="text-sm text-slate-500">
                   Net + VAT (auto-calculated)
@@ -807,22 +802,13 @@ function IntakeInvoicesContent() {
                           {format(new Date(invoice.due_date), "dd MMM yyyy")}
                         </TableCell>
                         <TableCell className="text-right">
-                          £{Number(invoice.net_amount).toLocaleString("en-GB", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
+                          {formatGBP(Number(invoice.net_amount))}
                         </TableCell>
                         <TableCell className="text-right">
-                          £{Number(invoice.vat_amount).toLocaleString("en-GB", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
+                          {formatGBP(Number(invoice.vat_amount))}
                         </TableCell>
                         <TableCell className="text-right font-semibold">
-                          £{Number(invoice.gross_amount).toLocaleString("en-GB", {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
+                          {formatGBP(Number(invoice.gross_amount))}
                         </TableCell>
                         <TableCell>{getStatusBadge(invoice.status)}</TableCell>
                         <TableCell className="text-right">

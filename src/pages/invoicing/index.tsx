@@ -42,6 +42,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format, addDays, startOfWeek, endOfWeek, addWeeks, isBefore, isWithinInterval, endOfMonth } from "date-fns";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import type { Database } from "@/integrations/supabase/types";
+import { formatGBP } from "@/lib/format";
 
 type InvoiceMonth = {
   id: string;
@@ -1402,8 +1403,8 @@ export default function InvoicingPage() {
                                       <TableCell className="min-w-[180px] px-4 py-3">
                                         <div className="flex items-center gap-2">
                                           <span className="text-sm font-medium">
-                                            {item.invoice_value
-                                              ? `£${item.invoice_value.toFixed(2)}`
+                                            {typeof item.invoice_value === "number"
+                                              ? formatGBP(item.invoice_value)
                                               : "—"}
                                           </span>
                                           <span className="text-xs text-muted-foreground italic">
@@ -1496,7 +1497,7 @@ export default function InvoicingPage() {
                   <div className="flex items-center justify-between pt-6 border-t">
                     <div className="text-lg font-semibold">
                       Total invoice value this month:{" "}
-                      <span className="text-primary">£{displayedTotal.toFixed(2)}</span>
+                      <span className="text-primary">{formatGBP(displayedTotal)}</span>
                     </div>
                     <div className="flex gap-2">
                       {invoiceMonth && (
@@ -1563,7 +1564,7 @@ export default function InvoicingPage() {
                       </CardHeader>
                       <CardContent>
                         <div className="text-2xl font-bold">
-                          £{totals.totalOutstanding.toLocaleString()}
+                          {formatGBP(totals.totalOutstanding)}
                         </div>
                       </CardContent>
                     </Card>
@@ -1576,7 +1577,7 @@ export default function InvoicingPage() {
                       </CardHeader>
                       <CardContent>
                         <div className="text-2xl font-bold text-blue-600">
-                          £{totals.inTerms.toLocaleString()}
+                          {formatGBP(totals.inTerms)}
                         </div>
                       </CardContent>
                     </Card>
@@ -1589,7 +1590,7 @@ export default function InvoicingPage() {
                       </CardHeader>
                       <CardContent>
                         <div className="text-2xl font-bold text-red-600">
-                          £{totals.overdue.toLocaleString()}
+                          {formatGBP(totals.overdue)}
                         </div>
                       </CardContent>
                     </Card>
@@ -1602,7 +1603,7 @@ export default function InvoicingPage() {
                       </CardHeader>
                       <CardContent>
                         <div className="text-2xl font-bold text-amber-600">
-                          £{totals.vatOutstanding.toLocaleString()}
+                          {formatGBP(totals.vatOutstanding)}
                         </div>
                       </CardContent>
                     </Card>
@@ -1615,7 +1616,7 @@ export default function InvoicingPage() {
                       </CardHeader>
                       <CardContent>
                         <div className="text-2xl font-bold text-green-600">
-                          £{totals.collected.toLocaleString()}
+                          {formatGBP(totals.collected)}
                         </div>
                       </CardContent>
                     </Card>
@@ -1628,7 +1629,7 @@ export default function InvoicingPage() {
                       </CardHeader>
                       <CardContent>
                         <div className="text-2xl font-bold">
-                          £{totals.totalValue.toLocaleString()}
+                          {formatGBP(totals.totalValue)}
                         </div>
                       </CardContent>
                     </Card>
@@ -1651,7 +1652,7 @@ export default function InvoicingPage() {
                             </div>
                             <div className="text-right">
                               <div className="text-2xl font-bold">
-                                £{week.total.toLocaleString()}
+                                {formatGBP(week.total)}
                               </div>
                               <p className="text-sm text-slate-600">
                                 {week.invoices.length} invoice
@@ -1709,7 +1710,7 @@ export default function InvoicingPage() {
                                     <div className="flex items-center gap-4">
                                       <div className="text-right">
                                         <div className="font-semibold">
-                                          £{invoice.amount.toLocaleString()}
+                                          {formatGBP(invoice.amount)}
                                         </div>
                                       </div>
                                       {!invoice.collected && (

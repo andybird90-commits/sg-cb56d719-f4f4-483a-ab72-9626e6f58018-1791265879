@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { PDFDocument, StandardFonts, type PDFFont, PageSizes } from "pdf-lib";
+import { formatGBP } from "@/lib/format";
 
 interface InvoiceItemPayload {
   id?: string;
@@ -54,7 +55,7 @@ function toNumber(value: unknown): number {
 
 function formatCurrency(value: number): string {
   const safe = Number.isFinite(value) ? value : 0;
-  return `£${safe.toFixed(2)}`;
+  return formatGBP(safe);
 }
 
 function wrapText(

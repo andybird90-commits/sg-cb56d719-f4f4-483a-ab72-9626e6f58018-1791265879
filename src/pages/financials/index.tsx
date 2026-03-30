@@ -16,6 +16,7 @@ import { jsPDF } from "jspdf";
 import { autoTable } from "jspdf-autotable";
 import { format } from "date-fns";
 import { FileText, ChevronRight, ChevronDown } from "lucide-react";
+import { formatGBP } from "@/lib/format";
 
 interface ProjectFinancials {
   project_id: string;
@@ -418,12 +419,12 @@ function FinancialsContent() {
     userTimesheetBreakdown.forEach((user) => {
       tableData.push([
         user.user_name,
-        `£${user.hourly_rate.toFixed(2)}`,
+        formatGBP(user.hourly_rate),
         "",
         "User total",
         "",
         user.total_hours.toFixed(1),
-        `£${user.total_cost.toFixed(2)}`
+        formatGBP(user.total_cost)
       ]);
 
       user.projects.forEach((project) => {
@@ -434,7 +435,7 @@ function FinancialsContent() {
           project.project_name,
           "Project total",
           project.hours.toFixed(1),
-          `£${project.cost.toFixed(2)}`
+          formatGBP(project.cost)
         ]);
 
         const sortedEntries = project.dailyEntries
@@ -449,7 +450,7 @@ function FinancialsContent() {
             "",
             format(new Date(entry.date), "dd/MM/yyyy"),
             entry.hours.toFixed(1),
-            `£${entry.cost.toFixed(2)}`
+            formatGBP(entry.cost)
           ]);
         });
       });
