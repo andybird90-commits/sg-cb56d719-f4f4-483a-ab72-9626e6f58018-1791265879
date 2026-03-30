@@ -323,11 +323,24 @@ export default function InvoicingPage() {
           const companyPaymentTerms = company?.payment_terms;
           const paymentTerms = projectPaymentTerms ?? companyPaymentTerms ?? 30;
           
-          const collection = item.invoice_collections?.[0];
+          const collectionsForItem = Array.isArray(item.invoice_collections)
+            ? item.invoice_collections
+            : [];
+
+          const preferredCollection =
+            collectionsForItem.find((c: any) => !!c?.collected_date) ??
+            collectionsForItem[0] ??
+            null;
+
           const monthEnd = endOfMonth(issueDate);
-          const dueDate = collection?.due_date ? new Date(collection.due_date) : addDays(monthEnd, paymentTerms);
-          const isCollected = !!collection?.collected_date;
-          const collectedDate = collection?.collected_date ? new Date(collection.collected_date) : null;
+          const dueDate = preferredCollection?.due_date
+            ? new Date(preferredCollection.due_date)
+            : addDays(monthEnd, paymentTerms);
+
+          const isCollected = collectionsForItem.some((c: any) => !!c?.collected_date);
+          const collectedDate = preferredCollection?.collected_date
+            ? new Date(preferredCollection.collected_date)
+            : null;
 
           const rawRef = (item.invoice_reference as string | null) || null;
           const trimmedRef =
@@ -515,34 +528,35 @@ export default function InvoicingPage() {
           return;
         }
       } else {
-        const { data: existingCol, error: existingColError } = await supabase
+        const { data: existingCols, error: existingColsError } = await supabase
           .from("invoice_collections")
           .select("id")
-          .eq("invoice_item_id", invoiceId)
-          .maybeSingle();
+          .eq("invoice_item_id", invoiceId);
 
-        if (existingColError) {
+        if (existingColsError) {
            
-          console.log("[cashflow] existing collection lookup error", {
+          console.log("[cashflow] collection lookup error", {
             invoiceId,
-            existingColError,
+            existingColsError,
           });
+          throw existingColsError;
         }
 
-        if (existingCol) {
+        const existingIds = (existingCols || []).map((c) => c.id).filter(Boolean);
+
+        if (existingIds.length > 0) {
           const { data: updatedRows, error } = await supabase
             .from("invoice_collections")
             .update({
               collected_date: format(new Date(), "yyyy-MM-dd"),
               collected_by_user_id: profile?.id,
             })
-            .eq("id", existingCol.id)
+            .in("id", existingIds)
             .select("id, collected_date");
 
            
-          console.log("[cashflow] mark collected (system update) result", {
+          console.log("[cashflow] mark collected (system update-many) result", {
             invoiceId,
-            collectionId: existingCol.id,
             updatedRowsCount: updatedRows?.length ?? 0,
             updatedRows,
             error,
@@ -1108,22 +1122,6 @@ export default function InvoicingPage() {
     0,
   );
   const displayedTotal = totalValue;
-
-  if (process.env.NODE_ENV === "development") {
-    const w = window as unknown as { __invoiceItemsDebugLogged?: boolean };
-    if (!w.__invoiceItemsDebugLogged) {
-      w.__invoiceItemsDebugLogged = true;
-       
-      console.log("Invoice Items Debug:", {
-        totalItems: invoiceItems.length,
-        includedItems: includedItems.length,
-        excludedItems: invoiceItems.filter((i) => i.excluded_this_month).length,
-        nullValueItems: invoiceItems.filter((i) => i.invoice_value === null).length,
-        calculatedTotalFromItems: totalValue,
-        phasingTotal,
-      });
-    }
-  }
 
   useEffect(() => {
     loadInvoiceData(selectedYear, selectedMonth);
