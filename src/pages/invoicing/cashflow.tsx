@@ -88,9 +88,13 @@ function CashFlowContent() {
     }
   }, [invoices, weekOffset]);
 
-  const fetchInvoicesAndCollections = async () => {
+  const fetchInvoicesAndCollections = async (options: { silent?: boolean } = {}) => {
+    const silent = options.silent === true;
+
     try {
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
       setError(null);
 
       const { data: lockedMonths, error: lockedError } = await supabase
@@ -271,7 +275,9 @@ function CashFlowContent() {
       console.error("Failed to load cash flow data", err);
       setError("Failed to load cash flow data");
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
@@ -361,7 +367,7 @@ function CashFlowContent() {
         description: "Invoice marked as collected",
       });
 
-      await fetchInvoicesAndCollections();
+      await fetchInvoicesAndCollections({ silent: true });
     } catch (err) {
       console.error("Failed to mark as collected", err);
       toast({
