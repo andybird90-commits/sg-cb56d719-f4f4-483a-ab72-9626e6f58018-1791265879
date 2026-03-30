@@ -588,9 +588,29 @@ function CashFlowContent() {
                                     type="button"
                                     size="sm"
                                     disabled={markingInvoiceId === invoice.id}
+                                    onPointerDown={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                    }}
                                     onClick={(e) => {
                                       e.preventDefault();
                                       e.stopPropagation();
+
+                                      if (process.env.NODE_ENV === "development") {
+                                        // Debug signal: confirms whether the click handler is reached at all
+                                        // (If you don't see this toast, something is intercepting the click.)
+                                        toast({
+                                          title: "Debug",
+                                          description: `Click reached handler for invoice ${invoice.invoice_number}`,
+                                        });
+                                         
+                                        console.log("[cashflow] Mark Collected clicked", {
+                                          invoiceId: invoice.id,
+                                          collectionId: collection.id,
+                                          source: invoice.source || "system",
+                                        });
+                                      }
+
                                       void handleMarkCollected(
                                         invoice.id,
                                         collection.id,
