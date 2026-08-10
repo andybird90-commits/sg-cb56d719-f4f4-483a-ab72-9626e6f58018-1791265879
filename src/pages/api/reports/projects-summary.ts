@@ -25,69 +25,140 @@ export default async function handler(
 
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    if (!supabaseUrl || !supabaseKey) {
+    if (!supabaseUrl || !supabaseServiceKey) {
       throw new Error("Missing Supabase configuration");
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // Use service role key to bypass RLS
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Fetch opportunities
+    console.log("Fetching opportunities...");
     const { data: opportunities, error: oppError } = await supabase
       .from("opportunities")
-      .select("*")
+      .select(`
+        id,
+        name,
+        company_id,
+        contact_id,
+        stage,
+        expected_fee_value,
+        probability_percent,
+        tender_due_date,
+        tender_received_date,
+        submitted_date,
+        expected_start_date,
+        expected_end_date,
+        enquiry_number,
+        project_reference,
+        added_by_user_id,
+        created_at,
+        archived,
+        archived_reason
+      `)
       .order("created_at", { ascending: false });
 
     if (oppError) {
-      console.error("Opportunities fetch error:", oppError);
+      console.error("Opportunities error:", oppError);
       throw oppError;
     }
 
-    // Fetch projects
+    console.log(`Found ${opportunities?.length || 0} opportunities`);
+
+    console.log("Fetching projects...");
     const { data: projects, error: projError } = await supabase
       .from("projects")
-      .select("*")
+      .select(`
+        id,
+        name,
+        client_company_id,
+        status,
+        agreed_fee_value,
+        start_date,
+        end_date,
+        opportunity_reference,
+        project_reference,
+        po_number,
+        added_by_user_id,
+        created_at,
+        archived,
+        archived_reason
+      `)
       .order("created_at", { ascending: false });
 
     if (projError) {
-      console.error("Projects fetch error:", projError);
+      console.error("Projects error:", projError);
       throw projError;
     }
 
-    // Fetch companies
-    const { data: companies, error: compError } = await supabase
-      .from("companies")
-      .select("id, name, short_name, sector, status");
+    console.log(`Found ${projects?.length || 0} projects`);
 
-    if (compError) {
-      console.error("Companies fetch error:", compError);
-      throw compError;
+    // Get unique company IDs
+    const companyIds = new Set<string>();
+    opportunities?.forEach(o => o.company_id && companyIds.add(o.company_id));
+    projects?.forEach(p => p.client_company_id && companyIds.add(p.client_company_id));
+
+    // Get unique contact IDs
+    const contactIds = new Set<string>();
+    opportunities?.forEach(o => o.contact_id && contactIds.add(o.contact_id));
+
+    // Get unique user IDs
+    const userIds = new Set<string>();
+    opportunities?.forEach(o => o.added_by_user_id && userIds.add(o.added_by_user_id));
+    projects?.forEach(p => p.added_by_user_id && userIds.add(p.added_by_user_id));
+
+    // Fetch companies
+    let companies: any[] = [];
+    if (companyIds.size > 0) {
+      const { data, error } = await supabase
+        .from("companies")
+        .select("id, name, short_name, sector, status")
+        .in("id", Array.from(companyIds));
+      
+      if (error) {
+        console.error("Companies error:", error);
+      } else {
+        companies = data || [];
+      }
     }
 
     // Fetch contacts
-    const { data: contacts, error: contError } = await supabase
-      .from("contacts")
-      .select("id, name, email, phone, job_title");
-
-    if (contError) {
-      console.error("Contacts fetch error:", contError);
-      throw contError;
+    let contacts: any[] = [];
+    if (contactIds.size > 0) {
+      const { data, error } = await supabase
+        .from("contacts")
+        .select("id, name, email, phone, job_title")
+        .in("id", Array.from(contactIds));
+      
+      if (error) {
+        console.error("Contacts error:", error);
+      } else {
+        contacts = data || [];
+      }
     }
 
     // Fetch users
-    const { data: users, error: usersError } = await supabase
-      .from("users")
-      .select("id, full_name, email");
-
-    if (usersError) {
-      console.error("Users fetch error:", usersError);
+    let users: any[] = [];
+    if (userIds.size > 0) {
+      const { data, error } = await supabase
+        .from("users")
+        .select("id, full_name, email")
+        .in("id", Array.from(userIds));
+      
+      if (error) {
+        console.error("Users error:", error);
+      } else {
+        users = data || [];
+      }
     }
 
     // Create lookup maps
-    const companyMap = new Map(companies?.map(c => [c.id, c]) || []);
-    const contactMap = new Map(contacts?.map(c => [c.id, c]) || []);
-    const userMap = new Map(users?.map(u => [u.id, u]) || []);
+    const companyMap = new Map(companies.map(c => [c.id, c]));
+    const contactMap = new Map(contacts.map(c => [c.id, c]));
+    const userMap = new Map(users.map(u => [u.id, u]));
+
+    console.log(`Loaded ${companies.length} companies, ${contacts.length} contacts, ${users.length} users`);
 
     // Build CSV content
     const csvRows: string[] = [];
@@ -181,6 +252,8 @@ export default async function handler(
       ].map(escapeCSV).join(","));
     });
 
+    console.log(`Generated ${csvRows.length} total rows (including header)`);
+
     const csv = csvRows.join("\n");
     const timestamp = new Date().toISOString().split("T")[0];
     const filename = `projects-summary-${timestamp}.csv`;
@@ -193,7 +266,8 @@ export default async function handler(
     console.error("Error generating report:", error);
     res.status(500).json({ 
       error: "Failed to generate report",
-      details: error instanceof Error ? error.message : "Unknown error"
+      details: error instanceof Error ? error.message : "Unknown error",
+      stack: error instanceof Error ? error.stack : undefined
     });
   }
 }
