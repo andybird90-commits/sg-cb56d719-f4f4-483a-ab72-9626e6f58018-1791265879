@@ -1,11 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 function escapeCSV(value: any): string {
   if (value === null || value === undefined) return "";
   const stringValue = String(value);
@@ -13,6 +8,11 @@ function escapeCSV(value: any): string {
     return `"${stringValue.replace(/"/g, '""')}"`;
   }
   return stringValue;
+}
+
+function formatGBP(value: number | null | undefined): string {
+  if (!value) return "";
+  return `£${value.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export default async function handler(
@@ -24,84 +24,70 @@ export default async function handler(
   }
 
   try {
-    // Fetch all opportunities with company data
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error("Missing Supabase configuration");
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Fetch opportunities
     const { data: opportunities, error: oppError } = await supabase
       .from("opportunities")
-      .select(`
-        id,
-        name,
-        description,
-        stage,
-        status,
-        expected_fee_value,
-        probability_percent,
-        tender_due_date,
-        tender_received_date,
-        submitted_date,
-        expected_start_date,
-        expected_end_date,
-        enquiry_number,
-        project_reference,
-        created_at,
-        archived,
-        archived_reason,
-        companies:company_id (
-          name,
-          short_name,
-          sector,
-          status
-        ),
-        contacts:contact_id (
-          name,
-          email,
-          phone,
-          job_title
-        ),
-        added_by:added_by_user_id (
-          full_name,
-          email
-        )
-      `)
+      .select("*")
       .order("created_at", { ascending: false });
 
-    if (oppError) throw oppError;
+    if (oppError) {
+      console.error("Opportunities fetch error:", oppError);
+      throw oppError;
+    }
 
-    // Fetch all projects with company data
+    // Fetch projects
     const { data: projects, error: projError } = await supabase
       .from("projects")
-      .select(`
-        id,
-        code,
-        name,
-        status,
-        agreed_fee_value,
-        start_date,
-        end_date,
-        po_number,
-        project_reference,
-        opportunity_reference,
-        created_at,
-        archived,
-        archived_reason,
-        companies:client_company_id (
-          name,
-          short_name,
-          sector,
-          status
-        ),
-        opportunities:opportunity_id (
-          enquiry_number,
-          stage,
-          expected_fee_value
-        ),
-        added_by:added_by_user_id (
-          full_name,
-          email
-        )
-      `)
+      .select("*")
       .order("created_at", { ascending: false });
 
-    if (projError) throw projError;
+    if (projError) {
+      console.error("Projects fetch error:", projError);
+      throw projError;
+    }
+
+    // Fetch companies
+    const { data: companies, error: compError } = await supabase
+      .from("companies")
+      .select("id, name, short_name, sector, status");
+
+    if (compError) {
+      console.error("Companies fetch error:", compError);
+      throw compError;
+    }
+
+    // Fetch contacts
+    const { data: contacts, error: contError } = await supabase
+      .from("contacts")
+      .select("id, name, email, phone, job_title");
+
+    if (contError) {
+      console.error("Contacts fetch error:", contError);
+      throw contError;
+    }
+
+    // Fetch users
+    const { data: users, error: usersError } = await supabase
+      .from("users")
+      .select("id, full_name, email");
+
+    if (usersError) {
+      console.error("Users fetch error:", usersError);
+    }
+
+    // Create lookup maps
+    const companyMap = new Map(companies?.map(c => [c.id, c]) || []);
+    const contactMap = new Map(contacts?.map(c => [c.id, c]) || []);
+    const userMap = new Map(users?.map(u => [u.id, u]) || []);
 
     // Build CSV content
     const csvRows: string[] = [];
@@ -114,7 +100,7 @@ export default async function handler(
       "Client",
       "Client Sector",
       "Status/Stage",
-      "Expected/Agreed Fee (£)",
+      "Expected/Agreed Fee",
       "Probability %",
       "Tender Due Date",
       "Tender Received",
@@ -134,14 +120,18 @@ export default async function handler(
 
     // Add opportunity rows
     opportunities?.forEach((opp: any) => {
+      const company = companyMap.get(opp.company_id);
+      const contact = contactMap.get(opp.contact_id);
+      const addedBy = userMap.get(opp.added_by_user_id);
+
       csvRows.push([
         "Opportunity",
-        opp.id,
-        opp.name,
-        opp.companies?.name || "",
-        opp.companies?.sector || "",
-        opp.stage,
-        opp.expected_fee_value || "",
+        opp.id || "",
+        opp.name || "",
+        company?.name || "",
+        company?.sector || "",
+        opp.stage || "",
+        opp.expected_fee_value ? formatGBP(opp.expected_fee_value) : "",
         opp.probability_percent || "",
         opp.tender_due_date || "",
         opp.tender_received_date || "",
@@ -151,10 +141,10 @@ export default async function handler(
         opp.enquiry_number || "",
         opp.project_reference || "",
         "",
-        opp.contacts?.name || "",
-        opp.contacts?.email || "",
-        opp.added_by?.full_name || "",
-        opp.created_at ? new Date(opp.created_at).toLocaleDateString() : "",
+        contact?.name || "",
+        contact?.email || "",
+        addedBy?.full_name || "",
+        opp.created_at ? new Date(opp.created_at).toLocaleDateString("en-GB") : "",
         opp.archived ? "Yes" : "No",
         opp.archived_reason || ""
       ].map(escapeCSV).join(","));
@@ -162,27 +152,30 @@ export default async function handler(
 
     // Add project rows
     projects?.forEach((proj: any) => {
+      const company = companyMap.get(proj.client_company_id);
+      const addedBy = userMap.get(proj.added_by_user_id);
+
       csvRows.push([
         "Project",
-        proj.id,
-        proj.name,
-        proj.companies?.name || "",
-        proj.companies?.sector || "",
-        proj.status,
-        proj.agreed_fee_value || "",
+        proj.id || "",
+        proj.name || "",
+        company?.name || "",
+        company?.sector || "",
+        proj.status || "",
+        proj.agreed_fee_value ? formatGBP(proj.agreed_fee_value) : "",
         "",
         "",
         "",
         "",
         proj.start_date || "",
         proj.end_date || "",
-        proj.opportunities?.enquiry_number || "",
+        proj.opportunity_reference || "",
         proj.project_reference || "",
         proj.po_number || "",
         "",
         "",
-        proj.added_by?.full_name || "",
-        proj.created_at ? new Date(proj.created_at).toLocaleDateString() : "",
+        addedBy?.full_name || "",
+        proj.created_at ? new Date(proj.created_at).toLocaleDateString("en-GB") : "",
         proj.archived ? "Yes" : "No",
         proj.archived_reason || ""
       ].map(escapeCSV).join(","));
@@ -192,7 +185,7 @@ export default async function handler(
     const timestamp = new Date().toISOString().split("T")[0];
     const filename = `projects-summary-${timestamp}.csv`;
 
-    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.status(200).send(csv);
 
