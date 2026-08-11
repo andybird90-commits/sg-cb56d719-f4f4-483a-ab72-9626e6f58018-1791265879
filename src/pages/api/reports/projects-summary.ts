@@ -25,14 +25,21 @@ export default async function handler(
 
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-    if (!supabaseUrl || !supabaseServiceKey) {
+    if (!supabaseUrl || !supabaseAnonKey) {
       throw new Error("Missing Supabase configuration");
     }
 
-    // Use service role key to bypass RLS
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Get auth token from request
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.replace("Bearer ", "");
+
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      }
+    });
 
     console.log("Fetching opportunities...");
     const { data: opportunities, error: oppError } = await supabase

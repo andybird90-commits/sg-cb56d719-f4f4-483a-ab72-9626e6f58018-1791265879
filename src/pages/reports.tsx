@@ -4,15 +4,33 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Download, FileText, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase";
 
 export default function ReportsPage() {
   const [downloading, setDownloading] = useState(false);
   const { toast } = useToast();
 
   const downloadProjectsSummary = async () => {
-    setDownloading(true);
     try {
-      const response = await fetch("/api/reports/projects-summary");
+      setDownloading(true);
+
+      // Get current session token
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast({
+          title: "Authentication required",
+          description: "Please log in to download reports",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const response = await fetch("/api/reports/projects-summary", {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
+      });
       
       if (!response.ok) {
         throw new Error("Failed to generate report");
@@ -30,14 +48,14 @@ export default function ReportsPage() {
 
       toast({
         title: "Download complete",
-        description: "Projects summary has been downloaded successfully.",
+        description: "Projects summary downloaded successfully"
       });
     } catch (error) {
       console.error("Download error:", error);
       toast({
         title: "Download failed",
-        description: "There was an error downloading the report.",
-        variant: "destructive",
+        description: error instanceof Error ? error.message : "Failed to download report",
+        variant: "destructive"
       });
     } finally {
       setDownloading(false);
